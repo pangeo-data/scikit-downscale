@@ -37,62 +37,52 @@ import numpy as np
 import xarray as xr
 import xesmf as xe
 
-from storylines.tools import plotting_positions
+from .quantile_mapping import quantile_mapping_by_group
+
 
 BUFFER = 0.5
 
 
-class Qmap(object):
-
-    def __init__(self, **kwargs):
-        pass
-
-    def _cdf(self, obj):
-        axis = obj.get_axis_num('time')
-        dims = list(obj.dims)
-        dims[axis] = 'quantile'
-        n_quantiles = obj.shape[axis]
-        coords = obj.coords
-        coords['quantile'] = plotting_positions(n_quantiles)
-        del coords['time']
-
-        return xr.DataArray(np.sort(obj.values, axis=axis),
-                            dims=dims, coords=coords)
-
-    def fit(self, train, target):
-
-        self.train_cdf = self._cdf(train)
-        self.target_cdf = self._cdf(target)
-
-    def predict(self, predict):
-
-        self
-
-
 def get_bounds(ds):
-    return {'lat', (ds['lat'].values.min(), ds['lat'].values.max()),
-            'lon', (ds['lon'].values.min(), ds['lon'].values.max())}
+	return {'lat': (ds['lat'].values.min(), ds['lat'].values.max()),
+			'lon': (ds['lon'].values.min(), ds['lon'].values.max())}
 
 
 def make_course_grid(bounds, step=1.0):
-    ds = xr.Dataset({'lat': (['lat'], np.linspace(bounds['lat'][0] - BUFFER,
+    ds = xr.Dataset({'lat': (['lat'], np.arange(bounds['lat'][0] - BUFFER,
                                                   bounds['lat'][1] + BUFFER,
                                                   step)),
-                     'lon': (['lon'], np.linspace(bounds['lon'][0] - BUFFER,
+                     'lon': (['lon'], np.arange(bounds['lon'][0] - BUFFER,
                                                   bounds['lon'][1] + BUFFER,
                                                   step))})
     return ds
 
 
+def make_source_grid(obj):
+    
+    lon_step = np.diff(obj.lon.values[:2])[0]
+    lat_step = np.diff(obj.lat.values[:2])[0]
+    
+    obj.coords['lon_b'] = ('x_b', np.append(obj.lon.values - 0.5*lon_step, obj.lon.values[-1] + 0.5*lon_step))
+    obj.coords['lat_b'] = ('y_b', np.append(obj.lat.values - 0.5*lat_step, obj.lat.values[-1] + 0.5*lat_step))
+    return obj
+
+
+
 def bcsd(da_obs, da_train, da_predict, var='precip'):
+
+    da_obs = make_source_grid(da_obs)
+    da_train = make_source_grid(da_train)
+    da_predict = make_source_grid(da_predict)
 
     # regrid to common course grid
     bounds = get_bounds(da_obs)
-    course_grid = make_course_grid(bounds)
-    regridder = xe.Regridder(da_obs, course_grid, 'conservative')
+    course_grid = course_grid = xe.util.grid_2d(*bounds['lon'], 1, *bounds['lat'], 1)
+    regridder = xe.Regridder(da_obs, course_grid, 'bilinear')
     da_obs_regrid = regridder(da_obs)
 
-    regridder = xe.Regridder(da_train, course_grid, 'conservative')
+    
+    regridder = xe.Regridder(da_train, course_grid, 'bilinear')
     da_train_regrid = regridder(da_train)
     da_predict_regrid = regridder(da_predict)
 
@@ -101,17 +91,11 @@ def bcsd(da_obs, da_train, da_predict, var='precip'):
         'time.month').mean(dim='time')
 
     if var == 'precip':
-        # Calc CDFs
-        # sort op
-        # calc quantiles (x values)
-        # do this for all three datasets
-        # TODO: figure out extrapolation
-        qmap = Qmap()
-        qmap.fit(da_train_regrid, da_obs_regrid)
-
-        # Bias correction
+		# Bias correction
         # apply quantile mapping
-        da_predict_regrid_qm = qmap.predict(da_predict_regrid)
+		
+        da_predict_regrid_qm = quantile_mapping_by_group(da_predict_regrid, da_train_regrid, da_obs_regrid,
+				                                         grouper='time.month')
 
         da_predict_regrid_anoms = da_predict_regrid_qm.groupby('time.month') / da_train_regrid_mean
     else:
@@ -119,10 +103,14 @@ def bcsd(da_obs, da_train, da_predict, var='precip'):
         da_predict_regrid_run = da_predict_regrid.groupby('time.month').rolling(time='9Y', center=True).mean('time')
         da_predict_changes = da_predict_regrid - da_predict_regrid_run
         qmap = Qmap(da_train_regrid, da_obs)
-        da_predict_regrid_qm = qmap.predict(da_predict_changes)
+
+        da_predict_regrid_qm = quantile_mapping_by_group(da_predict, da_train, da_obs,
+				                                                         grouper='time.month')
 
         da_predict_regrid_qm_mean = da_predict_regrid_run + da_predict_regrid_qm
         # calc anoms (difference)
+
+		da_predict_regrid_anoms = da_predict_regrid_qm - da_predict_regrid_qm_mean
 
     # regrid to obs grid
     regridder = xe.Regridder(da_predict_regrid_anoms, da_obs, 'bilinear')
