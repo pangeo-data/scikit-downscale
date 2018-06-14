@@ -44,33 +44,35 @@ BUFFER = 0.5
 
 
 def get_bounds(ds):
-	return {'lat': (ds['lat'].values.min(), ds['lat'].values.max()),
-			'lon': (ds['lon'].values.min(), ds['lon'].values.max())}
+    return {'lat': (ds['lat'].values.min(), ds['lat'].values.max()),
+            'lon': (ds['lon'].values.min(), ds['lon'].values.max())}
 
 
 def make_course_grid(bounds, step=1.0):
     ds = xr.Dataset({'lat': (['lat'], np.arange(bounds['lat'][0] - BUFFER,
-                                                  bounds['lat'][1] + BUFFER,
-                                                  step)),
+                                                bounds['lat'][1] + BUFFER,
+                                                step)),
                      'lon': (['lon'], np.arange(bounds['lon'][0] - BUFFER,
-                                                  bounds['lon'][1] + BUFFER,
-                                                  step))})
+                                                bounds['lon'][1] + BUFFER,
+                                                step))})
     return ds
 
 
 def make_source_grid(obj):
-    
+
     lon_step = np.diff(obj.lon.values[:2])[0]
     lat_step = np.diff(obj.lat.values[:2])[0]
-    
-    obj.coords['lon_b'] = ('x_b', np.append(obj.lon.values - 0.5*lon_step, obj.lon.values[-1] + 0.5*lon_step))
-    obj.coords['lat_b'] = ('y_b', np.append(obj.lat.values - 0.5*lat_step, obj.lat.values[-1] + 0.5*lat_step))
+
+    obj.coords['lon_b'] = ('x_b', np.append(obj.lon.values - 0.5*lon_step,
+                           obj.lon.values[-1] + 0.5*lon_step))
+    obj.coords['lat_b'] = ('y_b', np.append(obj.lat.values - 0.5*lat_step,
+                           obj.lat.values[-1] + 0.5*lat_step))
     return obj
 
 
+def bcsd(da_obs, da_train, da_predict, var='pr'):
 
-def bcsd(da_obs, da_train, da_predict, var='precip'):
-
+    # add grid information to input arrays
     da_obs = make_source_grid(da_obs)
     da_train = make_source_grid(da_train)
     da_predict = make_source_grid(da_predict)
@@ -81,7 +83,7 @@ def bcsd(da_obs, da_train, da_predict, var='precip'):
     regridder = xe.Regridder(da_obs, course_grid, 'bilinear')
     da_obs_regrid = regridder(da_obs)
 
-    
+    # regrid training/predict data to common grid
     regridder = xe.Regridder(da_train, course_grid, 'bilinear')
     da_train_regrid = regridder(da_train)
     da_predict_regrid = regridder(da_predict)
@@ -90,49 +92,52 @@ def bcsd(da_obs, da_train, da_predict, var='precip'):
     da_train_regrid_mean = da_train_regrid.groupby(
         'time.month').mean(dim='time')
 
-    if var == 'precip':
-		# Bias correction
+    if var == 'pr':
+        # Bias correction
         # apply quantile mapping
-		
-        da_predict_regrid_qm = quantile_mapping_by_group(da_predict_regrid, da_train_regrid, da_obs_regrid,
-				                                         grouper='time.month')
+        da_predict_regrid_qm = quantile_mapping_by_group(
+            da_predict_regrid, da_train_regrid, da_obs_regrid,
+            grouper='time.month')
 
         da_predict_regrid_anoms = da_predict_regrid_qm.groupby('time.month') / da_train_regrid_mean
     else:
         # don't do this for training period? check with andy
-        da_predict_regrid_run = da_predict_regrid.groupby('time.month').rolling(time='9Y', center=True).mean('time')
+        da_predict_regrid_run = da_predict_regrid.groupby(
+            'time.month').rolling(time='9Y', center=True).mean('time')
+        # what do we do with these?
         da_predict_changes = da_predict_regrid - da_predict_regrid_run
-        qmap = Qmap(da_train_regrid, da_obs)
 
-        da_predict_regrid_qm = quantile_mapping_by_group(da_predict, da_train, da_obs,
-				                                                         grouper='time.month')
+        da_predict_regrid_qm = quantile_mapping_by_group(
+            da_predict_regrid, da_train_regrid, da_obs_regrid,
+            grouper='time.month')
 
         da_predict_regrid_qm_mean = da_predict_regrid_run + da_predict_regrid_qm
         # calc anoms (difference)
 
-		da_predict_regrid_anoms = da_predict_regrid_qm - da_predict_regrid_qm_mean
+    da_predict_regrid_anoms = da_predict_regrid_qm - da_predict_regrid_qm_mean
 
     # regrid to obs grid
     regridder = xe.Regridder(da_predict_regrid_anoms, da_obs, 'bilinear')
     out_regrid = regridder(da_predict_regrid_anoms)
 
+    # return regridded anomalies
     return out_regrid
 
 
 def main():
 
-    obs_fname = ''
-    train_fname = ''
-    predict_fname = ''
+    obs_fname = '/glade/u/home/jhamman/workdir/GARD_inputs/newman_ensemble/conus_ens_004.nc'
+    train_fname = '/glade/p/ral/RHAP/gutmann/cmip/daily/CNRM-CERFACS/CNRM-CM5/historical/day/atmos/day/r1i1p1/latest/pr/*nc'
+    predict_fname = '/glade/p/ral/RHAP/gutmann/cmip/daily/CNRM-CERFACS/CNRM-CM5/rcp45/day/atmos/day/r1i1p1/latest/pr/*nc'
     var = 'pr'
 
     # get variables from the obs/training/prediction datasets
     da_obs_daily = xr.open_mfdataset(obs_fname)[var]
-    da_obs = da_obs_daily.resample(time='MS').mean('time')
+    da_obs = da_obs_daily.resample(time='MS').mean('time').load()
     da_train = xr.open_mfdataset(train_fname)[var].resample(
-        time='MS').mean('time')
+        time='MS').mean('time').load()
     da_predict = xr.open_mfdataset(predict_fname)[var].resample(
-        time='MS').mean('time')
+        time='MS').mean('time').load()
 
     bcsd(da_obs, da_train, da_predict, var=var)
 
