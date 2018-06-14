@@ -1,14 +1,11 @@
 #!/usr/bin/env python
 
-from os.path import exists
-from setuptools import setup
-import toolz
+from distutils.core import setup
 
 setup(name='xsd',
-      version='0.0.1',
-      description='',
-      url='',
-      license='BSD',
-      packages=['xsd'],
-      long_description=(open('README.md').read() if exists('README.md') else ''),
-      zip_safe=False)
+      version='0.0.0',
+      description='Statistical downscaling extension for xarray',
+      author='Joe Hamman',
+      author_email='jhamman@ucar.edu',
+      url='https://github.com/jhamman/xsd',
+      packages=['xsd'])
