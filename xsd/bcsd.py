@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+''' Bias Correction and Statistical Downscaling (BCSD) method'''
 
 # 1. set list of models to use -- will these be the same 97 as in the CONUS
 # dataset?  if using new ones, need to make sure that there are both
@@ -40,26 +42,20 @@ import xesmf as xe
 from .quantile_mapping import quantile_mapping_by_group
 
 
-BUFFER = 0.5
+def get_bounds(obj, lat_var='lat', lon_var='lon'):
+    ''' Determine the latitude and longitude bounds of a xarray object'''
+    return {'lat': (obj[lat_var].values.min(), obj[lat_var].values.max()),
+            'lon': (obj[lon_var].values.min(), obj[lon_var].values.max())}
 
 
-def get_bounds(ds):
-    return {'lat': (ds['lat'].values.min(), ds['lat'].values.max()),
-            'lon': (ds['lon'].values.min(), ds['lon'].values.max())}
+def _make_source_grid(obj):
+    ''' Add longitude and latitude bounds to an xarray object
 
-
-def make_course_grid(bounds, step=1.0):
-    ds = xr.Dataset({'lat': (['lat'], np.arange(bounds['lat'][0] - BUFFER,
-                                                bounds['lat'][1] + BUFFER,
-                                                step)),
-                     'lon': (['lon'], np.arange(bounds['lon'][0] - BUFFER,
-                                                bounds['lon'][1] + BUFFER,
-                                                step))})
-    return ds
-
-
-def make_source_grid(obj):
-
+    Note
+    ----
+    This function is only valid if the object is already on a regular lat/lon
+    grid.
+    '''
     lon_step = np.diff(obj.lon.values[:2])[0]
     lat_step = np.diff(obj.lat.values[:2])[0]
 
@@ -70,55 +66,94 @@ def make_source_grid(obj):
     return obj
 
 
-def bcsd(da_obs, da_train, da_predict, var='pr'):
+def _running_mean(obj, **kwargs):
+    '''helper function to apply rolling mean to groupby object'''
+    return obj.rolling(**kwargs).mean()
 
-    # add grid information to input arrays
-    da_obs = make_source_grid(da_obs)
-    da_train = make_source_grid(da_train)
-    da_predict = make_source_grid(da_predict)
+
+def _regrid_to(dest, method='bilinear', *objs):
+    ''' helper function to handle regridding a batch of objects to a common
+    grid
+    '''
+    out = []
+    for obj in objs:
+        obj = _make_source_grid(obj)  # add grid info if needed
+        regridder = xe.Regridder(obj, dest, method)  # construct the regridder
+        out.append(regridder(obj))  # do the regrid op
+    return out
+
+
+def bcsd(da_obs, da_train, da_predict, var='pr'):
+    ''' Apply the Bias Correction and Statistical Downscaling (BCSD) method.
+
+    Parameters
+    ----------
+    da_obs : xr.DataArray
+        Array representing the observed (truth) values.
+    da_train : xr.DataArray
+        Array representing the training data.
+    da_predict : xr.DataArray
+        Array representing the prediction data to be corrected using the BCSD
+        method.
+    var : str
+        Variable name triggering particular treatment of some variables. Valid
+        options include {'pr', 'tmin', 'tmax', 'trange', 'tavg'}.
+
+    Returns
+    -------
+    out_regrid : xr.DataArray
+        Anomalies on the same grid as ``da_obs``.
+    '''
 
     # regrid to common course grid
     bounds = get_bounds(da_obs)
-    course_grid = course_grid = xe.util.grid_2d(*bounds['lon'], 1, *bounds['lat'], 1)
-    regridder = xe.Regridder(da_obs, course_grid, 'bilinear')
-    da_obs_regrid = regridder(da_obs)
+    course_grid = xe.util.grid_2d(*bounds['lon'], 1, *bounds['lat'], 1)
+    da_obs_regrid, da_train_regrid, da_predict_regrid = _regrid_to(
+        course_grid, da_obs, da_train, da_predict)
 
-    # regrid training/predict data to common grid
-    regridder = xe.Regridder(da_train, course_grid, 'bilinear')
-    da_train_regrid = regridder(da_train)
-    da_predict_regrid = regridder(da_predict)
-
-    # Calc means for train/paedict
+    # Calc mean climatology for training data
     da_train_regrid_mean = da_train_regrid.groupby(
         'time.month').mean(dim='time')
 
     if var == 'pr':
         # Bias correction
-        # apply quantile mapping
+        # apply quantile mapping by month
         da_predict_regrid_qm = quantile_mapping_by_group(
             da_predict_regrid, da_train_regrid, da_obs_regrid,
             grouper='time.month')
 
-        da_predict_regrid_anoms = da_predict_regrid_qm.groupby('time.month') / da_train_regrid_mean
+        # calculate the amonalies as a ratio of the training data
+        # again, this is done month-by-month
+        da_predict_regrid_anoms = (da_predict_regrid_qm.groupby('time.month')
+                                   / da_train_regrid_mean)
     else:
-        # don't do this for training period? check with andy
-        da_predict_regrid_run = da_predict_regrid.groupby(
-            'time.month').rolling(time='9Y', center=True).mean('time')
-        # what do we do with these?
-        da_predict_changes = da_predict_regrid - da_predict_regrid_run
+        # Calculate the 9-year running mean for each month
+        # Q: don't do this for training period? check with andy
+        da_predict_regrid_rolling_mean = da_predict_regrid.groupby(
+            'time.month').apply(_running_mean, time=9, center=True,
+                                min_periods=1)
 
+        # Calculate the anomalies relative to each 9-year window
+        da_predict_anoms = da_predict_regrid - da_predict_regrid_rolling_mean
+
+        # Bias correction
+        # apply quantile mapping by month
         da_predict_regrid_qm = quantile_mapping_by_group(
             da_predict_regrid, da_train_regrid, da_obs_regrid,
             grouper='time.month')
 
-        da_predict_regrid_qm_mean = da_predict_regrid_run + da_predict_regrid_qm
         # calc anoms (difference)
+        # this is obviously not what we want
+        da_predict_regrid_qm_mean = (da_predict_regrid_rolling_mean
+                                     + da_predict_regrid_qm)
 
-    da_predict_regrid_anoms = da_predict_regrid_qm - da_predict_regrid_qm_mean
+        # this is obviously not what we want
+        da_predict_regrid_anoms = (da_predict_regrid_qm -
+                                   da_predict_regrid_qm_mean)
 
     # regrid to obs grid
-    regridder = xe.Regridder(da_predict_regrid_anoms, da_obs, 'bilinear')
-    out_regrid = regridder(da_predict_regrid_anoms)
+    out_regrid, = _regrid_to(da_obs, da_predict_regrid_anoms,
+                             method='bilinear')
 
     # return regridded anomalies
     return out_regrid
@@ -129,17 +164,23 @@ def main():
     obs_fname = '/glade/u/home/jhamman/workdir/GARD_inputs/newman_ensemble/conus_ens_004.nc'
     train_fname = '/glade/p/ral/RHAP/gutmann/cmip/daily/CNRM-CERFACS/CNRM-CM5/historical/day/atmos/day/r1i1p1/latest/pr/*nc'
     predict_fname = '/glade/p/ral/RHAP/gutmann/cmip/daily/CNRM-CERFACS/CNRM-CM5/rcp45/day/atmos/day/r1i1p1/latest/pr/*nc'
-    var = 'pr'
 
-    # get variables from the obs/training/prediction datasets
-    da_obs_daily = xr.open_mfdataset(obs_fname)[var]
-    da_obs = da_obs_daily.resample(time='MS').mean('time').load()
-    da_train = xr.open_mfdataset(train_fname)[var].resample(
-        time='MS').mean('time').load()
-    da_predict = xr.open_mfdataset(predict_fname)[var].resample(
-        time='MS').mean('time').load()
+    out = xr.Dataset()
+    for var in ['pr']:
 
-    bcsd(da_obs, da_train, da_predict, var=var)
+        # get variables from the obs/training/prediction datasets
+        da_obs_daily = xr.open_mfdataset(obs_fname)[var]
+        da_obs = da_obs_daily.resample(time='MS').mean('time').load()
+        da_train = xr.open_mfdataset(train_fname)[var].resample(
+            time='MS').mean('time').load()
+        da_predict = xr.open_mfdataset(predict_fname)[var].resample(
+            time='MS').mean('time').load()
+
+        out[var] = bcsd(da_obs, da_train, da_predict, var=var)
+
+    out_file = './test.nc'
+    print('writing outfile %s' % out_file)
+    out.to_netcdf(out_file)
 
 
 if __name__ == '__main__':
