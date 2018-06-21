@@ -23,17 +23,12 @@
 # multiplicative anomalies relative to the historical climo mean.  Finally
 # interpolate anomalies to target forcing resolution.
 #
-# 7.  calculate running mean temperature increase for model projections, save,
+# 7.  calculate running mean temperature shift for model projections, save,
 # and subtract from model projections.
 #
 # 8.  BC projection temperatures after mean shift removal, then add back the
 # mean shift.  Calculate additive anomalies relative to historical climo mean
 # and interpolate to target forcing resolution.
-#
-# And that's it.  From there the other other scripts could handle the daily
-# disag to get the final forcings.  I probably should have stuck that all in a
-# 1 pager, sorry -- mainly I just though it would be good to be clear on the
-# steps if we're thinking of going for gold with xarray.
 
 import numpy as np
 import xarray as xr
@@ -101,62 +96,68 @@ def bcsd(da_obs, da_train, da_predict, var='pr'):
 
     Returns
     -------
-    out_regrid : xr.DataArray
+    out_coarse : xr.DataArray
         Anomalies on the same grid as ``da_obs``.
     '''
 
-    # regrid to common course grid
+    # regrid to common coarse grid
     bounds = get_bounds(da_obs)
-    course_grid = xe.util.grid_2d(*bounds['lon'], 1, *bounds['lat'], 1)
-    da_obs_regrid, da_train_regrid, da_predict_regrid = _regrid_to(
-        course_grid, da_obs, da_train, da_predict)
+    coarse_grid = xe.util.grid_2d(*bounds['lon'], 1, *bounds['lat'], 1)
+    da_obs_coarse, da_train_coarse, da_predict_coarse = _regrid_to(
+        coarse_grid, da_obs, da_train, da_predict)
 
-    # Calc mean climatology for training data
-    da_train_regrid_mean = da_train_regrid.groupby(
-        'time.month').mean(dim='time')
+    # Calc mean climatology for obs data
+    da_obs_coarse_mean = da_obs_coarse.groupby('time.month').mean(dim='time')
 
     if var == 'pr':
         # Bias correction
         # apply quantile mapping by month
-        da_predict_regrid_qm = quantile_mapping_by_group(
-            da_predict_regrid, da_train_regrid, da_obs_regrid,
+        da_predict_coarse_qm = quantile_mapping_by_group(
+            da_predict_coarse, da_train_coarse, da_obs_coarse,
             grouper='time.month')
 
         # calculate the amonalies as a ratio of the training data
         # again, this is done month-by-month
-        da_predict_regrid_anoms = (da_predict_regrid_qm.groupby('time.month')
-                                   / da_train_regrid_mean)
+        if (da_obs_coarse_mean.min('time') <= 0).any():
+            raise ValueError('Invalid value in observed climatology')
+        da_predict_coarse_anoms = (da_predict_coarse_qm.groupby('time.month')
+                                   / da_obs_coarse_mean)
     else:
+        train_mean_regrid = da_train_coarse.groupby(
+            'time.month').mean(dim='time')
+
         # Calculate the 9-year running mean for each month
-        # Q: don't do this for training period? check with andy
-        da_predict_regrid_rolling_mean = da_predict_regrid.groupby(
+        da_predict_coarse_rolling_mean = da_predict_coarse.groupby(
             'time.month').apply(_running_mean, time=9, center=True,
                                 min_periods=1)
 
-        # Calculate the anomalies relative to each 9-year window
-        da_predict_anoms = da_predict_regrid - da_predict_regrid_rolling_mean
+        # calc shift
+        da_predict_coarse_shift = da_predict_coarse_rolling_mean.groupby(
+            'time.month') - train_mean_regrid
+
+        # remove shift
+        da_predict_coarse_no_shift = (da_predict_coarse
+                                      - da_predict_coarse_shift)
 
         # Bias correction
         # apply quantile mapping by month
-        da_predict_regrid_qm = quantile_mapping_by_group(
-            da_predict_regrid, da_train_regrid, da_obs_regrid,
+        da_predict_coarse_qm = quantile_mapping_by_group(
+            da_predict_coarse_no_shift, da_train_coarse, da_obs_coarse,
             grouper='time.month')
 
-        # calc anoms (difference)
-        # this is obviously not what we want
-        da_predict_regrid_qm_mean = (da_predict_regrid_rolling_mean
-                                     + da_predict_regrid_qm)
+        # restore the shift
+        da_predict_qm_w_shift = da_predict_coarse_qm + da_predict_coarse_shift
 
-        # this is obviously not what we want
-        da_predict_regrid_anoms = (da_predict_regrid_qm -
-                                   da_predict_regrid_qm_mean)
+        # calc anoms (difference)
+        da_predict_coarse_anoms = (da_predict_qm_w_shift.groupby('time.month')
+                                   - da_obs_coarse_mean)
 
     # regrid to obs grid
-    out_regrid, = _regrid_to(da_obs, da_predict_regrid_anoms,
+    out_coarse, = _regrid_to(da_obs, da_predict_coarse_anoms,
                              method='bilinear')
 
     # return regridded anomalies
-    return out_regrid
+    return out_coarse
 
 
 def main():
