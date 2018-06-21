@@ -30,6 +30,10 @@
 # mean shift.  Calculate additive anomalies relative to historical climo mean
 # and interpolate to target forcing resolution.
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import numpy as np
 import xarray as xr
 import xesmf as xe
@@ -51,13 +55,19 @@ def _make_source_grid(obj):
     This function is only valid if the object is already on a regular lat/lon
     grid.
     '''
-    lon_step = np.diff(obj.lon.values[:2])[0]
-    lat_step = np.diff(obj.lat.values[:2])[0]
 
-    obj.coords['lon_b'] = ('x_b', np.append(obj.lon.values - 0.5*lon_step,
-                           obj.lon.values[-1] + 0.5*lon_step))
-    obj.coords['lat_b'] = ('y_b', np.append(obj.lat.values - 0.5*lat_step,
-                           obj.lat.values[-1] + 0.5*lat_step))
+    if obj['lon'].ndim == 2:
+        return obj
+
+    lon_step = np.diff(obj['lon'].values[:2])[0]
+    lat_step = np.diff(obj['lat'].values[:2])[0]
+
+    lon_bounds = np.append(obj['lon'].values - 0.5*lon_step,
+                           obj['lon'].values[-1] + 0.5*lon_step)
+    obj.coords['lon_b'] = ('x_b', lon_bounds)
+    lat_bounds = np.append(obj['lat'].values - 0.5*lat_step,
+                           obj['lat'].values[-1] + 0.5*lat_step)
+    obj.coords['lat_b'] = ('y_b', lat_bounds)
     return obj
 
 
@@ -66,14 +76,21 @@ def _running_mean(obj, **kwargs):
     return obj.rolling(**kwargs).mean()
 
 
-def _regrid_to(dest, method='bilinear', *objs):
+def _regrid_to(dest, *objs, method='bilinear'):
     ''' helper function to handle regridding a batch of objects to a common
     grid
     '''
     out = []
     for obj in objs:
-        obj = _make_source_grid(obj)  # add grid info if needed
-        regridder = xe.Regridder(obj, dest, method)  # construct the regridder
+
+        if isinstance(obj, xr.DataArray):
+            source = obj.to_dataset(name='array')
+        else:
+            source = obj
+
+        source = _make_source_grid(source)  # add grid info if needed
+        # construct the regridder
+        regridder = xe.Regridder(source, dest, method)
         out.append(regridder(obj))  # do the regrid op
     return out
 
@@ -118,7 +135,7 @@ def bcsd(da_obs, da_train, da_predict, var='pr'):
 
         # calculate the amonalies as a ratio of the training data
         # again, this is done month-by-month
-        if (da_obs_coarse_mean.min('time') <= 0).any():
+        if (da_obs_coarse_mean.min('month') <= 0).any():
             raise ValueError('Invalid value in observed climatology')
         da_predict_coarse_anoms = (da_predict_coarse_qm.groupby('time.month')
                                    / da_obs_coarse_mean)
