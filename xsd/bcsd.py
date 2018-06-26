@@ -85,8 +85,10 @@ def _regrid_to(dest, *objs, method='bilinear'):
 
         if isinstance(obj, xr.DataArray):
             source = obj.to_dataset(name='array')
+            source['mask'] = obj.isel(time=0).notnull()
         else:
             source = obj
+            # todo handle mask for dataset
 
         source = _make_source_grid(source)  # add grid info if needed
         # construct the regridder
@@ -175,6 +177,35 @@ def bcsd(da_obs, da_train, da_predict, var='pr'):
 
     # return regridded anomalies
     return out_coarse
+
+
+def get_month_slice(year, month):
+    '''helper function to create a slice for 1 month given a year/month'''
+    start = '{:04d}-{:02d}-01'.format(year, month)
+    last_day = calendar.monthrange(year, month)[1]
+    stop = '{:04d}-{:02d}-{:02d}'.format(year, month, last_day)
+    return slice(start, stop)
+
+
+def disagg(da_obs, da_anoms):
+    # purely random month selection
+    years = xr.DataArray(np.random.randint(low=da_obs['time.year'].min(),
+                                           high=da_obs['time.year'].max(),
+                                           size=len(da_anoms['time'])),
+                         dims='time', coords={'time': da_anoms['time']})
+
+    # loop through the months and apply the anomalies
+    disag_out = []
+    for i, (year, month) in enumerate(zip(years.values, years['time.month'].values)):
+        tslice = get_month_slice(year, month)
+        anoms = out.isel(time=i)
+        disag_data = da_obs_daily.sel(time=tslice) + anoms
+        disag_data['time'] = pd.date_range(anoms.time.values, freq='D', periods=len(disag_data['time']))
+        disag_data.coords['anom_year'] = xr.Variable('time', [year] * len(disag_data['time']))
+        disag_out.append(disag_data)
+
+    # concat all months together (they are already sorted)
+    disag_out = xr.concat(disag_out, dim='time')
 
 
 def main():
