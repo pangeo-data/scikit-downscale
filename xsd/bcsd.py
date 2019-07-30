@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+''' Bias Correction and Statistical Downscaling (BCSD) method'''
 
 # 1. set list of models to use -- will these be the same 97 as in the CONUS
 # dataset?  if using new ones, need to make sure that there are both
@@ -21,17 +23,16 @@
 # multiplicative anomalies relative to the historical climo mean.  Finally
 # interpolate anomalies to target forcing resolution.
 #
-# 7.  calculate running mean temperature increase for model projections, save,
+# 7.  calculate running mean temperature shift for model projections, save,
 # and subtract from model projections.
 #
 # 8.  BC projection temperatures after mean shift removal, then add back the
 # mean shift.  Calculate additive anomalies relative to historical climo mean
 # and interpolate to target forcing resolution.
-#
-# And that's it.  From there the other other scripts could handle the daily
-# disag to get the final forcings.  I probably should have stuck that all in a
-# 1 pager, sorry -- mainly I just though it would be good to be clear on the
-# steps if we're thinking of going for gold with xarray.
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import numpy as np
 import xarray as xr
@@ -40,88 +41,171 @@ import xesmf as xe
 from .quantile_mapping import quantile_mapping_by_group
 
 
-BUFFER = 0.5
+def get_bounds(obj, lat_var='lat', lon_var='lon'):
+    ''' Determine the latitude and longitude bounds of a xarray object'''
+    return {'lat': (obj[lat_var].values.min(), obj[lat_var].values.max()),
+            'lon': (obj[lon_var].values.min(), obj[lon_var].values.max())}
 
 
-def get_bounds(ds):
-    return {'lat': (ds['lat'].values.min(), ds['lat'].values.max()),
-            'lon': (ds['lon'].values.min(), ds['lon'].values.max())}
+def _make_source_grid(obj):
+    ''' Add longitude and latitude bounds to an xarray object
 
+    Note
+    ----
+    This function is only valid if the object is already on a regular lat/lon
+    grid.
+    '''
 
-def make_course_grid(bounds, step=1.0):
-    ds = xr.Dataset({'lat': (['lat'], np.arange(bounds['lat'][0] - BUFFER,
-                                                bounds['lat'][1] + BUFFER,
-                                                step)),
-                     'lon': (['lon'], np.arange(bounds['lon'][0] - BUFFER,
-                                                bounds['lon'][1] + BUFFER,
-                                                step))})
-    return ds
+    if obj['lon'].ndim == 2:
+        return obj
 
+    lon_step = np.diff(obj['lon'].values[:2])[0]
+    lat_step = np.diff(obj['lat'].values[:2])[0]
 
-def make_source_grid(obj):
-
-    lon_step = np.diff(obj.lon.values[:2])[0]
-    lat_step = np.diff(obj.lat.values[:2])[0]
-
-    obj.coords['lon_b'] = ('x_b', np.append(obj.lon.values - 0.5*lon_step,
-                           obj.lon.values[-1] + 0.5*lon_step))
-    obj.coords['lat_b'] = ('y_b', np.append(obj.lat.values - 0.5*lat_step,
-                           obj.lat.values[-1] + 0.5*lat_step))
+    lon_bounds = np.append(obj['lon'].values - 0.5*lon_step,
+                           obj['lon'].values[-1] + 0.5*lon_step)
+    obj.coords['lon_b'] = ('x_b', lon_bounds)
+    lat_bounds = np.append(obj['lat'].values - 0.5*lat_step,
+                           obj['lat'].values[-1] + 0.5*lat_step)
+    obj.coords['lat_b'] = ('y_b', lat_bounds)
     return obj
 
 
+def _running_mean(obj, **kwargs):
+    '''helper function to apply rolling mean to groupby object'''
+    return obj.rolling(**kwargs).mean()
+
+
+def _regrid_to(dest, *objs, method='bilinear'):
+    ''' helper function to handle regridding a batch of objects to a common
+    grid
+    '''
+    out = []
+    for obj in objs:
+
+        if isinstance(obj, xr.DataArray):
+            source = obj.to_dataset(name='array')
+            source['mask'] = obj.isel(time=0).notnull()
+        else:
+            source = obj
+            # todo handle mask for dataset
+
+        source = _make_source_grid(source)  # add grid info if needed
+        # construct the regridder
+        regridder = xe.Regridder(source, dest, method)
+        out.append(regridder(obj))  # do the regrid op
+    return out
+
+
 def bcsd(da_obs, da_train, da_predict, var='pr'):
+    ''' Apply the Bias Correction and Statistical Downscaling (BCSD) method.
 
-    # add grid information to input arrays
-    da_obs = make_source_grid(da_obs)
-    da_train = make_source_grid(da_train)
-    da_predict = make_source_grid(da_predict)
+    Parameters
+    ----------
+    da_obs : xr.DataArray
+        Array representing the observed (truth) values.
+    da_train : xr.DataArray
+        Array representing the training data.
+    da_predict : xr.DataArray
+        Array representing the prediction data to be corrected using the BCSD
+        method.
+    var : str
+        Variable name triggering particular treatment of some variables. Valid
+        options include {'pr', 'tmin', 'tmax', 'trange', 'tavg'}.
 
-    # regrid to common course grid
+    Returns
+    -------
+    out_coarse : xr.DataArray
+        Anomalies on the same grid as ``da_obs``.
+    '''
+
+    # regrid to common coarse grid
     bounds = get_bounds(da_obs)
-    course_grid = course_grid = xe.util.grid_2d(*bounds['lon'], 1, *bounds['lat'], 1)
-    regridder = xe.Regridder(da_obs, course_grid, 'bilinear')
-    da_obs_regrid = regridder(da_obs)
+    coarse_grid = xe.util.grid_2d(*bounds['lon'], 1, *bounds['lat'], 1)
+    da_obs_coarse, da_train_coarse, da_predict_coarse = _regrid_to(
+        coarse_grid, da_obs, da_train, da_predict)
 
-    # regrid training/predict data to common grid
-    regridder = xe.Regridder(da_train, course_grid, 'bilinear')
-    da_train_regrid = regridder(da_train)
-    da_predict_regrid = regridder(da_predict)
-
-    # Calc means for train/paedict
-    da_train_regrid_mean = da_train_regrid.groupby(
-        'time.month').mean(dim='time')
+    # Calc mean climatology for obs data
+    da_obs_coarse_mean = da_obs_coarse.groupby('time.month').mean(dim='time')
 
     if var == 'pr':
         # Bias correction
-        # apply quantile mapping
-        da_predict_regrid_qm = quantile_mapping_by_group(
-            da_predict_regrid, da_train_regrid, da_obs_regrid,
+        # apply quantile mapping by month
+        da_predict_coarse_qm = quantile_mapping_by_group(
+            da_predict_coarse, da_train_coarse, da_obs_coarse,
             grouper='time.month')
 
-        da_predict_regrid_anoms = da_predict_regrid_qm.groupby('time.month') / da_train_regrid_mean
+        # calculate the amonalies as a ratio of the training data
+        # again, this is done month-by-month
+        if (da_obs_coarse_mean.min('month') <= 0).any():
+            raise ValueError('Invalid value in observed climatology')
+        da_predict_coarse_anoms = (da_predict_coarse_qm.groupby('time.month')
+                                   / da_obs_coarse_mean)
     else:
-        # don't do this for training period? check with andy
-        da_predict_regrid_run = da_predict_regrid.groupby(
-            'time.month').rolling(time='9Y', center=True).mean('time')
-        # what do we do with these?
-        da_predict_changes = da_predict_regrid - da_predict_regrid_run
+        train_mean_regrid = da_train_coarse.groupby(
+            'time.month').mean(dim='time')
 
-        da_predict_regrid_qm = quantile_mapping_by_group(
-            da_predict_regrid, da_train_regrid, da_obs_regrid,
+        # Calculate the 9-year running mean for each month
+        da_predict_coarse_rolling_mean = da_predict_coarse.groupby(
+            'time.month').apply(_running_mean, time=9, center=True,
+                                min_periods=1)
+
+        # calc shift
+        da_predict_coarse_shift = da_predict_coarse_rolling_mean.groupby(
+            'time.month') - train_mean_regrid
+
+        # remove shift
+        da_predict_coarse_no_shift = (da_predict_coarse
+                                      - da_predict_coarse_shift)
+
+        # Bias correction
+        # apply quantile mapping by month
+        da_predict_coarse_qm = quantile_mapping_by_group(
+            da_predict_coarse_no_shift, da_train_coarse, da_obs_coarse,
             grouper='time.month')
 
-        da_predict_regrid_qm_mean = da_predict_regrid_run + da_predict_regrid_qm
-        # calc anoms (difference)
+        # restore the shift
+        da_predict_qm_w_shift = da_predict_coarse_qm + da_predict_coarse_shift
 
-    da_predict_regrid_anoms = da_predict_regrid_qm - da_predict_regrid_qm_mean
+        # calc anoms (difference)
+        da_predict_coarse_anoms = (da_predict_qm_w_shift.groupby('time.month')
+                                   - da_obs_coarse_mean)
 
     # regrid to obs grid
-    regridder = xe.Regridder(da_predict_regrid_anoms, da_obs, 'bilinear')
-    out_regrid = regridder(da_predict_regrid_anoms)
+    out_coarse, = _regrid_to(da_obs, da_predict_coarse_anoms,
+                             method='bilinear')
 
     # return regridded anomalies
-    return out_regrid
+    return out_coarse
+
+
+def get_month_slice(year, month):
+    '''helper function to create a slice for 1 month given a year/month'''
+    start = '{:04d}-{:02d}-01'.format(year, month)
+    last_day = calendar.monthrange(year, month)[1]
+    stop = '{:04d}-{:02d}-{:02d}'.format(year, month, last_day)
+    return slice(start, stop)
+
+
+def disagg(da_obs, da_anoms):
+    # purely random month selection
+    years = xr.DataArray(np.random.randint(low=da_obs['time.year'].min(),
+                                           high=da_obs['time.year'].max(),
+                                           size=len(da_anoms['time'])),
+                         dims='time', coords={'time': da_anoms['time']})
+
+    # loop through the months and apply the anomalies
+    disag_out = []
+    for i, (year, month) in enumerate(zip(years.values, years['time.month'].values)):
+        tslice = get_month_slice(year, month)
+        anoms = out.isel(time=i)
+        disag_data = da_obs_daily.sel(time=tslice) + anoms
+        disag_data['time'] = pd.date_range(anoms.time.values, freq='D', periods=len(disag_data['time']))
+        disag_data.coords['anom_year'] = xr.Variable('time', [year] * len(disag_data['time']))
+        disag_out.append(disag_data)
+
+    # concat all months together (they are already sorted)
+    disag_out = xr.concat(disag_out, dim='time')
 
 
 def main():
@@ -129,17 +213,23 @@ def main():
     obs_fname = '/glade/u/home/jhamman/workdir/GARD_inputs/newman_ensemble/conus_ens_004.nc'
     train_fname = '/glade/p/ral/RHAP/gutmann/cmip/daily/CNRM-CERFACS/CNRM-CM5/historical/day/atmos/day/r1i1p1/latest/pr/*nc'
     predict_fname = '/glade/p/ral/RHAP/gutmann/cmip/daily/CNRM-CERFACS/CNRM-CM5/rcp45/day/atmos/day/r1i1p1/latest/pr/*nc'
-    var = 'pr'
 
-    # get variables from the obs/training/prediction datasets
-    da_obs_daily = xr.open_mfdataset(obs_fname)[var]
-    da_obs = da_obs_daily.resample(time='MS').mean('time').load()
-    da_train = xr.open_mfdataset(train_fname)[var].resample(
-        time='MS').mean('time').load()
-    da_predict = xr.open_mfdataset(predict_fname)[var].resample(
-        time='MS').mean('time').load()
+    out = xr.Dataset()
+    for var in ['pr']:
 
-    bcsd(da_obs, da_train, da_predict, var=var)
+        # get variables from the obs/training/prediction datasets
+        da_obs_daily = xr.open_mfdataset(obs_fname)[var]
+        da_obs = da_obs_daily.resample(time='MS').mean('time').load()
+        da_train = xr.open_mfdataset(train_fname)[var].resample(
+            time='MS').mean('time').load()
+        da_predict = xr.open_mfdataset(predict_fname)[var].resample(
+            time='MS').mean('time').load()
+
+        out[var] = bcsd(da_obs, da_train, da_predict, var=var)
+
+    out_file = './test.nc'
+    print('writing outfile %s' % out_file)
+    out.to_netcdf(out_file)
 
 
 if __name__ == '__main__':

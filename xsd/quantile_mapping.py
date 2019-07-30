@@ -2,15 +2,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-import warnings
 import dask.array as da
 import xarray as xr
 import numpy as np
 from scipy import stats
 from xarray.core.pycompat import dask_array_type
 
-from storylines.tools.encoding import attrs, encoding, make_gloabl_attrs
+# from storylines.tools.encoding import attrs, encoding, make_gloabl_attrs
 
 SYNTHETIC_MIN = -1e20
 SYNTHETIC_MAX = 1e20
@@ -383,124 +381,3 @@ def _inner_qmap_grid(data, like, ref, use_ref_data=False, **kwargs):
         for i, j in np.ndindex(data.shape[1:]):
             new[:, i, j] = qmap(data[:, i, j], like[:, i, j], **kwargs)
     return new
-
-
-def run(data_file, ref_file, obs_files, kind, variables):
-    """
-    Wrapper around the quantile mapping functions in this module
-    """
-
-    # open files
-    obs = xr.open_mfdataset(obs_files, decode_times=False,
-                            concat_dim='time').drop('time')
-    if kind == 'gard':
-        data, ref, new_fname = _gard_func(data_file, ref_file)
-    elif kind == 'icar':
-        data, ref, new_fname = _icar_func(data_file, ref_file)
-
-    qm_ds = xr.Dataset()
-    for var in variables:
-        qm_ds[var] = quantile_mapping(
-            data[var], ref[var], obs[var],
-            detrend=detrend[var],
-            extrapolate='1to1')
-
-        if zeros[var]:
-            # make sure a zero in the input data comes out as a zero
-            qm_ds[var] = xr.where(data[var] <= 0, 0, qm_ds[var])
-
-    qm_ds['time'] = data['time']
-
-    if 't_mean' in variables and 't_range' in variables:
-        qm_ds['t_max'] = qm_ds['t_mean'] + 0.5 * qm_ds['t_range']
-        qm_ds['t_min'] = qm_ds['t_mean'] - 0.5 * qm_ds['t_range']
-
-    use_encoding = {}
-    for key in qm_ds.data_vars:
-        if key in encoding:
-            use_encoding[key] = encoding[key]
-
-    for var in qm_ds.data_vars:
-        try:
-            qm_ds[var].attrs = attrs.get(var, obs[var].attrs)
-            qm_ds[var].encoding = use_encoding.get(var, obs[var].encoding)
-        except KeyError:
-            warnings.warn('unable to find attributes for %s' % var)
-
-    qm_ds.attrs = make_gloabl_attrs(title='Quantile mapped downscaled dataset')
-
-    qm_ds.to_netcdf(new_fname, unlimited_dims=['time'],
-                    format='NETCDF4', encoding=use_encoding)
-
-
-def _gard_func(data, ref):
-
-    new_fname = data[:-3] + '.qm.nc'
-
-    ds = xr.open_dataset(data)
-
-    if 't_mean' not in ds and 't_min' in ds and 't_max' in ds:
-        ds['t_mean'] = (ds['t_min'] + ds['t_max']) / 2
-
-    if ref == 'auto':
-        template = 'gard_output.{gset}.{dset}.{gcm}.{scen}.{date_range}.dm.nc'
-        _, gset, dset, gcm, scen, drange, step, _ = data.split('.')
-
-        ref_time = {'NCAR_WRF_50km': '19510101-20051231',
-                    'NCAR_WRF_50km_reanalysis': '19790101-20151231'}
-
-        ref = template.format(gset=gset, dset=dset, gcm=gcm,
-                              scen='hist', date_range=ref_time[dset])
-
-    if ref is not None and ref != data:
-        ref_ds = xr.open_dataset(ref)
-        if 't_mean' not in ref_ds and 't_min' in ref_ds and 't_max' in ref_ds:
-            ref_ds['t_mean'] = (ref_ds['t_min'] + ref_ds['t_max']) / 2
-    else:
-        ref_ds = ds
-
-    print('ds', ds)
-    print('ref_ds', ref_ds)
-    print('new_fname', new_fname, flush=True)
-
-    return ds, ref_ds, new_fname
-
-
-def _icar_func(data, ref):
-
-    if os.path.isfile(data):
-        data = xr.open_dataset(data).rename({'icar_pcp': 'pcp',
-                                             'avg_ta2m': 't_mean'})
-        case_name = os.path.basename(data)
-        pattern = data
-        for scen in ['hist', 'rcp45', 'rcp85']:
-            if scen in case_name:
-                break
-    else:
-        dirname = data
-        case_name = os.path.split(dirname)[-1]
-        pattern = os.path.join(dirname, 'merged', 'merged_%s_*.nc' % case_name)
-
-        data = xr.open_mfdataset(pattern).rename({'icar_pcp': 'pcp',
-                                                  'avg_ta2m': 't_mean'})
-        scen = case_name.split('_')[1]
-
-    data['lon'].data[data['lon'].data > 180] -= 360.
-
-    data['t_range'] = data['max_ta2m'] - data['min_ta2m']
-
-    if scen == 'hist':
-        ref = {v: None for v in data}
-    else:
-        if ref == 'auto':
-            ref_pattern = pattern.replace(scen, 'hist')
-        else:
-            ref_pattern = ref
-        ref = xr.open_mfdataset(ref_pattern).rename(
-            {'icar_pcp': 'pcp', 'avg_ta2m': 't_mean'})
-        ref['lon'].data[ref['lon'].data > 180] -= 360.
-        ref['t_range'] = ref['max_ta2m'] - ref['min_ta2m']
-
-    new_fname = '/glade/u/home/jhamman/workdir/icar_qm/%s' % case_name
-
-    return data, ref, new_fname
