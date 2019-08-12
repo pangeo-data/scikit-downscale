@@ -37,28 +37,29 @@ import calendar
 import numpy as np
 import pandas as pd
 import xarray as xr
-# import xesmf as xe
-
-import tempfile
-from cdo import Cdo
 
 from .quantile_mapping import quantile_mapping_by_group
 
 
-# all cdo stuff, to be removed later
-cdo = Cdo()
+REGRID = "CDO"
+if REGRID == 'CDO':
+    import tempfile
+    from cdo import Cdo
+    cdo = Cdo()
+elif REGRID == 'XESMF':
+    import xesmf as xe
 
 
 def get_bounds(obj):
     ''' Determine the latitude and longitude bounds of a xarray object'''
-    if 'lat' in obj:
+    if 'lat' in obj.coords:
         lat_var = 'lat'
         lon_var = 'lon'
-    elif 'xc' in obj:
+    elif 'xc' in obj.coords:
         lat_var = 'yc'
         lon_var = 'xc'
     else:
-        raise ValueError('did not find coordinate variables')
+        raise ValueError('did not find coordinate variables in %s' % obj)
     return {'lat': (obj[lat_var].values.min(), obj[lat_var].values.max()),
             'lon': (obj[lon_var].values.min(), obj[lon_var].values.max())}
 
@@ -84,31 +85,53 @@ def _running_mean(obj, **kwargs):
     return obj.rolling(**kwargs).mean()
 
 
-def _regrid_to(dest, *objs, name=None):
-    ''' helper function to handle regridding a batch of objects to a common
-    grid
-    '''
-    if isinstance(dest, xr.Dataset):
-        f = tempfile.NamedTemporaryFile(prefix='bcsd_dest_', suffix='.nc', delete=False)
-        f.close()
-        dest.to_netcdf(f.name, engine='scipy')
-        dest = f.name
-
-    out = []
-    for obj in objs:
-        if isinstance(obj, xr.DataArray):
-            input_ds = obj.to_dataset(name=name)
-        else:
-            input_ds = obj
-
-        if isinstance(input_ds, xr.Dataset):
-            f = tempfile.NamedTemporaryFile(prefix='bcsd_src_', suffix='.nc', delete=False)
+if REGRID == 'CDO':
+    def _regrid_to(dest, *objs, name=None):
+        ''' helper function to handle regridding a batch of objects to a common
+        grid
+        '''
+        if isinstance(dest, xr.Dataset):
+            f = tempfile.NamedTemporaryFile(prefix='bcsd_dest_', suffix='.nc', delete=False)
             f.close()
-            input_ds.to_netcdf(f.name, engine='scipy')
-            input_ds = f.name
+            dest.to_netcdf(f.name, engine='scipy')
+            dest = f.name
 
-        out.append(cdo.remapbil(dest, input=input_ds, returnXArray=name).load())
-    return out
+        out = []
+        for obj in objs:
+            if isinstance(obj, xr.DataArray):
+                input_ds = obj.to_dataset(name=name)
+            else:
+                input_ds = obj
+
+            if isinstance(input_ds, xr.Dataset):
+                f = tempfile.NamedTemporaryFile(prefix='bcsd_src_', suffix='.nc', delete=False)
+                f.close()
+                input_ds.to_netcdf(f.name, engine='scipy')
+                input_ds = f.name
+
+            out.append(cdo.remapbil(dest, input=input_ds, returnXArray=name).load())
+        return out
+else:   
+    def _regrid_to(dest, *objs, method='bilinear'):
+        ''' helper function to handle regridding a batch of objects to a common
+        grid
+        '''
+        out = []
+        for obj in objs:
+
+            if isinstance(obj, xr.DataArray):
+                source = obj.to_dataset(name='array')
+                source['mask'] = obj.isel(time=0).notnull()
+            else:
+                source = obj
+                if 'mask' not in source:
+                    var = next(iter(obj.variables))
+                    source['mask'] = obj[var].isel(time=0).notnull()
+
+            # construct the regridder
+            regridder = xe.Regridder(source, dest, method, reuse_weights=False)
+            out.append(regridder(obj))  # do the regrid op
+        return out
 
 
 def bcsd(ds_obs, ds_train, ds_predict, var='pcp'):
@@ -139,7 +162,7 @@ def bcsd(ds_obs, ds_train, ds_predict, var='pcp'):
     coarse_grid = make_coarse_grid(bounds, 1.)
     # coarse_grid = 'r360x180'
     (da_obs_coarse, da_train_coarse, da_predict_coarse) = _regrid_to(  # pylint: disable=unbalanced-tuple-unpacking
-        coarse_grid, ds_obs, ds_train, ds_predict, name=var)
+        coarse_grid, ds_obs, ds_train, ds_predict)
 
     mask = da_obs_coarse.any(dim='time')
     da_obs_coarse = da_obs_coarse.where(mask)
@@ -191,7 +214,7 @@ def bcsd(ds_obs, ds_train, ds_predict, var='pcp'):
                                    - da_obs_coarse_mean)
 
     # regrid to obs grid
-    out_coarse, = _regrid_to(ds_obs, da_predict_coarse_anoms, name=var)  # pylint: disable=unbalanced-tuple-unpacking
+    out_coarse, = _regrid_to(ds_obs, da_predict_coarse_anoms)  # pylint: disable=unbalanced-tuple-unpacking
 
     # return regridded anomalies
     return out_coarse
