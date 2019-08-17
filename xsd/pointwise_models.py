@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from sklearn.base import RegressorMixin
@@ -7,15 +8,16 @@ from sklearn.preprocessing import FunctionTransformer, StandardScaler, LabelBina
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
 
-def fit_model(X, y, model=None, **kwargs):
-    # reshape input data
-    if X.ndim == 1:
-        X = X.reshape(-1, 1)
-    if y.ndim == 1:
-        y = y.reshape(-1, 1)
+def fit_model(X, y, model=None, columns=None, **kwargs):
+    X = np.atleast_2d(X).transpose()  # reshape input data
+    y = np.atleast_2d(y).transpose()  # reshape input data
+    if columns is not None:
+        X = pd.DataFrame(data=X, columns=columns)
 
-    # return a len 1 scalar of dtype np.object
-    # there is likely a better way to do this
+    # return a len 1 scalar of dtype np.object, there is likely a better way
+    # to do this
+    # this is required because sklearn pipelines are iterable and can be cast
+    # to arrays
     out = np.empty((1), dtype=np.object)
     out[:] = [model.fit(X, y, **kwargs)]
     out = out.squeeze()
@@ -62,7 +64,7 @@ class PointWiseDownscaler:
                 ' by PointWiseDownscaler' % type(model)
             )
 
-    def fit(self, X, y, **fit_params):
+    def fit(self, X, y, feature_dim='variable', **fit_params):
         """Fit the model
 
         Fit all the transforms one after the other and transform the
@@ -70,26 +72,41 @@ class PointWiseDownscaler:
 
         Parameters
         ----------
-        X : xarray.DataArray
+        X : xarray.DataArray or xarray.Dataset
             Training data. Must fulfill input requirements of first step of
-            the pipeline.
+            the pipeline. If an xarray.Dataset is passed, it will be converted
+            to an array using `to_array()`.
 
         y : xarray.DataArray
             Training targets. Must fulfill label requirements for all steps
             of the pipeline.
+            
+        feature_dim : str, optional
+            Name of feature dimension. 
 
         **fit_params : dict of string -> object
-            Parameters passed to the ``fit`` method of each step, where
-            each parameter name is prefixed such that parameter ``p`` for
-            step ``s`` has key ``s__p``.
+            Parameters passed to the ``fit`` method of the this model. If the
+            model is a sklearn Pipeline, parameters can be passed to each
+            step, where each parameter name is prefixed such that parameter
+            ``p`` for step ``s`` has key ``s__p``.
         """
         kwargs = dict(model=self._model, **fit_params)
+        
+        # xarray.Dataset --> xarray.DataArray
+        if isinstance(X, xr.Dataset):
+            X = X.to_array(feature_dim)
+        
+        if feature_dim in X.coords:
+            input_core_dims = [[feature_dim, self._dim], [self._dim]]
+            kwargs['columns'] = X.coords[feature_dim].data
+        else:
+            input_core_dims = [[self._dim], [self._dim]]
+        
         self._models = xr.apply_ufunc(fit_model, X, y,
                                       vectorize=True,
                                       dask='allowed',
                                       output_dtypes=[np.object],
-                                      input_core_dims=[[self._dim],
-                                                       [self._dim]],
+                                      input_core_dims=input_core_dims,
                                       kwargs=kwargs)
 
     def predict(self, X, **predict_params):
