@@ -4,6 +4,6 @@ channels:
 dependencies:
   - python=3.6
   - xarray
-  - sklearn
+  - scikit-learn
   - xesmf
   - pytest
