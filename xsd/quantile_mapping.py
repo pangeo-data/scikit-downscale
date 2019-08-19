@@ -1,14 +1,9 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import dask.array as da
 import xarray as xr
 import numpy as np
 from scipy import stats
 from xarray.core.pycompat import dask_array_type
 
-# from storylines.tools.encoding import attrs, encoding, make_gloabl_attrs
 
 SYNTHETIC_MIN = -1e20
 SYNTHETIC_MAX = 1e20

@@ -2,13 +2,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from sklearn.base import RegressorMixin
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer, StandardScaler, LabelBinarizer, LabelEncoder
-from sklearn.linear_model import LinearRegression, LogisticRegression
 
-
-def fit_model(X, y, model=None, columns=None, **kwargs):
+def _fit_model(X, y, model=None, columns=None, **kwargs):
     X = np.atleast_2d(X).transpose()  # reshape input data
     y = np.atleast_2d(y).transpose()  # reshape input data
     if columns is not None:
@@ -24,16 +19,11 @@ def fit_model(X, y, model=None, columns=None, **kwargs):
     return out
 
 
-def predict(model, X):
-    if X.ndim == 1:
-        X = X.reshape(-1, 1)
-    # pull item() out because model is a np.scalar
+def _predict(model, X):
+    X = np.atleast_2d(X).transpose()  # reshape input data
+    # pull item() out because model is wrapped in np.scalar
     out = model.item().predict(X).squeeze()
     return out
-
-
-def transform(model, X):
-    return model.item().transorm(X).squeeze()
 
 
 class PointWiseDownscaler:
@@ -102,7 +92,7 @@ class PointWiseDownscaler:
         else:
             input_core_dims = [[self._dim], [self._dim]]
         
-        self._models = xr.apply_ufunc(fit_model, X, y,
+        self._models = xr.apply_ufunc(_fit_model, X, y,
                                       vectorize=True,
                                       dask='allowed',
                                       output_dtypes=[np.object],
@@ -116,7 +106,7 @@ class PointWiseDownscaler:
         ----------
         X : xarray.DataArray
             Data to predict on. Must fulfill input requirements of first step
-            of the pipeline.
+            of the model or pipeline.
 
         **predict_params : dict of string -> object
             Parameters to the ``predict`` called at the end of all
@@ -131,7 +121,7 @@ class PointWiseDownscaler:
         y_pred : xarray.DataArray
         """
 
-        return xr.apply_ufunc(predict, self._models, X,
+        return xr.apply_ufunc(_predict, self._models, X,
                               vectorize=True,
                               dask='allowed',
                               output_dtypes=[X.dtype],
