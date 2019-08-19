@@ -1,4 +1,4 @@
-name: xarray-tests
+name: xsd-tests
 channels:
   - conda-forge
 dependencies:
