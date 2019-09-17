@@ -13,7 +13,9 @@ detrend = {'pcp': False, 't_mean': True, 't_range': True}
 extrapolate = {'pcp': 'max', 't_mean': 'both', 't_range': 'max'}
 zeros = {'pcp': True, 't_mean': False, 't_range': False}
 
-
+# da_predict_coarse --> input_data --> data --> X_transform
+# da_train_coarse --> ref_data --> ref --> X_fit
+# da_obs_coarse --> data_to_match --> like --> y_fit
 def quantile_mapping(input_data, ref_data, data_to_match,
                      alpha=0.4, beta=0.4, detrend=False,
                      extrapolate=None, n_endpoints=10,

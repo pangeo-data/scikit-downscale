@@ -41,7 +41,7 @@ import xarray as xr
 from .quantile_mapping import quantile_mapping_by_group
 
 
-REGRID = "CDO"
+REGRID = "ESMF"
 if REGRID == 'CDO':
     import tempfile
     from cdo import Cdo
@@ -177,7 +177,7 @@ def bcsd(ds_obs, ds_train, ds_predict, var='pcp'):
             da_predict_coarse, da_train_coarse, da_obs_coarse,
             grouper='time.month')
 
-        # calculate the amonalies as a ratio of the training data
+        # calculate the anomalies as a ratio of the training data
         # again, this is done month-by-month
         if (da_obs_coarse_mean.min('month') <= 0).any():
             raise ValueError('Invalid value in observed climatology')
