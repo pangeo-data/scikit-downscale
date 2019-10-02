@@ -1,0 +1,10 @@
+name: xsd-tests
+channels:
+  - conda-forge
+dependencies:
+  - python=3.7
+  - dask
+  - pytest
+  - scikit-learn
+  - xarray
+  - xesmf

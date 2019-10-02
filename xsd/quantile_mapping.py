@@ -1,14 +1,9 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import dask.array as da
 import xarray as xr
 import numpy as np
 from scipy import stats
 from xarray.core.pycompat import dask_array_type
 
-# from storylines.tools.encoding import attrs, encoding, make_gloabl_attrs
 
 SYNTHETIC_MIN = -1e20
 SYNTHETIC_MAX = 1e20
@@ -18,7 +13,9 @@ detrend = {'pcp': False, 't_mean': True, 't_range': True}
 extrapolate = {'pcp': 'max', 't_mean': 'both', 't_range': 'max'}
 zeros = {'pcp': True, 't_mean': False, 't_range': False}
 
-
+# da_predict_coarse --> input_data --> data --> X_transform
+# da_train_coarse --> ref_data --> ref --> X_fit
+# da_obs_coarse --> data_to_match --> like --> y_fit
 def quantile_mapping(input_data, ref_data, data_to_match,
                      alpha=0.4, beta=0.4, detrend=False,
                      extrapolate=None, n_endpoints=10,
