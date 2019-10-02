@@ -29,7 +29,6 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
 
     def __init__(self, **lr_kwargs):
         self.lr_kwargs = lr_kwargs
-        self.lr_model_ = LinearRegression(**self.lr_kwargs)
 
     def fit(self, X):
         ''' Compute the linear trend.
@@ -39,6 +38,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         X : array-like, shape  [n_samples, n_features]
             Training data.
         '''
+        self.lr_model_ = LinearRegression(**self.lr_kwargs)
         self.lr_model_.fit(np.arange(len(X)).reshape(-1, 1), X)
         return self
 
@@ -75,6 +75,10 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
     detrend : boolean, optional
         If True, detrend the data before quantile mapping and add the trend
         back after transforming. Default is False.
+    lt_kwargs : dict, optional
+        Dictionary of keyword arguments to pass to the LinearTrendTransformer
+    qm_kwargs : dict, optional
+        Dictionary of keyword arguments to pass to the QuantileMapper
 
     Attributes
     ----------
@@ -82,8 +86,9 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         QuantileTranform for fit(X)
     '''
 
-    def __init__(self, detrend=False, **qt_kwargs):
+    def __init__(self, detrend=False, lt_kwargs={}, qt_kwargs={}):
 
+        self.lt_kwargs = lt_kwargs
         self.qt_kwargs = qt_kwargs
 
         self.detrend = detrend
@@ -96,14 +101,17 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         X : array-like, shape  [n_samples, n_features]
             Training data.
         '''
+        X = ensure_samples_features(X)
 
         # maybe detrend the input datasets
         if self.detrend:
-            x_to_cdf = LinearTrendTransformer().fit_transform(X)
+            x_to_cdf = LinearTrendTransformer(**self.lt_kwargs).fit_transform(X)
         else:
             x_to_cdf = X
+        
 
         # calculate the cdfs for X
+        # TODO: replace this transformer with something that uses robust empirical cdf plotting positions
         self.x_cdf_fit_ = QuantileTransformer(**self.qt_kwargs).fit(x_to_cdf)
 
         return self
@@ -116,10 +124,11 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         X : array_like, shape [n_samples, n_features]
             Samples.
         '''
+        X = ensure_samples_features(X)
 
         # maybe detrend the datasets
         if self.detrend:
-            x_trend = LinearTrendTransformer().fit(X)
+            x_trend = LinearTrendTransformer(**self.lt_kwargs).fit(X)
             x_to_cdf = x_trend.transform(X)
         else:
             x_to_cdf = X
@@ -136,6 +145,9 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
 
 
 def ensure_samples_features(obj):
+    ''' helper function to ensure sammples conform to sklearn format
+    requirements
+    '''
     if isinstance(obj, pd.DataFrame):
         return obj
     if isinstance(obj, pd.Series):

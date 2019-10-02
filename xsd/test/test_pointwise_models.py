@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+import pytest
+
 from xsd.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
 
 
@@ -29,4 +31,32 @@ def test_linear_trend_roundtrip():
 
 
 def test_quantile_mapper():
-    pass
+    n = 100
+    expected = np.sin(np.linspace(-10*np.pi, 10*np.pi, n)) * 10
+    with_bias = expected + 2
+
+    mapper = QuantileMapper()
+    mapper.fit(expected)
+    actual = mapper.transform(with_bias)
+    np.testing.assert_almost_equal(
+        actual.squeeze(), expected)
+
+
+@pytest.mark.xfail(reason='Need 3 part QM routine to handle bias removal')
+def test_quantile_mapper_detrend():
+    n = 100
+    trend = 1
+    yint = 15
+
+    trendline = trend * np.arange(n) + yint
+    base = np.sin(np.linspace(-10*np.pi, 10*np.pi, n)) * 10
+    expected = base + trendline
+    
+    with_bias = expected + 2
+
+    mapper = QuantileMapper(detrend=True)
+    mapper.fit(base)
+    actual = mapper.transform(with_bias)
+    np.testing.assert_almost_equal(
+        actual.squeeze(), expected)
+
