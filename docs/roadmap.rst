@@ -11,7 +11,7 @@ Background and scope
 
 `xsd` is a toolkit for statistical downscaling usising Xarray. It is meant to
 support the development of new and existing downscaling methods in a common
-framework. It implements a train/predict API that accepts Xarray objects,
+framework. It implements a fit/predict API that accepts Xarray objects,
 similiar to Python's Scikit-Learn, for building a range of downscaling models.
 For example, implementing a BCSD workflow may look something like this:
 
