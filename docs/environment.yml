@@ -13,5 +13,5 @@ dependencies:
   - sphinx
   - numpydoc
   - sphinx-gallery
-  - sphinx_rtd_them
+  - sphinx_rtd_theme
   - pip
