@@ -14,11 +14,7 @@ CLASSIFIERS = [
     "Topic :: Scientific/Engineering",
 ]
 
-packages = find_packages()
-print(packages)
-
 setup(name='xsd',
-      version='0.0.1',
       author='Joe Hamman',
       author_email='jhamman@ucar.edu',
       license="Apache",
@@ -28,5 +24,5 @@ setup(name='xsd',
       install_requires=["xarray >= 0.10", "scikit-learn >= 0.21"],
       tests_require=["pytest >= 2.7.1"],
       url='https://github.com/jhamman/xsd',
-      packages=packages
+      packages=find_packages(),
       )
