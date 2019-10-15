@@ -7,12 +7,26 @@ from sklearn.linear_model.base import LinearModel
 from sklearn.linear_model import LinearRegression
 from sklearn.utils.validation import check_is_fitted
 
+from .utils import ensure_samples_features
+
 
 class AnalogBase(LinearModel, RegressorMixin):
     _fit_attributes = ["kdtree_", "y_"]
 
     def fit(self, X, y):
+        """ Fit Analog model using a KDTree
 
+        Parameters
+        ----------
+        X : pd.Series or pd.DataFrame, shape (n_samples, 1)
+            Training data
+        y : pd.Series or pd.DataFrame, shape (n_samples, 1)
+            Target values.
+
+        Returns
+        -------
+        self : returns an instance of self.
+        """
         self.kdtree_ = cKDTree(X, **self.kdtree_kwargs)
         self.y_ = y
 
@@ -48,6 +62,18 @@ class AnalogRegression(AnalogBase):
         self.lr_kwargs = lr_kwargs
 
     def predict(self, X):
+        """ Predict using the AnalogRegression model
+
+        Parameters
+        ----------
+        X : DataFrame, shape (n_samples, 1)
+            Samples.
+
+        Returns
+        -------
+        C : pd.DataFrame, shape (n_samples, 1)
+            Returns predicted values.
+        """
         check_is_fitted(self, self._fit_attributes)
 
         predicted = np.empty(len(X))
@@ -66,14 +92,14 @@ class AnalogRegression(AnalogBase):
         _, inds = self.kdtree_.query(X, k=self.n_analogs, **self.query_kwargs)
 
         # extract data to train linear regression model
-        x = self.kdtree_.data[inds]
-        y = self.y_[inds]
+        x = ensure_samples_features(self.kdtree_.data[inds])
+        y = ensure_samples_features(self.y_.values[inds])
 
         # train linear regression model
         lr_model = LinearRegression(**self.lr_kwargs).fit(x, y)
 
         # predict for this time step
-        predicted = lr_model.predict(X)
+        predicted = lr_model.predict(ensure_samples_features(X))
         return predicted
 
 
@@ -84,15 +110,40 @@ class PureAnalog(AnalogBase):
     ----------
     kdtree_ : scipy.spatial.cKDTree
         KDTree object
+    n_analogs : int
+        Number of analogs to use
+    thresh : float
+        Subset analogs based on threshold
+    stats : bool
+        Calculate fit statistics during predict step
+    kdtree_kwargs : dict
+        Dictionary of keyword arguments to pass to cKDTree constructor
+    query_kwargs : dict
+        Dictionary of keyword arguments to pass to `cKDTree.query`
     """
 
-    def __init__(self, n_analogs=200, kdtree_kwargs={}, query_kwargs={}):
-
-        self.n_analogs = n_analogs
+    def __init__(
+        self,
+        n_analogs=200,
+        kind="best_analog",
+        thresh=None,
+        stats=True,
+        kdtree_kwargs={},
+        query_kwargs={},
+    ):
+        self.thresh = thresh
+        self.stats = stats
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
 
-    def predict(self, X, n_analogs=200, kind="best_analog", thresh=None, stats=True):
+        if kind == "best_analog" or n_analogs == 1:
+            self.n_analogs = 1
+            self.kind = "best_analog"
+        else:
+            self.n_analogs = n_analogs
+            self.kind = kind
+
+    def predict(self, X):
         """Predict using the PureAnalog model
 
         Parameters
@@ -106,66 +157,67 @@ class PureAnalog(AnalogBase):
             Returns predicted values.
         """
         check_is_fitted(self, self._fit_attributes)
+        self.stats_ = {}
 
-        if kind == "best_analog":
-            n_analogs = 1
-        else:
-            n_analogs = n_analogs
+        dist, inds = self.kdtree_.query(X, k=self.n_analogs, **self.query_kwargs)
 
-        dist, inds = self.kdtree_.query(X, k=n_analogs, **self.query_kwargs)
+        analogs = np.take(self.y_.values, inds, axis=0)
 
-        analogs = self.y_[inds]
-
-        if thresh is not None:
+        if self.thresh is not None:
             # TODO: rethink how the analog threshold is applied.
             # There are certainly edge cases not dealt with properly here
             # particularly in the weight analogs case
-            analog_mask = analogs > thresh
+            analog_mask = analogs > self.thresh
             masked_analogs = analogs[analog_mask]
 
-        if kind == "best_analog":
-            predicted = analogs[:, 0]
+        if self.kind == "best_analog":
+            predicted = analogs
 
-        elif kind == "sample_analogs":
+        elif self.kind == "sample_analogs":
             # get 1 random index to sample from the analogs
-            rand_inds = np.random.randint(low=0, high=self.n_analogs, size=X.shape)
+            rand_inds = np.random.randint(low=0, high=self.n_analogs, size=len(X))
             # select the analog now
-            predicted = analogs[rand_inds]
+            predicted = select_analogs(analogs, rand_inds)
 
-        elif kind == "weight_analogs":
+        elif self.kind == "weight_analogs":
             # take weighted average
             # work around for zero distances (perfect matches)
             tiny = 1e-20
             weights = 1.0 / np.where(dist == 0, tiny, dist)
-            if thresh:
+            if self.thresh:
                 predicted = np.average(masked_analogs, weights=weights, axis=1)
             else:
-                predicted = np.average(analogs, weights=weights, axis=1)
+                predicted = np.average(analogs.squeeze(), weights=weights, axis=1)
 
-        elif kind == "mean_analogs":
-            if thresh is not None:
+        elif self.kind == "mean_analogs":
+            if self.thresh is not None:
                 predicted = masked_analogs.mean(axis=1)
             else:
                 predicted = analogs.mean(axis=1)
 
         else:
-            raise ValueError("got unexpected kind %s" % kind)
+            raise ValueError("got unexpected kind %s" % self.kind)
 
-        if thresh is not None:
+        if self.thresh is not None:
             # for mean/weight cases, this fills nans when all analogs
             # were below thresh
             predicted = np.nan_to_num(predicted, nan=0.0)
 
-        if stats:
-            self.stats_ = {}
+        if self.stats:
             # calculate the standard deviation of the anlogs
-            if thresh is not None:
-                self.stats["error"] = masked_analogs.std(axis=1)
+            if self.thresh is None:
+                self.stats_["error"] = analogs.std(axis=1)
             else:
-                self.stats["error"] = analogs.where(analog_mask).std(axis=1)
-
-            # calculate the probability of precip
-            if thresh is not None:
-                self.stats["pop"] = np.where(analog_mask, 1, 0).mean(axis=1)
+                self.stats_["error"] = analogs.where(analog_mask).std(axis=1)
+                # calculate the probability of precip
+                self.stats_["pop"] = np.where(analog_mask, 1, 0).mean(axis=1)
 
         return predicted
+
+
+def select_analogs(analogs, inds):
+    # todo: this is possible with fancy indexing
+    out = np.empty(len(analogs))
+    for i, ind in enumerate(inds):
+        out[i] = analogs[i, ind]
+    return out
