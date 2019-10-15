@@ -27,6 +27,8 @@ Linear Models
 
    BcsdPrecipitation
    BcsdTemperature
+   PureAnalog
+   AnalogRegression
 
 Transformers
 ~~~~~~~~~~~~

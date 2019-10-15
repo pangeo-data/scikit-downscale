@@ -103,16 +103,21 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         '''
         X = ensure_samples_features(X)
 
+        qt_kws = self.qt_kwargs.copy()
+
+        if 'n_quantiles' not in qt_kws:
+            qt_kws['n_quantiles'] = len(X)
+
         # maybe detrend the input datasets
         if self.detrend:
             x_to_cdf = LinearTrendTransformer(**self.lt_kwargs).fit_transform(X)
         else:
             x_to_cdf = X
         
-
         # calculate the cdfs for X
-        # TODO: replace this transformer with something that uses robust empirical cdf plotting positions
-        self.x_cdf_fit_ = QuantileTransformer(**self.qt_kwargs).fit(x_to_cdf)
+        # TODO: replace this transformer with something that uses robust
+        # empirical cdf plotting positions
+        self.x_cdf_fit_ = QuantileTransformer(**qt_kws).fit(x_to_cdf)
 
         return self
 
@@ -134,7 +139,11 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
             x_to_cdf = X
 
         # do the final mapping
-        x_quantiles = quantile_transform(x_to_cdf)
+        qt_kws = self.qt_kwargs.copy()
+        if 'n_quantiles' not in qt_kws:
+            qt_kws['n_quantiles'] = len(X)
+
+        x_quantiles = quantile_transform(x_to_cdf, copy=True, **qt_kws)
         x_qmapped = self.x_cdf_fit_.inverse_transform(x_quantiles)
 
         # add the trend back
