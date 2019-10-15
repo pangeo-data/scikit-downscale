@@ -10,20 +10,32 @@ from xsd.pointwise_models import PointWiseDownscaler
     ("X", "y"),
     [
         # with numpy arrays
-        (random_point_data(n_points=3, n_vars=3),
-         random_point_data(n_points=3, n_vars=1)['a']),
-        (random_grid_data(grid_shape=(2, 3), n_vars=3),
-         random_grid_data(grid_shape=(2, 3), n_vars=1)['a']),
-        (random_grid_data(grid_shape=(2, 3), n_vars=3),
-         random_grid_data(grid_shape=(2, 3), n_vars=1)['a']),
+        (
+            random_point_data(n_points=3, n_vars=3),
+            random_point_data(n_points=3, n_vars=1)["a"],
+        ),
+        (
+            random_grid_data(grid_shape=(2, 3), n_vars=3),
+            random_grid_data(grid_shape=(2, 3), n_vars=1)["a"],
+        ),
+        (
+            random_grid_data(grid_shape=(2, 3), n_vars=3),
+            random_grid_data(grid_shape=(2, 3), n_vars=1)["a"],
+        ),
         # with dask arrays
-        (random_point_data(n_points=3, n_vars=3).chunk({'point': 1}),
-         random_point_data(n_points=3, n_vars=1)['a'].chunk({'point': 1})),
-        (random_grid_data(grid_shape=(2, 3), n_vars=3).chunk({'y': 1, 'x': 1}),
-         random_grid_data(grid_shape=(2, 3), n_vars=1)['a'].chunk({'y': 1, 'x': 1})),
-        (random_grid_data(grid_shape=(2, 3), n_vars=3).chunk({'y': 1, 'x': 1}),
-         random_grid_data(grid_shape=(2, 3), n_vars=1)['a'].chunk({'y': 1, 'x': 1}))
-    ]
+        (
+            random_point_data(n_points=3, n_vars=3).chunk({"point": 1}),
+            random_point_data(n_points=3, n_vars=1)["a"].chunk({"point": 1}),
+        ),
+        (
+            random_grid_data(grid_shape=(2, 3), n_vars=3).chunk({"y": 1, "x": 1}),
+            random_grid_data(grid_shape=(2, 3), n_vars=1)["a"].chunk({"y": 1, "x": 1}),
+        ),
+        (
+            random_grid_data(grid_shape=(2, 3), n_vars=3).chunk({"y": 1, "x": 1}),
+            random_grid_data(grid_shape=(2, 3), n_vars=1)["a"].chunk({"y": 1, "x": 1}),
+        ),
+    ],
 )
 def test_pointwise_model(X, y):
     pipeline = make_linear_reg_pipeline()

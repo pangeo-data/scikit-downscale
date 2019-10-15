@@ -10,12 +10,13 @@ from sklearn.utils.validation import check_is_fitted
 from .utils import QuantileMapper, ensure_samples_features
 
 MONTH_GROUPER = lambda x: x.month
-      
+
 
 class BcsdBase(LinearModel, RegressorMixin):
-    ''' Base class for BCSD model. 
-    '''
-    _fit_attributes = ['y_climo_', 'quantile_mappers_']
+    """ Base class for BCSD model. 
+    """
+
+    _fit_attributes = ["y_climo_", "quantile_mappers_"]
 
     def __init__(self, time_grouper=MONTH_GROUPER, **qm_kwargs):
         if isinstance(time_grouper, str):
@@ -26,20 +27,20 @@ class BcsdBase(LinearModel, RegressorMixin):
         self.qm_kwargs = qm_kwargs
 
     def _qm_fit_by_group(self, groups):
-        ''' helper function to fit quantile mappers by group
+        """ helper function to fit quantile mappers by group
 
         Note that we store these mappers for later
-        '''
+        """
         self.quantile_mappers_ = {}
         for key, group in groups:
             data = ensure_samples_features(group)
             self.quantile_mappers_[key] = QuantileMapper(**self.qm_kwargs).fit(data)
 
     def _qm_transform_by_group(self, groups):
-        ''' helper function to apply quantile mapping by group
+        """ helper function to apply quantile mapping by group
 
         Note that we recombine the dataframes using pd.concat, there may be a better way to do this
-        '''
+        """
 
         dfs = []
         for key, group in groups:
@@ -50,7 +51,7 @@ class BcsdBase(LinearModel, RegressorMixin):
 
 
 class BcsdPrecipitation(BcsdBase):
-    ''' Classic BCSD model for Precipitation
+    """ Classic BCSD model for Precipitation
 
     Parameters
     ----------
@@ -66,9 +67,10 @@ class BcsdPrecipitation(BcsdBase):
         Linear Regression object.
     quantile_mappers_ : dict
         QuantileMapper objects (one for each time group).
-    '''
+    """
+
     def fit(self, X, y):
-        ''' Fit BcsdPrecipitation model
+        """ Fit BcsdPrecipitation model
 
         Parameters
         ----------
@@ -80,7 +82,7 @@ class BcsdPrecipitation(BcsdBase):
         Returns
         -------
         self : returns an instance of self.
-        '''
+        """
         y_groups = y.groupby(self.time_grouper)
         # calculate the climatologies
         self.y_climo_ = y_groups.mean()
@@ -93,7 +95,7 @@ class BcsdPrecipitation(BcsdBase):
         return self
 
     def predict(self, X):
-        '''Predict using the BcsdPrecipitation model
+        """Predict using the BcsdPrecipitation model
 
         Parameters
         ----------
@@ -104,7 +106,7 @@ class BcsdPrecipitation(BcsdBase):
         -------
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
-        '''
+        """
         check_is_fitted(self, self._fit_attributes)
         X = ensure_samples_features(X)
 
@@ -127,7 +129,7 @@ class BcsdPrecipitation(BcsdBase):
 
 class BcsdTemperature(BcsdBase):
     def fit(self, X, y):
-        ''' Fit BcsdTemperature model
+        """ Fit BcsdTemperature model
 
         Parameters
         ----------
@@ -139,7 +141,7 @@ class BcsdTemperature(BcsdBase):
         Returns
         -------
         self : returns an instance of self.
-        '''
+        """
         # calculate the climatologies
         self._x_climo = X.groupby(self.time_grouper).mean()
         y_groups = y.groupby(self.time_grouper)
@@ -151,7 +153,7 @@ class BcsdTemperature(BcsdBase):
         return self
 
     def predict(self, X):
-        ''' Predict using the BcsdTemperature model
+        """ Predict using the BcsdTemperature model
 
         Parameters
         ----------
@@ -162,13 +164,14 @@ class BcsdTemperature(BcsdBase):
         -------
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
-        '''
+        """
         check_is_fitted(self, self._fit_attributes)
         X = ensure_samples_features(X)
 
         # Calculate the 9-year running mean for each month
         def rolling_func(x):
             return x.rolling(9, center=True, min_periods=1).mean()
+
         X_rolling_mean = X.groupby(self.time_grouper).apply(rolling_func)
 
         # calc shift
