@@ -5,6 +5,7 @@ import pandas as pd
 
 from sklearn.base import RegressorMixin
 from sklearn.linear_model.base import LinearModel
+from sklearn.utils.validation import check_is_fitted
 
 from .utils import QuantileMapper, ensure_samples_features
 
@@ -14,6 +15,7 @@ MONTH_GROUPER = lambda x: x.month
 class BcsdBase(LinearModel, RegressorMixin):
     ''' Base class for BCSD model. 
     '''
+    _fit_attributes = ['y_climo_', 'quantile_mappers_']
 
     def __init__(self, time_grouper=MONTH_GROUPER, **qm_kwargs):
         if isinstance(time_grouper, str):
@@ -43,17 +45,9 @@ class BcsdBase(LinearModel, RegressorMixin):
         for key, group in groups:
             data = ensure_samples_features(group)
             qmapped = self.quantile_mappers_[key].transform(data)
-            dfs.append(pd.DataFrame(qmapped, index=group.index))
+            dfs.append(pd.DataFrame(qmapped, index=group.index, columns=data.columns))
         return pd.concat(dfs).sort_index()
 
-    def _remove_climatology(self, obj, climatology):
-        dfs = []
-        for key, group in obj.groupby(self.time_grouper):
-            dfs.append(group - climatology.loc[key])
-        
-        out = pd.concat(dfs).sort_index()
-        assert obj.shape == out.shape
-        return out
 
 class BcsdPrecipitation(BcsdBase):
     ''' Classic BCSD model for Precipitation
@@ -89,8 +83,8 @@ class BcsdPrecipitation(BcsdBase):
         '''
         y_groups = y.groupby(self.time_grouper)
         # calculate the climatologies
-        self._y_climo = y_groups.mean()
-        if self._y_climo.min() <= 0:
+        self.y_climo_ = y_groups.mean()
+        if self.y_climo_.values.min() <= 0:
             raise ValueError("Invalid value in target climatology")
 
         # fit the quantile mappers
@@ -111,6 +105,7 @@ class BcsdPrecipitation(BcsdBase):
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
         '''
+        check_is_fitted(self, self._fit_attributes)
         X = ensure_samples_features(X)
 
         # Bias correction
@@ -118,7 +113,16 @@ class BcsdPrecipitation(BcsdBase):
         Xqm = self._qm_transform_by_group(X.groupby(self.time_grouper))
 
         # calculate the anomalies as a ratio of the training data
-        return Xqm.groupby(self.time_grouper) / self._y_climo
+        return self._calc_ratio_anoms(Xqm, self.y_climo_)
+
+    def _calc_ratio_anoms(self, obj, climatology):
+        dfs = []
+        for key, group in obj.groupby(self.time_grouper):
+            dfs.append(group / climatology.loc[key].values)
+
+        out = pd.concat(dfs).sort_index()
+        assert obj.shape == out.shape
+        return out
 
 
 class BcsdTemperature(BcsdBase):
@@ -139,7 +143,7 @@ class BcsdTemperature(BcsdBase):
         # calculate the climatologies
         self._x_climo = X.groupby(self.time_grouper).mean()
         y_groups = y.groupby(self.time_grouper)
-        self._y_climo = y_groups.mean()
+        self.y_climo_ = y_groups.mean()
 
         # fit the quantile mappers
         self._qm_fit_by_group(y_groups)
@@ -159,6 +163,7 @@ class BcsdTemperature(BcsdBase):
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
         '''
+        check_is_fitted(self, self._fit_attributes)
         X = ensure_samples_features(X)
 
         # Calculate the 9-year running mean for each month
@@ -179,7 +184,15 @@ class BcsdTemperature(BcsdBase):
         Xqm = self._qm_transform_by_group(X_no_shift.groupby(self.time_grouper))
 
         # restore the shift
-        X_qm_with_shift = Xqm + X_shift
-
+        X_qm_with_shift = X_shift + Xqm
         # calculate the anomalies
-        return self._remove_climatology(X_qm_with_shift, self._y_climo)
+        return self._remove_climatology(X_qm_with_shift, self.y_climo_)
+
+    def _remove_climatology(self, obj, climatology):
+        dfs = []
+        for key, group in obj.groupby(self.time_grouper):
+            dfs.append(group - climatology.loc[key].values)
+
+        out = pd.concat(dfs).sort_index()
+        assert obj.shape == out.shape
+        return out

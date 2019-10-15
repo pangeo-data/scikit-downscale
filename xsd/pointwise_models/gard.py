@@ -8,8 +8,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn.utils.validation import check_is_fitted
 
 
-
 class AnalogBase(LinearModel, RegressorMixin):
+    _fit_attributes = ['kdtree_', 'y_']
 
     def fit(self, X, y):
 
@@ -48,16 +48,16 @@ class AnalogRegression(AnalogBase):
         self.lr_kwargs = lr_kwargs
 
     def predict(self, X):
-        check_is_fitted(self)
+        check_is_fitted(self, self._fit_attributes)
 
-        predicted = np.empty(len(X), dtype=self.y_.dtype)
+        predicted = np.empty(len(X))
 
         # TODO - extract from lr_model's below.
         self.stats = {}
 
-        for i, row in enumerate(X):
+        for i, (_, row) in enumerate(X.iterrows()):
             # predict for this time step
-            predicted[i] = self._predict_one_step(row)
+            predicted[i] = self._predict_one_step(row.values)
 
         return predicted
 
@@ -85,14 +85,27 @@ class PureAnalog(AnalogBase):
     kdtree_ : scipy.spatial.cKDTree
         KDTree object
     '''
-    def __init__(self):
-        pass
+
+    def __init__(self, n_analogs=200, kdtree_kwargs={}, query_kwargs={}):
+
+        self.n_analogs = n_analogs
+        self.kdtree_kwargs = kdtree_kwargs
+        self.query_kwargs = query_kwargs
 
     def predict(self, X, n_analogs=200, kind='best_analog', thresh=None, stats=True):
-        """
-        TODO
-        """
-        check_is_fitted(self)
+        '''Predict using the PureAnalog model
+
+        Parameters
+        ----------
+        X : pd.Series or pd.DataFrame, shape (n_samples, 1)
+            Samples.
+
+        Returns
+        -------
+        C : pd.DataFrame, shape (n_samples, 1)
+            Returns predicted values.
+        '''
+        check_is_fitted(self, self._fit_attributes)
 
         if kind == 'best_analog':
             n_analogs = 1
@@ -101,7 +114,7 @@ class PureAnalog(AnalogBase):
 
         dist, inds = self.kdtree_.query(X, k=n_analogs, **self.query_kwargs)
 
-        analogs = self._y[inds]
+        analogs = self.y_[inds]
 
         if thresh is not None:
             # TODO: rethink how the analog threshold is applied.
