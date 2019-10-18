@@ -76,7 +76,7 @@ class PointWiseDownscaler:
         self._model = model
         self._models = None
 
-        if not hasattr(model, "fit") or not hasattr(model, "predict"):
+        if not hasattr(model, "fit"):
             raise TypeError(
                 "Type %s does not have the fit and predict methods required"
                 " by PointWiseDownscaler" % type(model)
