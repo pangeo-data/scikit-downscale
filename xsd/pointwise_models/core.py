@@ -211,7 +211,7 @@ class PointWiseDownscaler:
         y_trans : xarray.DataArray
         """
 
-        kwargs = dict(**predict_params)
+        kwargs = dict(**transform_params)
 
         # xarray.Dataset --> xarray.DataArray
         if isinstance(X, xr.Dataset):
