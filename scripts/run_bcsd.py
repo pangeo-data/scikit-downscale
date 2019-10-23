@@ -50,7 +50,7 @@ def run_ak(obs_fname, train_fname, predict_fname):
     out = xr.Dataset()
 
     # get variables from the obs/training/prediction datasets
-    ds_obs = xr.open_mfdataset(obs_fname, chunks=chunks, concat_dim='time',
+    ds_obs = xr.open_mfdataset(obs_fname, chunks=chunks, combine='by_coords',
                                data_vars='minimal')
     time_bounds = slice(ds_obs.indexes['time'][0], ds_obs.indexes['time'][-1])
     ds_obs.coords['xc'] = ds_obs['xc'].where(ds_obs['xc'] >= 0,
@@ -86,12 +86,12 @@ def run_ak(obs_fname, train_fname, predict_fname):
 
         da_train = xr.open_mfdataset(
             train_fname.format(gcm_var=gcm_var), chunks=chunks,
-            concat_dim='time', data_vars='minimal')[gcm_var].sel(
+            combine='by_coords', data_vars='minimal')[gcm_var].sel(
             time=time_bounds).astype('f4').resample(
                 time='MS').mean('time').load()
         da_predict = xr.open_mfdataset(
             predict_fname.format(gcm_var=gcm_var), chunks=chunks,
-            concat_dim='time', data_vars='minimal')[gcm_var].sel(
+            combine='by_coords', data_vars='minimal')[gcm_var].sel(
                 time=predict_time_bounds).astype('f4').resample(
                     time='MS').mean('time').load()
 
@@ -122,9 +122,11 @@ def run_hi(obs_fname, train_fname, predict_fname):
     out = xr.Dataset()
 
     # get variables from the obs/training/prediction datasets
-    ds_obs = xr.open_mfdataset(obs_fname, chunks=chunks, concat_dim='time',
+    ds_obs = xr.open_mfdataset(obs_fname, chunks=chunks, combine='by_coords',
                                data_vars='minimal')
-    time_bounds = slice(ds_obs.indexes['time'][0], ds_obs.indexes['time'][-1])
+    print('obs', ds_obs)
+    time_bounds = slice(ds_obs.indexes['time'][0].strftime('%Y-%m-%d'),
+                        ds_obs.indexes['time'][-1].strftime('%Y-%m-%d'))
 
     for obs_var, gcm_var in varnames.items():
         obs_keep_vars = [obs_var, 'lon', 'lat']
@@ -145,15 +147,12 @@ def run_hi(obs_fname, train_fname, predict_fname):
 
         da_train = xr.open_mfdataset(
             train_fname.format(gcm_var=gcm_var), chunks=chunks,
-            concat_dim='time', data_vars='minimal')[gcm_var].sel(
-            time=time_bounds).astype('f4').resample(
-                time='MS').mean('time').load()
+            combine='by_coords', data_vars='minimal')[gcm_var].pipe(resample, time_bounds)
         da_predict = xr.open_mfdataset(
             predict_fname.format(gcm_var=gcm_var), chunks=chunks,
-            concat_dim='time', data_vars='minimal')[gcm_var].sel(
-                time=predict_time_bounds).astype('f4').resample(
-                    time='MS').mean('time').load()
-
+            combine='by_coords', data_vars='minimal')[gcm_var].pipe(resample, time_bounds)
+        print('da_train', da_train)
+        print('da_predict', da_predict)
         anoms[obs_var] = bcsd(ds_obs_1var, da_train.to_dataset(name=obs_var),
                               da_predict.to_dataset(name=obs_var),
                               var=obs_var)
@@ -162,6 +161,14 @@ def run_hi(obs_fname, train_fname, predict_fname):
 
         gc.collect()
     return anoms, out
+
+
+def resample(da, time_bounds):
+    try:
+        da['time'] = da.indexes['time'].to_datetimeindex()
+    except:
+        pass
+    return da.sel(time=time_bounds).astype('f4').resample(time='MS').mean('time').load()
 
 
 if __name__ == '__main__':
