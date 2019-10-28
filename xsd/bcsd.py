@@ -36,6 +36,7 @@ import calendar
 
 import numpy as np
 import pandas as pd
+from scipy import interpolate
 import xarray as xr
 # import xesmf as xe
 
@@ -47,6 +48,7 @@ from .quantile_mapping import quantile_mapping_by_group
 
 # all cdo stuff, to be removed later
 cdo = Cdo()
+cdo.debug = False
 
 
 def get_bounds(obj):
@@ -84,14 +86,23 @@ def _running_mean(obj, **kwargs):
     return obj.rolling(**kwargs).mean()
 
 
-def _regrid_to(dest, *objs, name=None):
+def _add_encoding(obj):
+    if isinstance(obj, xr.Dataset):
+        for k in obj.data_vars:
+            obj[k].encoding['_FillValue'] = -9999
+    else:  # dataarray
+        obj.encoding['_FillValue'] = -9999
+    return obj
+
+
+def _regrid_to(dest, *objs, kind='remapbil', name=None):
     ''' helper function to handle regridding a batch of objects to a common
     grid
     '''
     if isinstance(dest, xr.Dataset):
         f = tempfile.NamedTemporaryFile(prefix='bcsd_dest_', suffix='.nc', delete=False)
         f.close()
-        dest.to_netcdf(f.name, engine='scipy')
+        _add_encoding(dest).to_netcdf(f.name, engine='scipy')
         dest = f.name
 
     out = []
@@ -104,11 +115,39 @@ def _regrid_to(dest, *objs, name=None):
         if isinstance(input_ds, xr.Dataset):
             f = tempfile.NamedTemporaryFile(prefix='bcsd_src_', suffix='.nc', delete=False)
             f.close()
-            input_ds.to_netcdf(f.name, engine='scipy')
+            _add_encoding(input_ds).to_netcdf(f.name, engine='scipy')
             input_ds = f.name
 
-        out.append(cdo.remapbil(dest, input=input_ds, returnXArray=name).load())
+        regrider = getattr(cdo, kind)
+
+        out.append(regrider(dest, input=input_ds, returnXArray=name).load())
     return out
+
+
+def _fill_missing_2d(da2d):
+    assert da2d.ndim == 2
+
+    da_out = da2d.copy(deep=True)
+
+    mask = da2d.notnull().values
+    xx, yy = np.meshgrid(da2d.lon.values, da2d.lat.values)
+
+    xym = np.vstack((np.ravel(xx[mask]), np.ravel(yy[mask]))).T
+    data = np.ravel(da2d.values[mask])
+
+    # create the interpolater
+    interp = interpolate.NearestNDInterpolator(xym, data)
+    # do the interpolation
+    da_out.values = interp(np.ravel(xx), np.ravel(yy)).reshape(xx.shape)
+
+    return da_out
+
+
+def fill_missing(da):
+    out = []
+    for t in range(len(da.time)):
+        out.append(_fill_missing_2d(da.isel(time=t)))
+    return xr.concat(out, dim='time')
 
 
 def bcsd(ds_obs, ds_train, ds_predict, var='pcp'):
@@ -133,13 +172,12 @@ def bcsd(ds_obs, ds_train, ds_predict, var='pcp'):
     out_coarse : xr.DataArray
         Anomalies on the same grid as ``ds_obs``.
     '''
-
     # regrid to common coarse grid
     bounds = get_bounds(ds_obs)
     coarse_grid = make_coarse_grid(bounds, 1.)
     # coarse_grid = 'r360x180'
     (da_obs_coarse, da_train_coarse, da_predict_coarse) = _regrid_to(  # pylint: disable=unbalanced-tuple-unpacking
-        coarse_grid, ds_obs, ds_train, ds_predict, name=var)
+        coarse_grid, ds_obs, ds_train, ds_predict, name=var, kind='remapcon')
 
     mask = da_obs_coarse.any(dim='time')
     da_obs_coarse = da_obs_coarse.where(mask)
@@ -191,7 +229,11 @@ def bcsd(ds_obs, ds_train, ds_predict, var='pcp'):
                                    - da_obs_coarse_mean)
 
     # regrid to obs grid
-    out_coarse, = _regrid_to(ds_obs, da_predict_coarse_anoms, name=var)  # pylint: disable=unbalanced-tuple-unpacking
+    print('regridding final coarse anoms')
+    da_predict_coarse_anoms = fill_missing(da_predict_coarse_anoms)
+    out_coarse, = _regrid_to(ds_obs, da_predict_coarse_anoms, kind='remapdis', name=var)  # pylint: disable=unbalanced-tuple-unpacking
+
+    out_coarse = out_coarse.where(ds_obs[var].isel(time=0).notnull())
 
     # return regridded anomalies
     return out_coarse
@@ -267,7 +309,5 @@ def disagg(da_obs, da_anoms, var='pcp'):
 
         disag_out.append(disag_data)
 
-    print('disag_out', disag_out)
-    print('sample', xr.concat(disag_out[:10], dim='time'))
     # concat all months together (they are already sorted)
     return xr.concat(disag_out, dim='time')
