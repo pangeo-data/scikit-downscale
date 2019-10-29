@@ -8,6 +8,7 @@ from sklearn.linear_model.base import LinearModel
 from sklearn.utils.validation import check_is_fitted
 
 from .utils import QuantileMapper, ensure_samples_features
+from .groupers import PaddedDOYGrouper
 
 MONTH_GROUPER = lambda x: x.month
 
@@ -20,11 +21,47 @@ class BcsdBase(LinearModel, RegressorMixin):
 
     def __init__(self, time_grouper=MONTH_GROUPER, **qm_kwargs):
         if isinstance(time_grouper, str):
-            self.time_grouper = pd.Grouper(freq=time_grouper)
+            if time_grouper == 'daily_nasa-nex':
+                self.time_grouper = PaddedDOYGrouper
+                self.timestep = 'daily'
+            else:
+                self.time_grouper = pd.Grouper(freq=time_grouper)
         else:
             self.time_grouper = time_grouper
+            self.timestep = 'monthly'
 
         self.qm_kwargs = qm_kwargs
+        
+    def _create_groups(self, df):
+        """ helper function to create groups by either daily or month,
+        depending on whether we are bias correcting daily or monthly data
+        """
+        if self.timestep == 'monthly':
+            return df.groupby(self.time_grouper)
+        elif self.timestep== 'daily':
+            return self.time_grouper(df)
+        else:
+            raise TypeError('unexpected time grouper type %s' % self.time_grouper)
+        
+    def _create_temperature_climatology_groups(self, df):
+        """ helper function to create climatology groups for either daily or monthly data. 
+        Note: the reason we need this function in addition to the above one is that for BC'ing 
+        daily data, we still want to calculate the 9-year running average of monthly data, so we 
+        can't use the above function. Instead we want to groupby month if we are BCing monthly data, 
+        and we want to resample to monthly data if we are BCing daily data. 
+        
+        Note: this is variable specific, since I think we want to sum for precip rather than 
+        taking the mean. 
+        """
+        if isinstance(self.time_grouper, pd.Grouper):
+            upsample = False
+            return (df.groupby(self.time_grouper), upsample)
+        elif isinstance(self.time_grouper, XsdGroupGeneratorBase):
+            df_monthly = df.resample('M').mean()
+            upsample = True
+            return (df_monthly(pd.Grouper(freq='M')), upsample)
+        else:
+            raise TypeError('unexpected time grouper type %s' % self.time_grouper)
 
     def _qm_fit_by_group(self, groups):
         """ helper function to fit quantile mappers by group
@@ -90,6 +127,7 @@ class BcsdPrecipitation(BcsdBase):
             raise ValueError("Invalid value in target climatology")
 
         # fit the quantile mappers
+        # TO-DO: do we need to detrend the data before fitting the quantile mappers??
         self._qm_fit_by_group(y_groups)
 
         return self
@@ -143,8 +181,14 @@ class BcsdTemperature(BcsdBase):
         self : returns an instance of self.
         """
         # calculate the climatologies
-        self._x_climo = X.groupby(self.time_grouper).mean()
-        y_groups = y.groupby(self.time_grouper)
+        # NOTE: here we want the means of daily or monthly groups. In the `predict` function when 
+        # we extract large scale GCM trends, then we want the monthly means regardless of whether we 
+        # are bias correcting daily or monthly data (for the NASA-NEX implementation of BCSD at least)
+        self._x_climo = self._create_groups(X).mean()
+        
+        # make groups for day or month 
+        y_groups = self._create_groups(y)
+        
         self.y_climo_ = y_groups.mean()
 
         # fit the quantile mappers
@@ -171,8 +215,14 @@ class BcsdTemperature(BcsdBase):
         # Calculate the 9-year running mean for each month
         def rolling_func(x):
             return x.rolling(9, center=True, min_periods=1).mean()
-
-        X_rolling_mean = X.groupby(self.time_grouper).apply(rolling_func)
+        
+        X_climo_groups, upsample = self._create_temperature_climatology_groups(X)
+        # X_rolling_mean = X.groupby(self.time_grouper).apply(rolling_func)
+        X_rolling_mean = X_climo_groups.apply(rolling_func)
+        
+        # if X is daily data, need to upsample X_rolling_mean to daily 
+        if upsample:
+            X_rolling_mean = X_rolling_mean.resample('D')
 
         # calc shift
         # why isn't this working??
@@ -184,7 +234,8 @@ class BcsdTemperature(BcsdBase):
 
         # Bias correction
         # apply quantile mapping by month
-        Xqm = self._qm_transform_by_group(X_no_shift.groupby(self.time_grouper))
+        # Xqm = self._qm_transform_by_group(X_no_shift.groupby(self.time_grouper))
+        Xqm = self._qm_transform_by_group(self._create_groups(X_no_shift))
 
         # restore the shift
         X_qm_with_shift = X_shift + Xqm
