@@ -49,10 +49,17 @@ def run_ak(obs_fname, train_fname, predict_fname):
     anoms = xr.Dataset()
     out = xr.Dataset()
 
+    def preproc(ds):
+        coords = ['xc', 'yc', 'xv', 'yv']
+        ds = ds.rename({'lat': 'nj', 'lon': 'ni'}).drop(['latitude', 'longitude']).set_coords(coords)
+        for v in coords:
+            ds[v] = ds[v].load()
+        return ds
+
     # get variables from the obs/training/prediction datasets
-    ds_obs = xr.open_mfdataset(obs_fname, chunks=chunks, combine='by_coords',
-                               data_vars='minimal')
-    time_bounds = slice(ds_obs.indexes['time'][0], ds_obs.indexes['time'][-1])
+    print(obs_fname, chunks)
+    ds_obs = xr.open_mfdataset(obs_fname, combine='by_coords', preprocess=preproc, coords='minimal', compat='override')
+    time_bounds = slice(ds_obs.indexes['time'][0].strftime('%Y-%m-%d'), ds_obs.indexes['time'][-1].strftime('%Y-%m-%d'))
     ds_obs.coords['xc'] = ds_obs['xc'].where(ds_obs['xc'] >= 0,
                                              ds_obs.coords['xc'] + 360)
     attrs_to_delete = ['grid_mapping', 'cell_methods', 'remap', 'FieldType',
@@ -86,12 +93,15 @@ def run_ak(obs_fname, train_fname, predict_fname):
 
         da_train = xr.open_mfdataset(
             train_fname.format(gcm_var=gcm_var), chunks=chunks,
-            combine='by_coords', data_vars='minimal')[gcm_var].sel(
-            time=time_bounds).astype('f4').resample(
-                time='MS').mean('time').load()
+            combine='by_coords', data_vars='minimal')[gcm_var]
+        da_train['time'] = da_train.indexes['time'].to_datetimeindex()
+        da_train = da_train.sel(time=time_bounds).astype('f4').resample(
+            time='MS').mean('time').load()
         da_predict = xr.open_mfdataset(
             predict_fname.format(gcm_var=gcm_var), chunks=chunks,
-            combine='by_coords', data_vars='minimal')[gcm_var].sel(
+            combine='by_coords', data_vars='minimal')[gcm_var]
+        da_predict['time'] = da_predict.indexes['time'].to_datetimeindex()
+        da_predict = da_predict.sel(
                 time=predict_time_bounds).astype('f4').resample(
                     time='MS').mean('time').load()
 
@@ -100,10 +110,9 @@ def run_ak(obs_fname, train_fname, predict_fname):
                               var=obs_var)
         out[obs_var] = disagg(ds_obs_daily[obs_var], anoms[obs_var],
                               var=obs_var)
-        out['xv'] = ds_obs_1var['xv']
-        out['yv'] = ds_obs_1var['yv']
-        anoms['xv'] = ds_obs_1var['xv']
-        anoms['yv'] = ds_obs_1var['yv']
+        for var in ['xv', 'yv']:
+            if var not in out.coords:
+                out[var] = ds_obs_1var[var]
 
         gc.collect()
     return anoms, out
