@@ -99,7 +99,7 @@ def run_ak(obs_fname, train_fname, predict_fname):
             time='MS').mean('time').load()
         da_predict = xr.open_mfdataset(
             predict_fname.format(gcm_var=gcm_var), chunks=chunks,
-            combine='by_coords', data_vars='minimal')[gcm_var]
+            combine='by_coords', coords='minimal', data_vars='minimal', compat='override')[gcm_var]
         da_predict['time'] = da_predict.indexes['time'].to_datetimeindex()
         da_predict = da_predict.sel(
                 time=predict_time_bounds).astype('f4').resample(
