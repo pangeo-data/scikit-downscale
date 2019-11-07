@@ -99,3 +99,21 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+#text files
+*.txt
+*.old
+
+#shell scripts
+*.bash
+*.tcsh
+*.csh
+*.sh
+*.ksh
+
+#submission scripts
+*.slurm
+*.pbs
+
+#logs
+/scripts/logs/
