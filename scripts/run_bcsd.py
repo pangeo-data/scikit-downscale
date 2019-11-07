@@ -93,17 +93,12 @@ def run_ak(obs_fname, train_fname, predict_fname):
 
         da_train = xr.open_mfdataset(
             train_fname.format(gcm_var=gcm_var), chunks=chunks,
-            combine='by_coords', data_vars='minimal')[gcm_var]
-        da_train['time'] = da_train.indexes['time'].to_datetimeindex()
-        da_train = da_train.sel(time=time_bounds).astype('f4').resample(
-            time='MS').mean('time').load()
+            combine='by_coords', data_vars='minimal')[gcm_var].pipe(resample, time_bounds)
         da_predict = xr.open_mfdataset(
             predict_fname.format(gcm_var=gcm_var), chunks=chunks,
-            combine='by_coords', coords='minimal', data_vars='minimal', compat='override')[gcm_var]
-        da_predict['time'] = da_predict.indexes['time'].to_datetimeindex()
-        da_predict = da_predict.sel(
-                time=predict_time_bounds).astype('f4').resample(
-                    time='MS').mean('time').load()
+            combine='by_coords', data_vars='minimal')[gcm_var].pipe(resample, predict_time_bounds)
+        print('da_train', da_train)
+        print('da_predict', da_predict)
 
         anoms[obs_var] = bcsd(ds_obs_1var, da_train.to_dataset(name=obs_var),
                               da_predict.to_dataset(name=obs_var),
@@ -159,7 +154,7 @@ def run_hi(obs_fname, train_fname, predict_fname):
             combine='by_coords', data_vars='minimal')[gcm_var].pipe(resample, time_bounds)
         da_predict = xr.open_mfdataset(
             predict_fname.format(gcm_var=gcm_var), chunks=chunks,
-            combine='by_coords', data_vars='minimal')[gcm_var].pipe(resample, time_bounds)
+            combine='by_coords', data_vars='minimal')[gcm_var].pipe(resample, predict_time_bounds)
         print('da_train', da_train)
         print('da_predict', da_predict)
         anoms[obs_var] = bcsd(ds_obs_1var, da_train.to_dataset(name=obs_var),
