@@ -172,7 +172,12 @@ def resample(da, time_bounds):
         da['time'] = da.indexes['time'].to_datetimeindex()
     except:
         pass
-    return da.sel(time=time_bounds).astype('f4').resample(time='MS').mean('time').load()
+    try:
+        return da.sel(time=time_bounds).astype('f4').resample(time='MS').mean('time').load()
+    except:
+        # hack for 360 day calendar
+        time_bounds = slice(time_bounds.start, time_bounds.stop.replace('31', '30'))
+        return da.astype('f4').resample(time='MS').mean('time').sel(time=time_bounds).load()
 
 
 if __name__ == '__main__':

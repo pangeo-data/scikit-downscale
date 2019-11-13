@@ -290,7 +290,7 @@ def disagg(da_obs, da_anoms, var='pcp'):
     for i, (year, month) in enumerate(zip(years.values,
                                           years['time.month'].values)):
         anom = da_anoms.isel(time=i)
-        anom_time = pd.Timestamp(anom['time'].values)
+        anom_time = pd.to_datetime(anom['time'].item().strftime('%Y-%m-%d'))
         obs = get_obs_data(da_obs, month, year, anom_time.year)
         if var == 'pcp':
             disag_data = obs * anom
