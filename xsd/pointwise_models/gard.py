@@ -92,8 +92,8 @@ class AnalogRegression(AnalogBase):
         _, inds = self.kdtree_.query(X, k=self.n_analogs, **self.query_kwargs)
 
         # extract data to train linear regression model
-        x = ensure_samples_features(self.kdtree_.data[inds])
-        y = ensure_samples_features(self.y_.values[inds])
+        x = ensure_samples_features(self.kdtree_.data[inds-1])
+        y = ensure_samples_features(self.y_.values[inds-1])
 
         # train linear regression model
         lr_model = LinearRegression(**self.lr_kwargs).fit(x, y)
