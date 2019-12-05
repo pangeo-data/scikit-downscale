@@ -1,6 +1,6 @@
 import numpy as np
 import xarray as xr
-
+from sklearn.base import BaseEstimator, TransformerMixin
 
 """
 Basic univariate quantile mapping post-processing algorithms.
@@ -8,7 +8,7 @@ Basic univariate quantile mapping post-processing algorithms.
 """
 
 
-def train(x, y, nq, group, kind="+"):
+def train(x, y, nq, group, kind="+", detrend='time'):
     """Compute quantile bias-adjustment factors.
 
     Parameters
@@ -19,30 +19,39 @@ def train(x, y, nq, group, kind="+"):
       Training target, usually an observed at-site time-series.
     nq : int
       Number of quantiles.
-    group : {'time.season', 'time.month', 'time.dayofyear'}
-      Grouping criterion.
+    group : {'time.season', 'time.month', 'time.dayofyear', 'time.time'}
+      Grouping criterion. Use an accessor that is identical to all values to skip grouping (e.g. time.time for daily
+      values).
     kind : {'+', '*'}
       The transfer operation, + for additive and * for multiplicative.
+    detrend : str, None
+      Dimension over which to detrend. Set to None to skip detrending.
 
     Returns
     -------
     xr.DataArray
       Delta factor computed over time grouping and quantile bins.
     """
+    # Detrend
+    if detrend is not None:
+        x, _ = xdetrend(x, dim=detrend)
+        y, _ = xdetrend(y, dim=detrend)
+
+
     # Define nodes. Here n equally spaced points within [0, 1]
     # E.g. for nq=4 :  0---x------x------x------x---1
     dq = 1 / nq / 2
     q = np.linspace(dq, 1 - dq, nq)
 
     # Group values by time, then compute quantiles. The resulting array will have new time and quantile dimensions.
-    xg = x.groupby(group).quantile(q)
-    yg = y.groupby(group).quantile(q)
+    xq = x.groupby(group).quantile(q)
+    yq = y.groupby(group).quantile(q)
 
     # Compute the correction factor
     if kind == "+":
-        out = yg - xg
+        out = yq - xq
     elif kind == "*":
-        out = yg / xg
+        out = yq / xq
     else:
         raise ValueError("kind must be + or *.")
 
@@ -53,7 +62,7 @@ def train(x, y, nq, group, kind="+"):
     return out
 
 
-def predict(x, qmf, interp=False):
+def predict(x, qmf, interp=False, detrend='time'):
     """Apply quantile mapping delta to an array.
 
     Parameters
@@ -64,6 +73,8 @@ def predict(x, qmf, interp=False):
       Quantile mapping factors computed by the `train` function.
     interp : bool
       Whether to interpolate between the groupings.
+    detrend : str, None
+      Dimension over which to detrend before apply quantile mapping factors. Set to None to skip detrending.
 
     Returns
     -------
@@ -76,6 +87,9 @@ def predict(x, qmf, interp=False):
 
     if "season" in qmf.group and interp:
         raise NotImplementedError
+
+    if detrend is not None:
+        x, trend = xdetrend(x, dim=detrend)
 
     # Find the group indexes
     ind, att = qmf.group.split(".")
@@ -125,6 +139,10 @@ def predict(x, qmf, interp=False):
 
     out.attrs["bias_corrected"] = True
 
+    # Add trend back
+    if detrend:
+        out += trend
+
     # Remove time grouping and quantile coordinates
     return out.drop(["quantile", att])
 
@@ -153,3 +171,31 @@ def add_q_bounds(qmf):
     qmf = qmf.reindex({att: q[i]})
     qmf.coords[att] = np.concatenate(([0], q, [1]))
     return qmf
+
+
+def _calc_slope(x, y):
+    """Wrapper that returns the slop from a linear regression fit of x and y."""
+    from scipy import stats
+    slope = stats.linregress(x, y)[0]  # extract slope only
+    return slope
+
+
+def xdetrend(obj, dim='time'):
+    index = xr.DataArray(obj[dim].values.astype(np.float),
+                             dims=dim,
+                             coords={dim: obj[dim]},
+                             name='index')
+
+    trend = xr.apply_ufunc(_calc_slope, index, obj,
+                           vectorize=True,
+                           input_core_dims=[[dim], [dim]],
+                           output_core_dims=[[]],
+                           output_dtypes=[np.float],
+                           dask='parallelized')
+
+    trend = (index * trend).transpose(*obj.dims)
+    detrended = obj - trend
+    return detrended, trend
+
+
+class PolynomialTrendTransformer(TransformerMixin, BaseEstimator):
