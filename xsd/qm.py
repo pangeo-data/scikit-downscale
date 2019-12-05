@@ -121,7 +121,7 @@ def predict(x, qmf, interp=False, detrend='time'):
     else:
         y = getattr(q.indexes[ind], att)
 
-    it = xr.DataArray(x, dims="time", coords={"time": time}, name="time group index")
+    it = xr.DataArray(y, dims="time", coords={"time": time}, name="time group index")
 
     # Extract the correct quantile for each time step.
 
