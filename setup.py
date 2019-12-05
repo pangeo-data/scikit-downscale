@@ -14,19 +14,16 @@ CLASSIFIERS = [
     "Topic :: Scientific/Engineering",
 ]
 
-packages = find_packages()
-print(packages)
-
-setup(name='xsd',
-      version='0.0.1',
-      author='Joe Hamman',
-      author_email='jhamman@ucar.edu',
-      license="Apache",
-      classifiers=CLASSIFIERS,
-      description='Statistical downscaling and postprocessing models for climate and weather model simulations.',
-      python_requires=">=3.6",
-      install_requires=["xarray >= 0.10", "scikit-learn >= 0.21"],
-      tests_require=["pytest >= 2.7.1"],
-      url='https://github.com/jhamman/xsd',
-      packages=packages
-      )
+setup(
+    name="xsd",
+    author="Joe Hamman",
+    author_email="jhamman@ucar.edu",
+    license="Apache",
+    classifiers=CLASSIFIERS,
+    description="Statistical downscaling and postprocessing models for climate and weather model simulations.",
+    python_requires=">=3.6",
+    install_requires=["xarray >= 0.10", "scikit-learn >= 0.21"],
+    tests_require=["pytest >= 2.7.1"],
+    url="https://github.com/jhamman/xsd",
+    packages=find_packages(),
+)

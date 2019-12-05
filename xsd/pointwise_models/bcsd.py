@@ -5,58 +5,53 @@ import pandas as pd
 
 from sklearn.base import RegressorMixin
 from sklearn.linear_model.base import LinearModel
+from sklearn.utils.validation import check_is_fitted
 
 from .utils import QuantileMapper, ensure_samples_features
 
 MONTH_GROUPER = lambda x: x.month
-      
+
 
 class BcsdBase(LinearModel, RegressorMixin):
-    ''' Base class for BCSD model. 
-    '''
+    """ Base class for BCSD model. 
+    """
+
+    _fit_attributes = ["y_climo_", "quantile_mappers_"]
 
     def __init__(self, time_grouper=MONTH_GROUPER, **qm_kwargs):
         if isinstance(time_grouper, str):
-            self.grouper_ = pd.Grouper(freq=time_grouper)
+            self.time_grouper = pd.Grouper(freq=time_grouper)
         else:
-            self.grouper_ = time_grouper
+            self.time_grouper = time_grouper
 
         self.qm_kwargs = qm_kwargs
-        self.quantile_mappers_ = {}
 
     def _qm_fit_by_group(self, groups):
-        ''' helper function to fit quantile mappers by group
+        """ helper function to fit quantile mappers by group
 
         Note that we store these mappers for later
-        '''
+        """
+        self.quantile_mappers_ = {}
         for key, group in groups:
             data = ensure_samples_features(group)
             self.quantile_mappers_[key] = QuantileMapper(**self.qm_kwargs).fit(data)
 
     def _qm_transform_by_group(self, groups):
-        ''' helper function to apply quantile mapping by group
+        """ helper function to apply quantile mapping by group
 
         Note that we recombine the dataframes using pd.concat, there may be a better way to do this
-        '''
+        """
 
         dfs = []
         for key, group in groups:
             data = ensure_samples_features(group)
             qmapped = self.quantile_mappers_[key].transform(data)
-            dfs.append(pd.DataFrame(qmapped, index=group.index))
+            dfs.append(pd.DataFrame(qmapped, index=group.index, columns=data.columns))
         return pd.concat(dfs).sort_index()
 
-    def _remove_climatology(self, obj, climatology):
-        dfs = []
-        for key, group in obj.groupby(self.grouper_):
-            dfs.append(group - climatology.loc[key])
-        
-        out = pd.concat(dfs).sort_index()
-        assert obj.shape == out.shape
-        return out
 
 class BcsdPrecipitation(BcsdBase):
-    ''' Classic BCSD model for Precipitation
+    """ Classic BCSD model for Precipitation
 
     Parameters
     ----------
@@ -68,13 +63,14 @@ class BcsdPrecipitation(BcsdBase):
 
     Attributes
     ----------
-    grouper_ : pd.Grouper
+    time_grouper : pd.Grouper
         Linear Regression object.
     quantile_mappers_ : dict
         QuantileMapper objects (one for each time group).
-    '''
+    """
+
     def fit(self, X, y):
-        ''' Fit BcsdPrecipitation model
+        """ Fit BcsdPrecipitation model
 
         Parameters
         ----------
@@ -86,11 +82,11 @@ class BcsdPrecipitation(BcsdBase):
         Returns
         -------
         self : returns an instance of self.
-        '''
-        y_groups = y.groupby(self.grouper_)
+        """
+        y_groups = y.groupby(self.time_grouper)
         # calculate the climatologies
-        self._y_climo = y_groups.mean()
-        if self._y_climo.min() <= 0:
+        self.y_climo_ = y_groups.mean()
+        if self.y_climo_.values.min() <= 0:
             raise ValueError("Invalid value in target climatology")
 
         # fit the quantile mappers
@@ -99,7 +95,7 @@ class BcsdPrecipitation(BcsdBase):
         return self
 
     def predict(self, X):
-        '''Predict using the BcsdPrecipitation model
+        """Predict using the BcsdPrecipitation model
 
         Parameters
         ----------
@@ -110,20 +106,30 @@ class BcsdPrecipitation(BcsdBase):
         -------
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
-        '''
+        """
+        check_is_fitted(self, self._fit_attributes)
         X = ensure_samples_features(X)
 
         # Bias correction
         # apply quantile mapping by month
-        Xqm = self._qm_transform_by_group(X.groupby(self.grouper_))
+        Xqm = self._qm_transform_by_group(X.groupby(self.time_grouper))
 
         # calculate the anomalies as a ratio of the training data
-        return Xqm.groupby(self.grouper_) / self._y_climo
+        return self._calc_ratio_anoms(Xqm, self.y_climo_)
+
+    def _calc_ratio_anoms(self, obj, climatology):
+        dfs = []
+        for key, group in obj.groupby(self.time_grouper):
+            dfs.append(group / climatology.loc[key].values)
+
+        out = pd.concat(dfs).sort_index()
+        assert obj.shape == out.shape
+        return out
 
 
 class BcsdTemperature(BcsdBase):
     def fit(self, X, y):
-        ''' Fit BcsdTemperature model
+        """ Fit BcsdTemperature model
 
         Parameters
         ----------
@@ -135,11 +141,11 @@ class BcsdTemperature(BcsdBase):
         Returns
         -------
         self : returns an instance of self.
-        '''
+        """
         # calculate the climatologies
-        self._x_climo = X.groupby(self.grouper_).mean()
-        y_groups = y.groupby(self.grouper_)
-        self._y_climo = y_groups.mean()
+        self._x_climo = X.groupby(self.time_grouper).mean()
+        y_groups = y.groupby(self.time_grouper)
+        self.y_climo_ = y_groups.mean()
 
         # fit the quantile mappers
         self._qm_fit_by_group(y_groups)
@@ -147,7 +153,7 @@ class BcsdTemperature(BcsdBase):
         return self
 
     def predict(self, X):
-        ''' Predict using the BcsdTemperature model
+        """ Predict using the BcsdTemperature model
 
         Parameters
         ----------
@@ -158,17 +164,19 @@ class BcsdTemperature(BcsdBase):
         -------
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
-        '''
+        """
+        check_is_fitted(self, self._fit_attributes)
         X = ensure_samples_features(X)
 
         # Calculate the 9-year running mean for each month
         def rolling_func(x):
             return x.rolling(9, center=True, min_periods=1).mean()
-        X_rolling_mean = X.groupby(self.grouper_).apply(rolling_func)
+
+        X_rolling_mean = X.groupby(self.time_grouper).apply(rolling_func)
 
         # calc shift
         # why isn't this working??
-        # X_shift = X_rolling_mean.groupby(self.grouper_) - self._x_climo
+        # X_shift = X_rolling_mean.groupby(self.time_grouper) - self._x_climo
         X_shift = self._remove_climatology(X_rolling_mean, self._x_climo)
 
         # remove shift
@@ -176,10 +184,18 @@ class BcsdTemperature(BcsdBase):
 
         # Bias correction
         # apply quantile mapping by month
-        Xqm = self._qm_transform_by_group(X_no_shift.groupby(self.grouper_))
+        Xqm = self._qm_transform_by_group(X_no_shift.groupby(self.time_grouper))
 
         # restore the shift
-        X_qm_with_shift = Xqm + X_shift
-
+        X_qm_with_shift = X_shift + Xqm
         # calculate the anomalies
-        return self._remove_climatology(X_qm_with_shift, self._y_climo)
+        return self._remove_climatology(X_qm_with_shift, self.y_climo_)
+
+    def _remove_climatology(self, obj, climatology):
+        dfs = []
+        for key, group in obj.groupby(self.time_grouper):
+            dfs.append(group - climatology.loc[key].values)
+
+        out = pd.concat(dfs).sort_index()
+        assert obj.shape == out.shape
+        return out

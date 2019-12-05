@@ -10,6 +10,7 @@ def _reshape_for_sklearn(vals, columns=None):
         return pd.DataFrame(data=vals, columns=columns)
     return vals
 
+
 def _fit_model(X, y, model=None, columns=None, **kwargs):
     X = _reshape_for_sklearn(X, columns=columns)
     y = _reshape_for_sklearn(y)
@@ -31,15 +32,22 @@ def _predict(model, X, columns=None):
     return out
 
 
-def _maybe_use_dask(a, dims, b=None):
-    dask_option = 'allowed'
-    if isinstance(a.data, dask.array.Array):
-        dask_option = 'parallelized'
-    
-    if  isinstance(b.data, dask.array.Array):
-        dask_option = 'parallelized'
+def _transform(model, X, columns=None):
+    X = _reshape_for_sklearn(X, columns=columns)
+    # pull item() out because model is wrapped in np.scalar
+    out = model.item().transform(X).squeeze()
+    return out
 
-    if dask_option == 'parallelized':
+
+def _maybe_use_dask(a, dims, b=None):
+    dask_option = "allowed"
+    if isinstance(a.data, dask.array.Array):
+        dask_option = "parallelized"
+
+    if isinstance(b.data, dask.array.Array):
+        dask_option = "parallelized"
+
+    if dask_option == "parallelized":
         a = a.chunk({d: -1 for d in dims if d in a.dims})
         if b is not None:
             b = b.chunk({d: -1 for d in dims if d in b.dims})
@@ -48,7 +56,7 @@ def _maybe_use_dask(a, dims, b=None):
 
 
 class PointWiseDownscaler:
-    '''
+    """
     Pointwise downscaling model wrapper
 
     Apply a scikit-learn model (e.g. Pipeline) point-by-point. The pipeline
@@ -61,20 +69,21 @@ class PointWiseDownscaler:
 
     dim : str, optional
         Dimension to apply the model along. Default is ``time``.
-    '''
-    def __init__(self, model, dim='time'):
+    """
+
+    def __init__(self, model, dim="time"):
         self._dim = dim
         self._model = model
         self._models = None
 
-        if not hasattr(model, 'fit') or not hasattr(model, 'predict'):
+        if not hasattr(model, "fit"):
             raise TypeError(
-                'Type %s does not have the fit and predict methods required'
-                ' by PointWiseDownscaler' % type(model)
+                "Type %s does not have the fit method required"
+                " by PointWiseDownscaler" % type(model)
             )
 
-    def fit(self, X, y, feature_dim='variable', **fit_params):
-        '''Fit the model
+    def fit(self, X, y, feature_dim="variable", **fit_params):
+        """Fit the model
 
         Fit all the transforms one after the other and transform the
         data, then fit the transformed data using the final estimator.
@@ -98,11 +107,11 @@ class PointWiseDownscaler:
             model is a sklearn Pipeline, parameters can be passed to each
             step, where each parameter name is prefixed such that parameter
             ``p`` for step ``s`` has key ``s__p``.
-        '''
+        """
         self._ydims = y.dims
 
         kwargs = dict(model=self._model, **fit_params)
-        
+
         # xarray.Dataset --> xarray.DataArray
         if isinstance(X, xr.Dataset):
             X = X.to_array(feature_dim)
@@ -112,21 +121,26 @@ class PointWiseDownscaler:
 
         if feature_dim in X.coords:
             input_core_dims = [[feature_dim, self._dim], [self._dim]]
-            kwargs['columns'] = X.coords[feature_dim].data
+            kwargs["columns"] = X.coords[feature_dim].data
         else:
             input_core_dims = [[self._dim], [self._dim]]
 
         X, y, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=y)
 
-        self._models = xr.apply_ufunc(_fit_model, X, y,
-                                      vectorize=True,
-                                      dask=dask_option,
-                                      output_dtypes=[np.object],
-                                      input_core_dims=input_core_dims,
-                                      kwargs=kwargs)
+        self._models = xr.apply_ufunc(
+            _fit_model,
+            X,
+            y,
+            vectorize=True,
+            dask=dask_option,
+            output_dtypes=[np.object],
+            input_core_dims=input_core_dims,
+            kwargs=kwargs,
+        )
+        return self
 
-    def predict(self, X, feature_dim='variable', **predict_params):
-        '''Apply transforms to the data, and predict with the final estimator
+    def predict(self, X, feature_dim="variable", **predict_params):
+        """Apply transforms to the data, and predict with the final estimator
 
         Parameters
         ----------
@@ -148,7 +162,7 @@ class PointWiseDownscaler:
         Returns
         -------
         y_pred : xarray.DataArray
-        '''
+        """
 
         kwargs = dict(**predict_params)
 
@@ -158,22 +172,74 @@ class PointWiseDownscaler:
 
         if feature_dim in X.coords:
             input_core_dims = [[], [feature_dim, self._dim]]
-            kwargs['columns'] = X.coords[feature_dim].data
+            kwargs["columns"] = X.coords[feature_dim].data
         else:
             input_core_dims = [[self._dim], [self._dim]]
 
         X, _, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=self._models)
 
-        return xr.apply_ufunc(_predict, self._models, X,
-                              vectorize=True,
-                              dask=dask_option,
-                              output_dtypes=[X.dtype],
-                              input_core_dims=input_core_dims,
-                              output_core_dims=[[self._dim]],
-                              kwargs=kwargs).transpose(*self._ydims)
+        return xr.apply_ufunc(
+            _predict,
+            self._models,
+            X,
+            vectorize=True,
+            dask=dask_option,
+            output_dtypes=[X.dtype],
+            input_core_dims=input_core_dims,
+            output_core_dims=[[self._dim]],
+            kwargs=kwargs,
+        ).transpose(*self._ydims)
+
+    def transform(self, X, feature_dim="variable", **transform_params):
+        """Apply transforms to the data, and transform with the final estimator
+
+        Parameters
+        ----------
+        X : xarray.DataArray
+            Data to transform on. Must fulfill input requirements of first step
+            of the model or pipeline.
+
+        feature_dim : str, optional
+            Name of feature dimension. 
+
+        **transform_params : dict of string -> object
+            Parameters to the ``transform`` called at the end of all
+            transformations in the pipeline.
+
+        Returns
+        -------
+        y_trans : xarray.DataArray
+        """
+
+        kwargs = dict(**transform_params)
+
+        # xarray.Dataset --> xarray.DataArray
+        if isinstance(X, xr.Dataset):
+            X = X.to_array(feature_dim)
+
+        if feature_dim in X.coords:
+            input_core_dims = [[], [feature_dim, self._dim]]
+            kwargs["columns"] = X.coords[feature_dim].data
+        else:
+            input_core_dims = [[self._dim], [self._dim]]
+
+        X, _, dask_option = _maybe_use_dask(
+            X, (self._dim, feature_dim), b=self._models)
+
+        return xr.apply_ufunc(
+            _transform,
+            self._models,
+            X,
+            vectorize=True,
+            dask=dask_option,
+            output_dtypes=[X.dtype],
+            input_core_dims=input_core_dims,
+            output_core_dims=[[self._dim]],
+            kwargs=kwargs,
+        ).transpose(*self._ydims)
 
     def __repr__(self):
         summary = ["<xsd.{}>".format(self.__class__.__name__)]
-        summary.append('  Fit Status: {}'.format(self._models is not None))
-        summary.append('  Model:\n    {}'.format(self._model))
-        return '\n'.join(summary)
+        summary.append("  Fit Status: {}".format(self._models is not None))
+        summary.append("  Model:\n    {}".format(self._model))
+        return "\n".join(summary)
