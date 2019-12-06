@@ -1,6 +1,10 @@
 import numpy as np
 import xarray as xr
+import dask.array
+import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
 
 """
 Basic univariate quantile mapping post-processing algorithms.
@@ -8,7 +12,7 @@ Basic univariate quantile mapping post-processing algorithms.
 """
 
 
-def train(x, y, nq, group, kind="+", detrend='time'):
+def train(x, y, nq, group, kind="+", detrend_order=4):
     """Compute quantile bias-adjustment factors.
 
     Parameters
@@ -24,8 +28,8 @@ def train(x, y, nq, group, kind="+", detrend='time'):
       values).
     kind : {'+', '*'}
       The transfer operation, + for additive and * for multiplicative.
-    detrend : str, None
-      Dimension over which to detrend. Set to None to skip detrending.
+    detrend : int, None
+      Polynomial order of detrending curve. Set to None to skip detrending.
 
     Returns
     -------
@@ -33,9 +37,9 @@ def train(x, y, nq, group, kind="+", detrend='time'):
       Delta factor computed over time grouping and quantile bins.
     """
     # Detrend
-    if detrend is not None:
-        x, _ = xdetrend(x, dim=detrend)
-        y, _ = xdetrend(y, dim=detrend)
+    if detrend_order is not None:
+        x, _ = xdetrend(x, dim="time", deg=detrend_order)
+        y, _ = xdetrend(y, dim="time", deg=detrend_order)
 
 
     # Define nodes. Here n equally spaced points within [0, 1]
@@ -62,7 +66,7 @@ def train(x, y, nq, group, kind="+", detrend='time'):
     return out
 
 
-def predict(x, qmf, interp=False, detrend='time'):
+def predict(x, qmf, interp=False, detrend_order=4):
     """Apply quantile mapping delta to an array.
 
     Parameters
@@ -88,8 +92,10 @@ def predict(x, qmf, interp=False, detrend='time'):
     if "season" in qmf.group and interp:
         raise NotImplementedError
 
-    if detrend is not None:
-        x, trend = xdetrend(x, dim=detrend)
+    # Detrend
+    if detrend_order is not None:
+        x, trend = xdetrend(x, dim="time", deg=detrend_order)
+
 
     # Find the group indexes
     ind, att = qmf.group.split(".")
@@ -140,13 +146,14 @@ def predict(x, qmf, interp=False, detrend='time'):
     out.attrs["bias_corrected"] = True
 
     # Add trend back
-    if detrend:
+    if detrend_order is not None:
         out += trend
 
     # Remove time grouping and quantile coordinates
     return out.drop(["quantile", att])
 
 
+# TODO: use pad
 def add_cyclic(qmf, att):
     """Reindex the scaling factors to include the last time grouping
     at the beginning and the first at the end.
@@ -160,6 +167,7 @@ def add_cyclic(qmf, att):
     return qmf
 
 
+# TODO: use pad ?
 def add_q_bounds(qmf):
     """Reindex the scaling factors to set the quantile at 0 and 1 to the first and last quantile respectively.
 
@@ -180,22 +188,102 @@ def _calc_slope(x, y):
     return slope
 
 
-def xdetrend(obj, dim='time'):
-    index = xr.DataArray(obj[dim].values.astype(np.float),
-                             dims=dim,
-                             coords={dim: obj[dim]},
-                             name='index')
+def polyfit(da, deg=1, dim="time"):
+    """
+    Least squares polynomial fit.
 
-    trend = xr.apply_ufunc(_calc_slope, index, obj,
-                           vectorize=True,
-                           input_core_dims=[[dim], [dim]],
-                           output_core_dims=[[]],
-                           output_dtypes=[np.float],
-                           dask='parallelized')
+    Fit a polynomial ``p(x) = p[deg] * x ** deg + ... + p[0]`` of degree `deg`
+    Returns a vector of coefficients `p` that minimises the squared error.
+    Parameters
+    ----------
+    da : xarray.DataArray
+        The array to fit
+    deg : int, optional
+        Degree of the fitting polynomial, Default is 1.
+    dim : str
+        The dimension along which the data will be fitted. Default is `time`.
 
-    trend = (index * trend).transpose(*obj.dims)
+    Returns
+    -------
+    output : xarray.DataArray
+        Polynomial coefficients with a new dimension to sort the polynomial
+        coefficients by degree
+    """
+
+    y = da.dropna(dim, how="all")
+    coord = y.coords[dim]
+
+    if pd.api.types.is_datetime64_dtype(coord.data):
+        # Use the 1e-9 to scale nanoseconds to seconds (by default, xarray use
+        # datetime in nanoseconds
+        x = pd.to_numeric(coord) * 1e-9
+    else:
+        x = coord
+
+    # Fit the parameters (lazy computation)
+    coefs = dask.array.apply_along_axis(
+            np.polyfit, da.get_axis_num("time"), x, y, deg=deg, shape=(deg+1, ), dtype=float)
+
+    coords = dict(da.coords.items())
+    coords.pop(dim)
+    coords['degree'] = range(deg, -1, -1)
+
+    dims = list(da.dims)
+    dims.remove(dim)
+    dims.insert(0, "degree")
+
+    out = xr.DataArray(data=coefs, coords=coords, dims=dims)
+    return out
+
+
+def polyval(coord, coefs):
+    if pd.api.types.is_datetime64_dtype(coord.data):
+        # Use the 1e-9 to scale nanoseconds to seconds (by default, xarray use
+        # datetime in nanoseconds
+        x = pd.to_numeric(coord) * 1e-9
+    else:
+        x = coord
+
+    y = xr.apply_ufunc(np.polyval, coefs, x, input_core_dims=[['degree'], []], dask='allowed')
+
+    return y
+
+
+def xdetrend(obj, dim='time', deg=1):
+    coefs = polyfit(obj, dim=dim, deg=deg)
+
+    trend = polyval(obj[dim], coefs)
     detrended = obj - trend
     return detrended, trend
 
 
-class PolynomialTrendTransformer(TransformerMixin, BaseEstimator):
+def _order_and_stack(obj, dim):
+    """
+    Private function used to reorder to use the work dimension as the first
+    dimension, stack all the dimensions except the first one
+    """
+    dims_stacked = [di for di in obj.dims if di != dim]
+    new_dims = [dim, ] + dims_stacked
+    if obj.ndim > 2:
+        obj_stacked = (obj.transpose(*new_dims)
+                       .stack(temp_dim=dims_stacked)
+                       .dropna('temp_dim'))
+    elif obj.ndim == 2:
+        obj_stacked = obj.transpose(*new_dims)
+    else:
+        obj_stacked = obj
+    return obj_stacked
+
+
+def _unstack(obj):
+    """
+    Private function used to reorder to use the work dimension as the first
+    dimension, stack all the dimensions except the first one
+    """
+    if 'temp_dim' in obj.dims:
+        obj_unstacked = obj.unstack('temp_dim')
+    else:
+        obj_unstacked = obj
+    return obj_unstacked
+
+
