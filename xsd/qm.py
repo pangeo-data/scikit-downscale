@@ -118,16 +118,16 @@ def predict(x, qmf, interp=False, detrend_order=4):
     if interp:
         time = q.indexes["time"]
         if att == "month":
-            x = time.month - 0.5 + time.day / time.daysinmonth
+            y = time.month - 0.5 + time.day / time.daysinmonth
         elif att == "dayofyear":
-            x = time.dayofyear
+            y = time.dayofyear
         else:
             raise NotImplementedError
 
     else:
-        x = getattr(q.indexes[ind], att)
+        y = getattr(q.indexes[ind], att)
 
-    it = xr.DataArray(x, dims="time", coords={"time": time}, name="time group index")
+    it = xr.DataArray(y, dims="time", coords={"time": time}, name="time group index")
 
     # Extract the correct quantile for each time step.
 
