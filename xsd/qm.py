@@ -258,17 +258,25 @@ def polyval(coefs, coord):
     return y
 
 
-def detrend(obj, dim="time", deg=1):
-    """Detrend a series with a polynomial."""
+def detrend(obj, dim="time", deg=1, kind="+"):
+    """Detrend a series with a polynomial.
+
+    The detrended object should have the same mean as the original.
+    """
 
     # Fit polynomial coefficients using Ordinary Least Squares.
     coefs = polyfit(obj, dim=dim, deg=deg)
 
+    # Set the 0th order coefficient to 0 to preserve
     # Compute polynomial
     trend = polyval(coefs, obj[dim])
 
-    # Remove trend from original series
-    detrended = obj - trend
+    # Remove trend from original series while preserving means
+    # TODO: Get the residuals directly from polyfit
+    if kind == "+":
+        detrended = obj - trend - trend.mean() + obj.mean()
+    elif kind == "*":
+        detrended = obj / trend / trend.mean() * obj.mean()
 
     return detrended, trend, coefs
 
