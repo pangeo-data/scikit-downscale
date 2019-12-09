@@ -2,9 +2,7 @@ import numpy as np
 import xarray as xr
 import dask.array
 import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.pipeline import make_pipeline
+
 
 """
 Basic univariate quantile mapping post-processing algorithms.
@@ -12,7 +10,7 @@ Basic univariate quantile mapping post-processing algorithms.
 """
 
 
-def train(x, y, nq, group, kind="+", detrend_order=4):
+def train(x, y, nq, group, kind="+", detrend_order=0):
     """Compute quantile bias-adjustment factors.
 
     Parameters
@@ -24,11 +22,10 @@ def train(x, y, nq, group, kind="+", detrend_order=4):
     nq : int
       Number of quantiles.
     group : {'time.season', 'time.month', 'time.dayofyear', 'time.time'}
-      Grouping criterion. Use an accessor that is identical to all values to skip grouping (e.g. time.time for daily
-      values).
+      Grouping criterion. If only coordinate is given (e.g. 'time') no grouping will be done.
     kind : {'+', '*'}
       The transfer operation, + for additive and * for multiplicative.
-    detrend : int, None
+    detrend_order : int, None
       Polynomial order of detrending curve. Set to None to skip detrending.
 
     Returns
@@ -36,10 +33,15 @@ def train(x, y, nq, group, kind="+", detrend_order=4):
     xr.DataArray
       Delta factor computed over time grouping and quantile bins.
     """
+    if '.' in group:
+        dim, prop = group.split('.')
+    else:
+        dim = group
+
     # Detrend
     if detrend_order is not None:
-        x, _ = xdetrend(x, dim="time", deg=detrend_order)
-        y, _ = xdetrend(y, dim="time", deg=detrend_order)
+        x, _, cx = detrend(x, dim=dim, deg=detrend_order)
+        y, _, cy = detrend(y, dim=dim, deg=detrend_order)
 
 
     # Define nodes. Here n equally spaced points within [0, 1]
@@ -48,8 +50,12 @@ def train(x, y, nq, group, kind="+", detrend_order=4):
     q = np.linspace(dq, 1 - dq, nq)
 
     # Group values by time, then compute quantiles. The resulting array will have new time and quantile dimensions.
-    xq = x.groupby(group).quantile(q)
-    yq = y.groupby(group).quantile(q)
+    if '.' in group:
+        xq = x.groupby(group).quantile(q)
+        yq = y.groupby(group).quantile(q)
+    else:
+        xq = x.quantile(q, dim=dim)
+        yq = y.quantile(q, dim=dim)
 
     # Compute the correction factor
     if kind == "+":
@@ -62,6 +68,10 @@ def train(x, y, nq, group, kind="+", detrend_order=4):
     # Save input parameters as attributes of output DataArray.
     out.attrs["kind"] = kind
     out.attrs["group"] = group
+
+    if detrend_order is not None:
+        out.attrs["detrending_poly_coeffs_x"] = cx
+        out.attrs["detrending_poly_coeffs_y"] = cy
 
     return out
 
@@ -77,64 +87,60 @@ def predict(x, qmf, interp=False, detrend_order=4):
       Quantile mapping factors computed by the `train` function.
     interp : bool
       Whether to interpolate between the groupings.
-    detrend : str, None
-      Dimension over which to detrend before apply quantile mapping factors. Set to None to skip detrending.
+    detrend_order : str, None
+      Polynomial order of detrending curve. Set to None to skip detrending.
 
     Returns
     -------
     xr.DataArray
       Input array with delta applied.
     """
+    if '.' in qmf.group:
+        dim, prop = qmf.group.split('.')
+    else:
+        dim, prop = qmf.group, None
 
-    if "time" not in qmf.group:
-        raise NotImplementedError
-
-    if "season" in qmf.group and interp:
+    if prop == "season" and interp:
         raise NotImplementedError
 
     # Detrend
     if detrend_order is not None:
-        x, trend = xdetrend(x, dim="time", deg=detrend_order)
+        x, trend, coeffs = detrend(x, dim=dim, deg=detrend_order)
 
-
-    # Find the group indexes
-    ind, att = qmf.group.split(".")
-
-    time = x.coords["time"]
-    gc = qmf.coords[att]
+    coord = x.coords[dim]
+    gc = qmf.coords[prop]
 
     # Add cyclical values to the scaling factors for interpolation
     if interp:
-        qmf = add_cyclic(qmf, att)
+        qmf = add_cyclic(qmf, prop)
         qmf = add_q_bounds(qmf)
 
     # Compute the percentile time series of the input array
-    q = x.groupby(qmf.group).apply(xr.DataArray.rank, pct=True, dim=ind)
-    iq = xr.DataArray(q, dims="time", coords={"time": time}, name="quantile index")
+    q = x.groupby(qmf.group).apply(xr.DataArray.rank, pct=True, dim=dim)
+    iq = xr.DataArray(q, dims=dim, coords={dim: coord}, name="quantile index")
 
     # Create DataArrays for indexing
     # TODO: Adjust for different calendars if necessary.
-
     if interp:
-        time = q.indexes["time"]
-        if att == "month":
-            y = time.month - 0.5 + time.day / time.daysinmonth
-        elif att == "dayofyear":
-            y = time.dayofyear
+        ind = q.indexes[dim]
+        if prop == "month":
+            y = ind.month - 0.5 + ind.day / ind.daysinmonth
+        elif prop == "dayofyear":
+            y = ind.dayofyear
         else:
             raise NotImplementedError
 
     else:
-        y = getattr(q.indexes[ind], att)
+        y = getattr(q.indexes[dim], prop)
 
-    it = xr.DataArray(y, dims="time", coords={"time": time}, name="time group index")
+    it = xr.DataArray(y, dims=dim, coords={dim: coord}, name=dim + " group index")
 
     # Extract the correct quantile for each time step.
 
     if interp:  # Interpolate both the time group and the quantile.
-        factor = qmf.interp({att: it, "quantile": iq})
+        factor = qmf.interp({prop: it, "quantile": iq})
     else:  # Find quantile for nearest time group and quantile.
-        factor = qmf.sel({att: it, "quantile": iq}, method="nearest")
+        factor = qmf.sel({prop: it, "quantile": iq}, method="nearest")
 
     # Apply the correction factors
     out = x.copy()
@@ -144,13 +150,15 @@ def predict(x, qmf, interp=False, detrend_order=4):
         out *= factor
 
     out.attrs["bias_corrected"] = True
+    if detrend_order is not None:
+        out.attrs["detrending_poly_coeffs"] = coeffs
 
     # Add trend back
     if detrend_order is not None:
         out += trend
 
     # Remove time grouping and quantile coordinates
-    return out.drop(["quantile", att])
+    return out.drop(["quantile", prop])
 
 
 # TODO: use pad
@@ -209,20 +217,16 @@ def polyfit(da, deg=1, dim="time"):
         Polynomial coefficients with a new dimension to sort the polynomial
         coefficients by degree
     """
-
-    y = da.dropna(dim, how="all")
+    # Remove NaNs
+    y = da.dropna(dim=dim, how="any")
     coord = y.coords[dim]
 
-    if pd.api.types.is_datetime64_dtype(coord.data):
-        # Use the 1e-9 to scale nanoseconds to seconds (by default, xarray use
-        # datetime in nanoseconds
-        x = pd.to_numeric(coord) * 1e-9
-    else:
-        x = coord
+    # Compute the x value.
+    x = get_index(coord)
 
     # Fit the parameters (lazy computation)
     coefs = dask.array.apply_along_axis(
-            np.polyfit, da.get_axis_num("time"), x, y, deg=deg, shape=(deg+1, ), dtype=float)
+            np.polyfit, da.get_axis_num(dim), x, y, deg=deg, shape=(deg+1, ), dtype=float)
 
     coords = dict(da.coords.items())
     coords.pop(dim)
@@ -236,54 +240,49 @@ def polyfit(da, deg=1, dim="time"):
     return out
 
 
-def polyval(coord, coefs):
-    if pd.api.types.is_datetime64_dtype(coord.data):
-        # Use the 1e-9 to scale nanoseconds to seconds (by default, xarray use
-        # datetime in nanoseconds
-        x = pd.to_numeric(coord) * 1e-9
-    else:
-        x = coord
+def polyval(coefs, coord):
+    """
+    Evaluate polynomial function.
+
+    Parameters
+    ----------
+    coord : xr.Coordinate
+      Coordinate (e.g. time) used as the independent variable to compute polynomial.
+    coefs : xr.DataArray
+      Polynomial coefficients as returned by polyfit.
+    """
+    x = get_index(coord)
 
     y = xr.apply_ufunc(np.polyval, coefs, x, input_core_dims=[['degree'], []], dask='allowed')
 
     return y
 
 
-def xdetrend(obj, dim='time', deg=1):
+def detrend(obj, dim="time", deg=1):
+    """Detrend a series with a polynomial."""
+
+    # Fit polynomial coefficients using Ordinary Least Squares.
     coefs = polyfit(obj, dim=dim, deg=deg)
 
-    trend = polyval(obj[dim], coefs)
+    # Compute polynomial
+    trend = polyval(coefs, obj[dim])
+
+    # Remove trend from original series
     detrended = obj - trend
-    return detrended, trend
+
+    return detrended, trend, coefs
 
 
-def _order_and_stack(obj, dim):
-    """
-    Private function used to reorder to use the work dimension as the first
-    dimension, stack all the dimensions except the first one
-    """
-    dims_stacked = [di for di in obj.dims if di != dim]
-    new_dims = [dim, ] + dims_stacked
-    if obj.ndim > 2:
-        obj_stacked = (obj.transpose(*new_dims)
-                       .stack(temp_dim=dims_stacked)
-                       .dropna('temp_dim'))
-    elif obj.ndim == 2:
-        obj_stacked = obj.transpose(*new_dims)
+def get_index(coord):
+    """Return x coordinate for polynomial fit."""
+    if pd.api.types.is_datetime64_dtype(coord.data):
+        # Scale from nanoseconds to days.
+        x = pd.to_numeric(coord) / 1e9 / 86400
     else:
-        obj_stacked = obj
-    return obj_stacked
+        x = coord
+    return x
 
 
-def _unstack(obj):
-    """
-    Private function used to reorder to use the work dimension as the first
-    dimension, stack all the dimensions except the first one
-    """
-    if 'temp_dim' in obj.dims:
-        obj_unstacked = obj.unstack('temp_dim')
-    else:
-        obj_unstacked = obj
-    return obj_unstacked
+
 
 
