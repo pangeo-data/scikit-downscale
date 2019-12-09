@@ -144,6 +144,10 @@ def predict(x, qmf, interp=False, detrend_order=4):
 
     # Apply the correction factors
     out = x.copy()
+
+    if len(out.dims) == 1:
+        factor = factor.squeeze(["lon","lat"])
+
     if qmf.kind == "+":
         out += factor
     elif qmf.kind == "*":
