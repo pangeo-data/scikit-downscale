@@ -3,6 +3,9 @@ import pandas as pd
 import xarray as xr
 import pytest
 from xsd import qm
+from xarray.tests.test_cftimeindex import da as timeda, index, date_type
+from xarray.tests.test_cftime_offsets import calendar
+
 
 
 class TestQM:
@@ -96,6 +99,17 @@ class TestPolyfit():
         np.testing.assert_array_almost_equal(y, da)
 
 
+class TestPolyval():
+    def test_simple(self, tas_series):
+        da = tas_series(np.arange(100))
+        coefs = qm.polyfit(da, dim="time")
+        assert len(coefs) == 2
+        assert coefs.sel(degree=1) > 0
+
+        y = qm.polyval(coefs, da.time)
+        np.testing.assert_array_almost_equal(y, da)
+
+
 class TestDetrend:
     def test_simple(self, tas_series):
         da = tas_series(np.arange(100))
@@ -103,4 +117,17 @@ class TestDetrend:
 
         np.testing.assert_almost_equal(coefs.sel(degree=1).values, 1)
         np.testing.assert_array_almost_equal(detrended, 0)
+
+
+class TestGetIndex:
+    def test_simple(self, timeda):
+        x = qm.get_index(timeda)
+        assert hasattr(x, "dims")
+
+    def test_encoding(self, calendar):
+        dt = xr.cftime_range("1970-01-01", periods=10, calendar=calendar)
+        time = xr.DataArray(dt, dims=("time", ))
+        time.encoding['calendar'] = calendar
+        x = qm.get_index(time)
+        assert hasattr(x, "dims")
 

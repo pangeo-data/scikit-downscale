@@ -145,9 +145,6 @@ def predict(x, qmf, interp=False, detrend_order=4):
     # Apply the correction factors
     out = x.copy()
 
-    if len(out.dims) == 1:
-        factor = factor.squeeze(["lon","lat"])
-
     if qmf.kind == "+":
         out += factor
     elif qmf.kind == "*":
@@ -287,14 +284,18 @@ def detrend(obj, dim="time", deg=1, kind="+"):
 
 def get_index(coord):
     """Return x coordinate for polynomial fit."""
+    # Scale from nanoseconds to days.
+    f = 1e9 * 86400
+
     if pd.api.types.is_datetime64_dtype(coord.data):
-        # Scale from nanoseconds to days.
-        x = pd.to_numeric(coord) / 1e9 / 86400
+        x = pd.to_numeric(coord) / f
+    elif 'calendar' in coord.encoding:
+        dt = xr.coding.cftime_offsets.get_date_type(coord.encoding['calendar'])
+        offset = dt(1970, 1, 1)
+        x = xr.Variable(data=xr.core.duck_array_ops.datetime_to_numeric(coord, offset) / f, dims=("time",))
     else:
         x = coord
+
     return x
-
-
-
 
 
