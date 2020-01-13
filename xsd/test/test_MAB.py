@@ -24,7 +24,7 @@ else:
     kind = "+"
 
 nq = 20
-group = 'time.dayofyear'  # 'time.dayofyear'
+group = 'time.month'  # 'time.dayofyear'
 detrend_order = 4
 
 qmf = xsd.qm.train(ref, obs, nq, group, kind=kind, detrend_order=detrend_order)

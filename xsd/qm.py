@@ -284,15 +284,12 @@ def detrend(obj, dim="time", deg=1, kind="+"):
 
 def get_index(coord):
     """Return x coordinate for polynomial fit."""
-    # Scale from nanoseconds to days.
-    f = 1e9 * 86400
-
     if pd.api.types.is_datetime64_dtype(coord.data):
-        x = pd.to_numeric(coord) / f
+        x = pd.to_numeric(coord) * 1E-9
     elif 'calendar' in coord.encoding:
         dt = xr.coding.cftime_offsets.get_date_type(coord.encoding['calendar'])
         offset = dt(1970, 1, 1)
-        x = xr.Variable(data=xr.core.duck_array_ops.datetime_to_numeric(coord, offset) / f, dims=("time",))
+        x = xr.Variable(data=xr.core.duck_array_ops.datetime_to_numeric(coord, offset, datetime_unit="s"), dims=("time",))
     else:
         x = coord
 
