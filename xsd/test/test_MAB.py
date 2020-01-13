@@ -11,6 +11,7 @@ name_obs = "/exec/marcbour/sim_climat/burkina/pcci/leo/obs/"+"tasmin_leo.nc"
 
 v = "tasmin"
 
+
 fut = xr.open_dataset(name_fut).squeeze()[v]
 ref = xr.open_dataset(name_ref).squeeze()[v]
 obs = xr.open_dataset(name_obs).squeeze()[v]
