@@ -10,7 +10,7 @@ Basic univariate quantile mapping post-processing algorithms.
 """
 
 
-def train(x, y, nq, group, kind="+", detrend_order=0):
+def train(x, y, nq, group, kind="+", detrend_order=0,time_int=1):
     """Compute quantile bias-adjustment factors.
 
     Parameters
@@ -48,11 +48,16 @@ def train(x, y, nq, group, kind="+", detrend_order=0):
     # E.g. for nq=4 :  0---x------x------x------x---1
     dq = 1 / nq / 2
     q = np.linspace(dq, 1 - dq, nq)
+    q = sorted(np.append([0.0001, 0.9999], q))
 
     # Group values by time, then compute quantiles. The resulting array will have new time and quantile dimensions.
     if '.' in group:
-        xq = x.groupby(group).quantile(q)
-        yq = y.groupby(group).quantile(q)
+        if prop is "dayofyear":
+            xq = x.rolling(time=time_int, center=True).construct(window_dim="values").groupby(group).quantile(q,dim=["values",dim])
+            yq = y.rolling(time=time_int, center=True).construct(window_dim="values").groupby(group).quantile(q,dim=["values",dim])
+        else:
+            xq = x.groupby(group).quantile(q)
+            yq = y.groupby(group).quantile(q)
     else:
         xq = x.quantile(q, dim=dim)
         yq = y.quantile(q, dim=dim)

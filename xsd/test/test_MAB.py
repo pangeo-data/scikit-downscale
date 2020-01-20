@@ -28,7 +28,7 @@ else:
 
 nq = 50
 group = 'time.month'  # 'time.dayofyear'
-detrend_order = 1
+detrend_order = 4
 
 qmf = train(ref, obs, nq, group, kind=kind, detrend_order=detrend_order)
 pp_fut = predict(fut, qmf, interp=True, detrend_order=detrend_order)
