@@ -10,7 +10,7 @@ Basic univariate quantile mapping post-processing algorithms.
 """
 
 
-def train(x, y, nq, group, kind="+", detrend_order=0,time_int=1):
+def train(x, y, nq, group='time.dayofyear', kind="+", timeint = 1, detrend_order=0):
     """Compute quantile bias-adjustment factors.
 
     Parameters
@@ -33,6 +33,12 @@ def train(x, y, nq, group, kind="+", detrend_order=0,time_int=1):
     xr.DataArray
       Delta factor computed over time grouping and quantile bins.
     """
+    #x = ref
+    #y = obs
+    #group = "time.month"
+    #nq = 40
+    #kind = "*"
+    #timeint = 1
     if '.' in group:
         dim, prop = group.split('.')
     else:
@@ -52,9 +58,9 @@ def train(x, y, nq, group, kind="+", detrend_order=0,time_int=1):
 
     # Group values by time, then compute quantiles. The resulting array will have new time and quantile dimensions.
     if '.' in group:
-        if prop is "dayofyear":
-            xq = x.rolling(time=time_int, center=True).construct(window_dim="values").groupby(group).quantile(q,dim=["values",dim])
-            yq = y.rolling(time=time_int, center=True).construct(window_dim="values").groupby(group).quantile(q,dim=["values",dim])
+        if prop == "dayofyear":
+            xq = x.rolling(time=timeint, center=True).construct(window_dim="values").groupby(group).quantile(q,dim=["values",dim])
+            yq = y.rolling(time=timeint, center=True).construct(window_dim="values").groupby(group).quantile(q,dim=["values",dim])
         else:
             xq = x.groupby(group).quantile(q)
             yq = y.groupby(group).quantile(q)
@@ -100,6 +106,9 @@ def predict(x, qmf, interp=False, detrend_order=4):
     xr.DataArray
       Input array with delta applied.
     """
+    #x = fut
+    #detrend_order = None
+    #interp=True
     if '.' in qmf.group:
         dim, prop = qmf.group.split('.')
     else:
@@ -122,7 +131,7 @@ def predict(x, qmf, interp=False, detrend_order=4):
 
     # Compute the percentile time series of the input array
     q = x.groupby(qmf.group).apply(xr.DataArray.rank, pct=True, dim=dim)
-    iq = xr.DataArray(q, dims=dim, coords={dim: coord}, name="quantile index")
+    iq = xr.DataArray(q, dims=q.dims, coords=q.coords, name="quantile index") #THIS WAS MODIFIED
 
     # Create DataArrays for indexing
     # TODO: Adjust for different calendars if necessary.
@@ -139,6 +148,7 @@ def predict(x, qmf, interp=False, detrend_order=4):
         y = getattr(q.indexes[dim], prop)
 
     it = xr.DataArray(y, dims=dim, coords={dim: coord}, name=dim + " group index")
+    it.values = it.time.dt.month #THIS WAS MODIFIED
 
     # Extract the correct quantile for each time step.
 

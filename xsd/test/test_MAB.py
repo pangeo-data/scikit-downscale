@@ -1,40 +1,51 @@
-import xsd.xsd.qm
+import os
+import glob
+import scipy
+import matplotlib.pyplot as plt
+import numpy as np
 import xarray as xr
-from pathlib import Path
-
-path = Path('/home/david/projects/test_xsd_MAB/')
-path = Path("/exec/marcbour/sim_climat/burkina/pcci/leo/regrid/tasmin/")
-name_fut = path / "tasmin_RACMO22T_AFR-44_MOHC-HadGEM2-ES_rcp26_4qqmap.nc"
-name_ref = path / "tasmin_RACMO22T_AFR-44_MOHC-HadGEM2-ES_rcp26_ref_4qqmap.nc"
-name_obs = path / "tasmin_leo.nc"
-name_obs = "/exec/marcbour/sim_climat/burkina/pcci/leo/obs/"+"tasmin_leo.nc"
-
-v = "tasmin"
+import pandas as pd
 
 
-fut = xr.open_dataset(name_fut).squeeze()[v]
-ref = xr.open_dataset(name_ref).squeeze()[v]
-obs = xr.open_dataset(name_obs).squeeze()[v]
+
+##### CREATE FILE FORM SHELL######
+import xclim
+from xclim import subset
+
+
+# QUANTILE MAPPING FUNCTION
+from xsd.xsd.qm import train, predict, add_cyclic, add_q_bounds, _calc_slope, polyfit, polyval, detrend, get_index
+
+
+############################
+# PLOT FUT,QQMAP,OBS FOR A LOCALISATION AND VARIABLE
+
+#SET PARAMETERS
+
+v = "pr"
+
+fut_path = '/exec/marcbour/sim_climat/senegal/fao/all/regrid/pr/pr_RACMO22T_AFR-44_ICHEC-EC-EARTH_rcp26_4qqmap.nc'
+ref_path = '/exec/marcbour/sim_climat/senegal/fao/all/regrid/pr/pr_RACMO22T_AFR-44_ICHEC-EC-EARTH_rcp26_ref_4qqmap.nc'
+obs_path = "/exec/marcbour/sim_climat/senegal/fao/all/obs/" + "pr_all_4qqmap.nc"
+
+fut = xr.open_dataset(fut_path)[v]
+ref = xr.open_dataset(ref_path)[v]
+obs = xr.open_dataset(obs_path)[v]
 
 if v == "pr":
 
     kind = "*"
-    obs.interpolate_na(dim="time")
 
 else:
     obs = obs + 273.15
     obs = obs.interpolate_na(dim="time")
     kind = "+"
 
-nq = 50
-group = 'time.month'  # 'time.dayofyear'
-detrend_order = 4
+#up_qmf = 5
+nq = 40
+#timeint = 1
+group = "time.month"
+detrend_order=None
 
 qmf = train(ref, obs, nq, group, kind=kind, detrend_order=detrend_order)
-pp_fut = predict(fut, qmf, interp=True, detrend_order=detrend_order)
-
-pp_fut.plot()
-ref.plot(alpha=0.5)
-obs.plot(alpha=0.5)
-
-plt.legend(["qqmap","ref","obs"])
+pp_fut = predict(fut, qmf, interp=False, detrend_order=detrend_order) #THIS IS NOT WORKING
