@@ -1,5 +1,6 @@
 import numpy as np
 import xarray as xr
+from xarray.core.missing import get_clean_interp_index
 import dask.array
 import pandas as pd
 
@@ -7,10 +8,13 @@ import pandas as pd
 """
 Basic univariate quantile mapping post-processing algorithms.
 
+Use `train` to estimate the correction factors, and then use `predict`
+to apply the factors to a series. 
+
 """
 
 
-def train(x, y, nq, group, kind="+", detrend_order=0):
+def train(x, y, nq, group='time.dayofyear', kind="+", window=1, detrend_order=0):
     """Compute quantile bias-adjustment factors.
 
     Parameters
@@ -21,8 +25,11 @@ def train(x, y, nq, group, kind="+", detrend_order=0):
       Training target, usually an observed at-site time-series.
     nq : int
       Number of quantiles.
-    group : {'time.season', 'time.month', 'time.dayofyear', 'time.time'}
+    group : {'time.season', 'time.month', 'time.dayofyear', 'time'}
       Grouping criterion. If only coordinate is given (e.g. 'time') no grouping will be done.
+    window : int
+      Length of the rolling window centered around the time of interest used to estimate the quantiles. This is mostly
+      useful for time.dayofyear grouping.
     kind : {'+', '*'}
       The transfer operation, + for additive and * for multiplicative.
     detrend_order : int, None
@@ -43,16 +50,25 @@ def train(x, y, nq, group, kind="+", detrend_order=0):
         x, _, cx = detrend(x, dim=dim, deg=detrend_order)
         y, _, cy = detrend(y, dim=dim, deg=detrend_order)
 
-
     # Define nodes. Here n equally spaced points within [0, 1]
     # E.g. for nq=4 :  0---x------x------x------x---1
     dq = 1 / nq / 2
     q = np.linspace(dq, 1 - dq, nq)
+    q = sorted(np.append([0.0001, 0.9999], q))
 
     # Group values by time, then compute quantiles. The resulting array will have new time and quantile dimensions.
     if '.' in group:
-        xq = x.groupby(group).quantile(q)
-        yq = y.groupby(group).quantile(q)
+
+        if window > 1:
+            # Construct rolling window
+            x = x.rolling(center=True, **{dim: window}).construct(window_dim="window")
+            y = y.rolling(center=True, **{dim: window}).construct(window_dim="window")
+            dims = ("window", dim)
+        else:
+            dims = dim
+
+        xq = x.groupby(group).quantile(q, dim=dims)
+        yq = y.groupby(group).quantile(q, dim=dims)
     else:
         xq = x.quantile(q, dim=dim)
         yq = y.quantile(q, dim=dim)
@@ -68,6 +84,7 @@ def train(x, y, nq, group, kind="+", detrend_order=0):
     # Save input parameters as attributes of output DataArray.
     out.attrs["kind"] = kind
     out.attrs["group"] = group
+    out.attrs["window"] = window
 
     if detrend_order is not None:
         out.attrs["detrending_poly_coeffs_x"] = cx
@@ -108,39 +125,40 @@ def predict(x, qmf, interp=False, detrend_order=4):
         x, trend, coeffs = detrend(x, dim=dim, deg=detrend_order)
 
     coord = x.coords[dim]
-    gc = qmf.coords[prop]
 
     # Add cyclical values to the scaling factors for interpolation
     if interp:
         qmf = add_cyclic(qmf, prop)
         qmf = add_q_bounds(qmf)
 
-    # Compute the percentile time series of the input array
-    q = x.groupby(qmf.group).apply(xr.DataArray.rank, pct=True, dim=dim)
-    iq = xr.DataArray(q, dims=dim, coords={dim: coord}, name="quantile index")
+    # Compute the percentile of the input array along `dim`
+    xq = x.groupby(qmf.group).apply(xr.DataArray.rank, pct=True, dim=dim)
+    #iq = xr.DataArray(q, dims=q.dims, coords=q.coords, name="quantile index")
 
-    # Create DataArrays for indexing
+    # Compute the `dim` value for indexing along grouping dimension
     # TODO: Adjust for different calendars if necessary.
+    ind = x.indexes[dim]
+    y = getattr(ind, prop)
     if interp:
-        ind = q.indexes[dim]
-        if prop == "month":
-            y = ind.month - 0.5 + ind.day / ind.daysinmonth
-        elif prop == "dayofyear":
-            y = ind.dayofyear
-        else:
-            raise NotImplementedError
+        if dim == "time":
+            if prop == "month":
+                y = ind.month - 0.5 + ind.day / ind.daysinmonth
+            elif prop == "dayofyear":
+                y = ind.dayofyear
+            else:
+                raise NotImplementedError
 
-    else:
-        y = getattr(q.indexes[dim], prop)
+    xt = xr.DataArray(y, dims=dim, coords={dim: coord}, name=dim + " group index")
 
-    it = xr.DataArray(y, dims=dim, coords={dim: coord}, name=dim + " group index")
+    # Expand dimensions of index to match the dimensions of xq
+    # We want vectorized indexing with no broadcasting
+    xt = xt.expand_dims(**{k: v for (k, v) in x.coords.items() if k != dim})
 
     # Extract the correct quantile for each time step.
-
     if interp:  # Interpolate both the time group and the quantile.
-        factor = qmf.interp({prop: it, "quantile": iq})
+        factor = qmf.interp({prop: xt, "quantile": xq})
     else:  # Find quantile for nearest time group and quantile.
-        factor = qmf.sel({prop: it, "quantile": iq}, method="nearest")
+        factor = qmf.sel({prop: xt, "quantile": xq}, method="nearest")
 
     # Apply the correction factors
     out = x.copy()
@@ -162,7 +180,7 @@ def predict(x, qmf, interp=False, detrend_order=4):
     return out.drop(["quantile", prop])
 
 
-# TODO: use pad
+# TODO: use xr.pad once it's implemented.
 def add_cyclic(qmf, att):
     """Reindex the scaling factors to include the last time grouping
     at the beginning and the first at the end.
@@ -176,7 +194,7 @@ def add_cyclic(qmf, att):
     return qmf
 
 
-# TODO: use pad ?
+# TODO: use xr.pad once it's implemented.
 def add_q_bounds(qmf):
     """Reindex the scaling factors to set the quantile at 0 and 1 to the first and last quantile respectively.
 
@@ -197,6 +215,7 @@ def _calc_slope(x, y):
     return slope
 
 
+# TODO: use xr.polyfit once it's implemented.
 def polyfit(da, deg=1, dim="time"):
     """
     Least squares polynomial fit.
@@ -220,10 +239,9 @@ def polyfit(da, deg=1, dim="time"):
     """
     # Remove NaNs
     y = da.dropna(dim=dim, how="any")
-    coord = y.coords[dim]
 
     # Compute the x value.
-    x = get_index(coord)
+    x = get_clean_interp_index(da, dim)
 
     # Fit the parameters (lazy computation)
     coefs = dask.array.apply_along_axis(
@@ -241,6 +259,7 @@ def polyfit(da, deg=1, dim="time"):
     return out
 
 
+# TODO: use xr.polyval once it's implemented.
 def polyval(coefs, coord):
     """
     Evaluate polynomial function.
@@ -252,7 +271,7 @@ def polyval(coefs, coord):
     coefs : xr.DataArray
       Polynomial coefficients as returned by polyfit.
     """
-    x = get_index(coord)
+    x = xr.Variable(data=get_clean_interp_index(coord, coord.name), dims=(coord.name,))
 
     y = xr.apply_ufunc(np.polyval, coefs, x, input_core_dims=[['degree'], []], dask='allowed')
 
