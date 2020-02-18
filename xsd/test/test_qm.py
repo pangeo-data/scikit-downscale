@@ -1,26 +1,47 @@
 import numpy as np
 import xarray as xr
 import pytest
-from xsd import qm
+from xsd import qm, dqm
 
 
 class TestQM:
+    @pytest.mark.parametrize("group", ["time.month", "time.dayofyear", "time.season"])
+    def test_train(self, tas_series, group):
+        n = 10000
+        r = np.random.rand(n)
+        ref = tas_series(r)
+        fut_add = tas_series(r + 2)
+        qs = qm.train(ref, fut_add, 20, group)
+        d = qs['target'] - qs['source']
+        np.testing.assert_array_almost_equal(d, 2)
+        assert qs.group == group
+
+    def test_add_cyclic(self, qds_month):
+        q = qm.add_cyclic(qds_month, "month")
+        assert len(q['month']) == 14
+
+    def test_q_bounds(self, qds_month):
+        q = qm.add_q_bounds(qds_month)
+        assert len(q['quantile']) == len(qds_month['quantile']) + 2
+
+
+class TestDQM:
     def test_simple(self, tas_series):
         n = 10000
         r = np.random.rand(n)
         ref = tas_series(r)
         fut_add = tas_series(r + 2)
-        d = qm.train(ref, fut_add, 20, "time.month", "+", detrend_order=None)
+        d = dqm.train(ref, fut_add, 20, "time.month", "+", detrend_order=None)
         np.testing.assert_array_almost_equal(d, 2)
 
-        out = qm.predict(ref, d, detrend_order=None)
+        out = dqm.predict(ref, d, detrend_order=None)
         np.testing.assert_array_almost_equal(out - ref, 2)
 
         fut_mul = tas_series(r * 2)
-        d = qm.train(ref, fut_mul, 20, "time.month", "*")
+        d = dqm.train(ref, fut_mul, 20, "time.month", "*")
         np.testing.assert_array_almost_equal(d, 2)
 
-        out = qm.predict(ref, d, detrend_order=None)
+        out = dqm.predict(ref, d, detrend_order=None)
         np.testing.assert_array_almost_equal(out / ref, 2)
 
     @pytest.mark.parametrize(
@@ -37,7 +58,7 @@ class TestQM:
         ref = tas_series(r)
         m = np.sin(ref.time.dt.dayofyear / 365.25 * 2 * np.pi) * 5
         fut_add = tas_series(r + m)
-        d = qm.train(ref, fut_add, 1, freq, "+")
+        d = dqm.train(ref, fut_add, 1, freq, "+")
         a = d.sel(quantile=0.4, method="nearest")
         b = 5 * np.sin(2 * np.pi * (np.arange(l) + 0.5) / l + phi)
         if freq == "time.season":
@@ -45,17 +66,17 @@ class TestQM:
         np.testing.assert_array_almost_equal(a, b, 0)
 
         if freq == "time.dayofyear":
-            out = qm.predict(ref, d, interp=True, detrend_order=None)
+            out = dqm.predict(ref, d, interp=True, detrend_order=None)
             np.testing.assert_array_almost_equal(out, fut_add, 0)
 
         elif freq == "time.month":
             # Note that there is a lot of intra-month variability within the correction.
-            out = qm.predict(ref, d, interp=True, detrend_order=None)
+            out = dqm.predict(ref, d, interp=True, detrend_order=None)
             np.testing.assert_array_almost_equal(out.resample(time="M").mean(), fut_add.resample(time="M").mean(), 0)
 
         elif freq == "time.season":
             with pytest.raises(NotImplementedError):
-                out = qm.predict(ref, d, interp=True, detrend_order=None)
+                out = dqm.predict(ref, d, interp=True, detrend_order=None)
 
     def test_detrend(self, tas_series, deg=0):
         # Create synthetic series with simple index (not datetime)
@@ -74,19 +95,19 @@ class TestQM:
         fut = ref.where(ref > 0, ref + 1)
 
         # Quantile mapping on original values
-        qf = qm.train(ref, fut, 10, 't', '+')
+        qf = dqm.train(ref, fut, 10, 't', '+')
 
         # Add trend
-        xtrend = qm.polyval(xcoefs, ref.t)
+        xtrend = dqm.polyval(xcoefs, ref.t)
         pref = xtrend + ref
-        detrended, est_trend, ecoefs = qm.detrend(pref, deg=deg, dim='t')
+        detrended, est_trend, ecoefs = dqm.detrend(pref, deg=deg, dim='t')
 
         np.testing.assert_array_almost_equal(ecoefs, coefs, 5)
         np.testing.assert_array_almost_equal(detrended, ref, 2)
         np.testing.assert_array_almost_equal(est_trend / xtrend, 1, 2)
 
         # Quantile on trended values
-        pqf = qm.train(pref, fut, 10, 't', '+', detrend_order=deg)
+        pqf = dqm.train(pref, fut, 10, 't', '+', detrend_order=deg)
 
         # Confirm that the trend does not affect the quantile mapping
         np.testing.assert_array_almost_equal(qf, pqf)
@@ -97,13 +118,13 @@ class TestQM:
         ref = tas_series(r)
         delta = xr.DataArray([[2, 3, 4], [4, 5, 6]], dims=("lat", "lon"))
         fut_add = ref + delta
-        d = qm.train(ref, fut_add, 20, "time.month", "+", detrend_order=None)
+        d = dqm.train(ref, fut_add, 20, "time.month", "+", detrend_order=None)
         xr.testing.assert_allclose(d, delta.broadcast_like(d))
 
-        out = qm.predict(ref, d, detrend_order=None)
+        out = dqm.predict(ref, d, detrend_order=None)
         xr.testing.assert_allclose(out - ref, delta.broadcast_like(ref))
 
-        out = qm.predict(ref, d, interp=True, detrend_order=None)
+        out = dqm.predict(ref, d, interp=True, detrend_order=None)
         xr.testing.assert_allclose(out - ref, delta.broadcast_like(ref))
 
     def test_window(self, tas_series):
@@ -112,7 +133,7 @@ class TestQM:
         ref = tas_series(r)
         fut = ref.copy()
         fut[fut.time.dt.dayofyear.isin([9, 10, 11])] += 10
-        d = qm.train(ref, fut, 15, "time.dayofyear", "+", window=3, detrend_order=None)
+        d = dqm.train(ref, fut, 15, "time.dayofyear", "+", window=3, detrend_order=None)
         np.testing.assert_allclose(d.sel(dayofyear=30), 0)
         np.testing.assert_allclose(d.sel(dayofyear=10), 10)
         np.testing.assert_allclose(d.sel(dayofyear=[9, 11]).mean(), 6.7, 2)
@@ -122,29 +143,29 @@ class TestQM:
 class TestPolyfit():
     def test_simple(self, tas_series):
         da = tas_series(np.arange(100))
-        coefs = qm.polyfit(da, dim="time")
+        coefs = dqm.polyfit(da, dim="time")
         assert len(coefs) == 2
         assert coefs.sel(degree=1) > 0
 
-        y = qm.polyval(coefs, da.time)
+        y = dqm.polyval(coefs, da.time)
         np.testing.assert_array_almost_equal(y, da)
 
 
 class TestPolyval():
     def test_simple(self, tas_series):
         da = tas_series(np.arange(100))
-        coefs = qm.polyfit(da, dim="time")
+        coefs = dqm.polyfit(da, dim="time")
         assert len(coefs) == 2
         assert coefs.sel(degree=1) > 0
 
-        y = qm.polyval(coefs, da.time)
+        y = dqm.polyval(coefs, da.time)
         np.testing.assert_array_almost_equal(y, da)
 
 
 class TestDetrend:
     def test_simple(self, tas_series):
         da = tas_series(np.arange(100)+10)
-        detrended, trend, coefs = qm.detrend(da)
+        detrended, trend, coefs = dqm.detrend(da)
 
         #np.testing.assert_almost_equal(coefs.sel(degree=1).values, 1)
         np.testing.assert_array_almost_equal(detrended, 0)
@@ -152,13 +173,13 @@ class TestDetrend:
 
 class TestGetIndex:
     def test_simple(self, timeda):
-        x = qm.get_index(timeda)
+        x = dqm.get_index(timeda)
         assert hasattr(x, "dims")
 
     def test_encoding(self, calendar):
         dt = xr.cftime_range("1970-01-01", periods=10, calendar=calendar)
         time = xr.DataArray(dt, dims=("time", ))
         time.encoding['calendar'] = calendar
-        x = qm.get_index(time)
+        x = dqm.get_index(time)
         assert hasattr(x, "dims")
 

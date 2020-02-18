@@ -28,3 +28,20 @@ def tas_series():
         )
 
     return _tas_series
+
+
+@pytest.fixture
+def qds_month():
+    dims = ("quantile", "month")
+    source = xr.Variable(dims=dims,
+                         data=np.zeros((5, 12)))
+    target = xr.Variable(dims=dims,
+                         data=np.ones((5, 12))*2)
+
+    return xr.Dataset(data_vars={"source": source,
+                                 "target": target},
+                      coords={"quantile": [0, .3, 5., 7, 1],
+                              "month": range(1, 13)},
+                      attrs={"group": "time.month",
+                             "window": 1})
+
