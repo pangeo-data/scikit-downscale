@@ -66,7 +66,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
             Returns corrected values.
         """
         fut_mean, fut_std, fut_zscore = _get_fut_stats(X, self.window_width)
-        shift_expanded, scale_expanded = _expand_params(X, self.var_str, shift, scale)
+        shift_expanded, scale_expanded = _expand_params(X, self.var_str, self.shift, self.scale)
 
         fut_mean_corrected, fut_std_corrected = _correct_fut_stats(fut_mean, fut_std, var_str, shift_expanded, scale_expanded)
         fut_corrected = (fut_zscore * fut_std_corrected) + fut_mean_corrected
