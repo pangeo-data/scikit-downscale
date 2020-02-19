@@ -1,8 +1,10 @@
-from sklearn.base import RegressorMixin
-from sklearn.linear_model.base import LinearModel
 import pandas as pd
 import numpy as np
 import xarray as xr
+
+from sklearn.base import RegressorMixin
+from sklearn.linear_model.base import LinearModel
+
 
 class ZScoreRegressor(LinearModel, RegressorMixin):
     """ Z Score Regressor bias correction model wrapper
@@ -71,10 +73,6 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         return fut_corrected
   
 
-
-#Helpers
-# Helpers for Fit
-
 def _reshape(ds, window_width):
     """
     Helper function for `fit` that splits the year and day
@@ -97,6 +95,7 @@ def _reshape(ds, window_width):
     
     ds_rsh = xr.concat([late_Decs,ds_split,early_Jans],dim='day')
     return ds_rsh
+
 
 def _calc_stats(df, window_width):
     """
