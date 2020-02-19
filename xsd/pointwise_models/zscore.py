@@ -65,7 +65,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         fut_corrected : pd.DataFrame, shape (n_samples, 1)
             Returns corrected values.
         """
-        fut_mean, fut_std, fut_zscore = _get_fut_stats(X, selfwindow_width)
+        fut_mean, fut_std, fut_zscore = _get_fut_stats(X, self.window_width)
         shift_expanded, scale_expanded = _expand_params(S, self.var_str, shift, scale)
 
         fut_mean_corrected, fut_std_corrected = _correct_fut_stats(fut_mean, fut_std, var_str, shift_expanded, scale_expanded)
@@ -94,7 +94,7 @@ def _reshape(ds, window_width):
                        .assign_coords(day=g.time.dt.dayofyear.values))
     ds_split = ds.groupby('time.year').apply(split)
     
-    early_Jans = ds_split.isel(day = slice(None,window_width//2))
+    early_Jans = ds_split.isel(day = slice(None, window_width//2))
     late_Decs = ds_split.isel(day = slice(-window_width//2,None))
     
     ds_rsh = xr.concat([late_Decs,ds_split,early_Jans],dim='day')
