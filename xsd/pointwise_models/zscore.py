@@ -110,7 +110,7 @@ def _calc_stats(df, window_width):
     df_mean : Means for each day of year across all years
     df_std:  Standard deviations for each day of year across all years
     """
-    
+    df.set_names('time')
     ds = df.to_xarray()
     ds_rsh = _reshape(ds, window_width)
     
