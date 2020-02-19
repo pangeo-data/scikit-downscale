@@ -14,6 +14,11 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
     """
 
     def __init__(self, window_width=31, var_str='U'):
+
+        if 'U' not in ds.data_vars:
+            ds = ds.rename({ds.data_vars[0]: 'U'})
+        assert 'U' in ds.data_vars
+
         self.window_width = window_width
         self.var_str = var_str
 
