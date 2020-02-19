@@ -67,7 +67,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
             Returns corrected values.
         """
 
-         if 'U' not in X.columns.values:
+        if 'U' not in X.columns.values:
             self.var_str =X.columns.values[0]
 
         fut_mean, fut_std, fut_zscore = _get_fut_stats(X, self.window_width)
