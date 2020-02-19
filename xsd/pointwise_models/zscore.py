@@ -13,7 +13,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
     must implement the fit and predict methods.
     """
 
-    def __init__(self, window_width=31, var_str='U'):
+    def __init__(self, window_width=31, var_str='foo'):
 
         self.window_width = window_width
         self.var_str = var_str
@@ -66,9 +66,6 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         fut_corrected : pd.DataFrame, shape (n_samples, 1)
             Returns corrected values.
         """
-
-        if 'U' not in X.columns.values:
-            self.var_str =X.columns.values[0]
 
         fut_mean, fut_std, fut_zscore = _get_fut_stats(X, self.window_width)
         shift_expanded, scale_expanded = _expand_params(X, self.var_str, self.shift, self.scale)
