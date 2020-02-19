@@ -86,6 +86,10 @@ def _reshape(ds, window_width):
     Returns:
     ds_rsh : Reshaped Xarray dataset
     """
+    if 'time' not in ds.coords and 'index' in ds.coords:
+        ds = ds.rename({'index': 'time'})
+    assert 'time' in ds.coords
+
     split = lambda g: (g.rename({'time': 'day'})
                        .assign_coords(day=g.time.dt.dayofyear.values))
     ds_split = ds.groupby('time.year').apply(split)
@@ -110,7 +114,7 @@ def _calc_stats(df, window_width):
     df_mean : Means for each day of year across all years
     df_std:  Standard deviations for each day of year across all years
     """
-    df.set_names('time')
+
     ds = df.to_xarray()
     ds_rsh = _reshape(ds, window_width)
     
