@@ -15,9 +15,6 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
 
     def __init__(self, window_width=31, var_str='U'):
 
-        if 'U' not in ds.data_vars:
-            var_str = ds.data_vars[0]
-
         self.window_width = window_width
         self.var_str = var_str
 
@@ -69,10 +66,14 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         fut_corrected : pd.DataFrame, shape (n_samples, 1)
             Returns corrected values.
         """
+
+         if 'U' not in X.columns.values:
+            self.var_str =X.columns.values[0]
+
         fut_mean, fut_std, fut_zscore = _get_fut_stats(X, self.window_width)
         shift_expanded, scale_expanded = _expand_params(X, self.var_str, self.shift, self.scale)
 
-        fut_mean_corrected, fut_std_corrected = _correct_fut_stats(fut_mean, fut_std, var_str, shift_expanded, scale_expanded)
+        fut_mean_corrected, fut_std_corrected = _correct_fut_stats(fut_mean, fut_std, self.var_str, shift_expanded, scale_expanded)
         fut_corrected = (fut_zscore * fut_std_corrected) + fut_mean_corrected
         return fut_corrected
   
