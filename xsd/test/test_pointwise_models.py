@@ -94,7 +94,8 @@ def test_zscore_scale():
     X = xr.DataArray(data_X, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
     y = xr.DataArray(data_y, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
 
-    data_scale_expected = [2 for i in data_rsh]
+
+    data_scale_expected = [2 for i in np.zeros(364)]
     scale_expected = xr.DataArray(data_scale_expected, name='foo', dims=['day'], coords = {'day': np.arange(1,365)}).to_dataframe()
 
     zscore = ZScoreRegressor()
@@ -110,7 +111,7 @@ def test_zscore_shift():
     X = xr.DataArray(data_X, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
     y = xr.DataArray(data_y, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
 
-    data_shift_expected = [-1 for i in data_rsh]
+    data_shift_expected = [-1 for i in np.zeros(364)]
     shift_expected = xr.DataArray(data_shift_expected, name='foo', dims=['day'], coords = {'day': np.arange(1,365)}).to_dataframe()
 
     zscore = ZScoreRegressor()
