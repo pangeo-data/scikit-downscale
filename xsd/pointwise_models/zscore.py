@@ -188,8 +188,8 @@ def _expand_params(df, var_str, shift, scale):
     data_shift_expanded = np.concatenate((sh_repeated, sh_remaining))
     data_scale_expanded = np.concatenate((sc_repeated, sc_remaining))
     
-    shift_expanded = xr.DataArray(data_shift_expanded, name=var_str, dims=['index'], coords = {'index': time}).to_dataframe()
-    scale_expanded = xr.DataArray(data_scale_expanded, name=var_str, dims=['index'], coords = {'index': time}).to_dataframe()
+    shift_expanded = xr.DataArray(data_shift_expanded, name=var_str, dims=['index'], coords = {'index': df.time}).to_dataframe()
+    scale_expanded = xr.DataArray(data_scale_expanded, name=var_str, dims=['index'], coords = {'index': df.time}).to_dataframe()
     return shift_expanded, scale_expanded
 
 
