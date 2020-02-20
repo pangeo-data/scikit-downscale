@@ -135,4 +135,4 @@ def test_zscore_predict():
     expected = xr.DataArray(data_X, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
     expected[0:i] = 'NaN' ; expected[-i:] = 'NaN'
 
-    np.testing.assert_allclose(zscore.predict(X).astype(float), expected.astype(float))
+    np.testing.assert_allclose(zscore.predict(X).astype(float), expected.astype(float), rtol=1e-5, atol=0, equal_nan=True)
