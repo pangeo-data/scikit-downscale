@@ -178,7 +178,7 @@ def _expand_params(df, var_str, shift, scale):
         repeated over the length of the dataframe.
     """ 
     repeats = int(df.shape[0] / shift[var_str].shape[0])
-    remainder = X.shape[0] % shift[var_str].shape[0]
+    remainder = df.shape[0] % shift[var_str].shape[0]
 
     sh_repeated = np.tile(shift[var_str], repeats)
     sc_repeated = np.tile(scale[var_str], repeats)
