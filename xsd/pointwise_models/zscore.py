@@ -177,9 +177,19 @@ def _expand_params(df, var_str, shift, scale):
     scale_expanded : The value by which to adjust the future standard deviation,
         repeated over the length of the dataframe.
     """ 
-    repeats = (df.shape[0]/shift[var_str].shape[0])
-    shift_expanded = np.repeat(shift[var_str], repeats)
-    scale_expanded = np.repeat(scale[var_str], repeats)
+    repeats = int(df.shape[0] / shift[var_str].shape[0])
+    remainder = X.shape[0] % shift[var_str].shape[0]
+
+    sh_repeated = np.tile(shift[var_str], repeats)
+    sc_repeated = np.tile(scale[var_str], repeats)
+    sh_remaining = shift[var_str][0:remainder].values
+    sc_remaining = scale[var_str][0:remainder].values
+    
+    data_shift_expanded = np.concatenate((sh_repeated, sh_remaining))
+    data_scale_expanded = np.concatenate((sc_repeated, sc_remaining))
+    
+    shift_expanded = xr.DataArray(data_shift_expanded, name=var_str, dims=['index'], coords = {'index': time}).to_dataframe()
+    scale_expanded = xr.DataArray(data_scale_expanded, name=var_str, dims=['index'], coords = {'index': time}).to_dataframe()
     return shift_expanded, scale_expanded
 
 
