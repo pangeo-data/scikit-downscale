@@ -190,7 +190,7 @@ def _expand_params(df, var_str, shift, scale):
     
     shift_expanded = xr.DataArray(data_shift_expanded, name=var_str, dims=['index'], coords = {'index': df.index}).to_dataframe()
     scale_expanded = xr.DataArray(data_scale_expanded, name=var_str, dims=['index'], coords = {'index': df.index}).to_dataframe()
-    
+
     return shift_expanded, scale_expanded
 
 
@@ -238,6 +238,6 @@ def _correct_fut_stats(fut_mean, fut_std, var_str, shift_expanded, scale_expande
     Returns:
     
     """ 
-    fut_mean_corrected = fut_mean[var_str] + shift_expanded
-    fut_std_corrected = fut_std[var_str] * scale_expanded
+    fut_mean_corrected = fut_mean + shift_expanded
+    fut_std_corrected = fut_std * scale_expanded
     return fut_mean_corrected, fut_std_corrected
