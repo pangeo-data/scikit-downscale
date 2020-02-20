@@ -84,3 +84,36 @@ def test_linear_model(model_cls):
     model.fit(X, y)
     model.predict(X)
     assert isinstance(model, LinearModel)
+
+
+def test_zscore_scale():
+    time = pd.date_range(start='2018-01-01', end='2020-01-01')
+    data_X = np.linspace(0,1,len(time))
+    data_y = data_X * 2
+
+    X = xr.DataArray(data_X, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
+    y = xr.DataArray(data_y, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
+
+    data_scale_expected = [2 for i in data_rsh]
+    scale_expected = xr.DataArray(data_scale_expected, name='foo', dims=['day'], coords = {'day': np.arange(1,365)}).to_dataframe()
+
+    zscore = ZScoreRegressor()
+    zscore.fit(X, y)
+
+    np.testing.assert_allclose(zscore.scale, scale_expected)
+
+def test_zscore_shift():
+    time = pd.date_range(start='2018-01-01', end='2020-01-01')
+    data_X = np.ones(len(time))
+    data_y = np.zeros(len(time))
+
+    X = xr.DataArray(data_X, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
+    y = xr.DataArray(data_y, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
+
+    data_shift_expected = [-1 for i in data_rsh]
+    shift_expected = xr.DataArray(data_shift_expected, name='foo', dims=['day'], coords = {'day': np.arange(1,365)}).to_dataframe()
+
+    zscore = ZScoreRegressor()
+    zscore.fit(X, y)
+
+    np.testing.assert_allclose(zscore.shift, shift_expected)
