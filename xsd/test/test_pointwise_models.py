@@ -106,14 +106,13 @@ def test_zscore_scale():
 
 def test_zscore_shift():
     time = pd.date_range(start='2018-01-01', end='2020-01-01')
-    data_X = np.ones(len(time))
-    data_y = np.zeros(len(time))
+    data_X = np.zeros(len(time))
+    data_y = np.ones(len(time))
 
     X = xr.DataArray(data_X, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
     y = xr.DataArray(data_y, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
 
-    data_shift_expected = [-1 for i in np.zeros(364)]
-    shift_expected = xr.DataArray(data_shift_expected, name='foo', dims=['day'], coords = {'day': np.arange(1,365)}).to_dataframe()
+    shift_expected = xr.DataArray(np.ones(364), name='foo', dims=['day'], coords = {'day': np.arange(1,365)}).to_dataframe()
 
     zscore = ZScoreRegressor()
     zscore.fit(X, y)
@@ -128,12 +127,12 @@ def test_zscore_predict():
 
     shift = xr.DataArray(np.zeros(364), name='foo', dims=['day'], coords = {'day': np.arange(1,365)}).to_dataframe()
     scale = xr.DataArray(np.ones(364), name='foo', dims=['day'], coords = {'day': np.arange(1,365)}).to_dataframe()
+    
+    zscore = ZScoreRegressor()
+    zscore.shift = shift ; zscore.scale = scale
 
     i = int(zscore.window_width/2)
     expected = xr.DataArray(data_X, name='foo', dims=['index'], coords = {'index': time}).to_dataframe()
     expected[0:i] = 'NaN' ; expected[-i:] = 'NaN'
-
-    zscore = ZScoreRegressor()
-    zscore.shift = shift ; zscore.scale = scale
 
     np.testing.assert_allclose(zscore.predict(X).astype(float), expected.astype(float))
