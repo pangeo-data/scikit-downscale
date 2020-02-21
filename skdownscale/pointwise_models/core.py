@@ -126,7 +126,7 @@ class PointWiseDownscaler:
             input_core_dims = [[self._dim], [self._dim]]
 
         # X, y, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=y)
-        dask_option = 'parallelized'
+        dask_option = "parallelized"
 
         self._models = xr.apply_ufunc(
             _fit_model,
@@ -223,8 +223,7 @@ class PointWiseDownscaler:
         else:
             input_core_dims = [[self._dim], [self._dim]]
 
-        X, _, dask_option = _maybe_use_dask(
-            X, (self._dim, feature_dim), b=self._models)
+        X, _, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=self._models)
 
         return xr.apply_ufunc(
             _transform,

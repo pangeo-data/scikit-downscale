@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import gc
 import os
-import click
 
+import click
 import pandas as pd
 import xarray as xr
 
 from xsd.bcsd import bcsd, disagg
-
-import gc
 
 
 @click.command()

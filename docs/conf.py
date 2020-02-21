@@ -17,9 +17,10 @@
 # sys.path.insert(0, os.path.abspath('.'))
 
 
+import skdownscale
+
 # -- Project information -----------------------------------------------------
 from pkg_resources import get_distribution
-import skdownscale
 
 project = "scikit-downscale"
 copyright = "2019, Joe Hamman"
@@ -129,15 +130,24 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
-latex_documents = [(master_doc, "skdownscale.tex",
-                    "scikit-downscale Documentation", "Joe Hamman", "manual")]
+latex_documents = [
+    (
+        master_doc,
+        "skdownscale.tex",
+        "scikit-downscale Documentation",
+        "Joe Hamman",
+        "manual",
+    )
+]
 
 
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "scikit-downscale", "scikit-downscale Documentation", [author], 1)]
+man_pages = [
+    (master_doc, "scikit-downscale", "scikit-downscale Documentation", [author], 1)
+]
 
 
 # -- Options for Texinfo output ----------------------------------------------
