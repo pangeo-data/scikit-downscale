@@ -11,7 +11,7 @@ def _reshape_for_sklearn(vals, columns=None):
     return vals
 
 
-def _fit_model(X, y, model=None, columns=None, **kwargs):
+def _fit_model(*args, model=None, columns=None, **kwargs):
     X = _reshape_for_sklearn(X, columns=columns)
     y = _reshape_for_sklearn(y)
 
@@ -20,7 +20,7 @@ def _fit_model(X, y, model=None, columns=None, **kwargs):
     # this is required because sklearn pipelines are iterable and can be cast
     # to arrays
     out = np.empty((1), dtype=np.object)
-    out[:] = [model.fit(X, y, **kwargs)]
+    out[:] = [model.fit(X, y)]
     out = out.squeeze()
     return out
 
@@ -82,7 +82,7 @@ class PointWiseDownscaler:
                 " by PointWiseDownscaler" % type(model)
             )
 
-    def fit(self, X, y, feature_dim="variable", **fit_params):
+    def fit(self, X, *args, feature_dim="variable"):
         """Fit the model
 
         Fit all the transforms one after the other and transform the
@@ -108,16 +108,16 @@ class PointWiseDownscaler:
             step, where each parameter name is prefixed such that parameter
             ``p`` for step ``s`` has key ``s__p``.
         """
-        self._ydims = y.dims
+        # self._ydims = y.dims
 
-        kwargs = dict(model=self._model, **fit_params)
+        kwargs = dict(model=self._model)
 
         # xarray.Dataset --> xarray.DataArray
         if isinstance(X, xr.Dataset):
             X = X.to_array(feature_dim)
-        if isinstance(y, xr.Dataset):
-            assert len(y.data_vars) == 1, y.data_vars
-            y = y[list(y.data_vars.keys())[0]]
+        # if isinstance(y, xr.Dataset):
+        #     assert len(y.data_vars) == 1, y.data_vars
+        #     y = y[list(y.data_vars.keys())[0]]
 
         if feature_dim in X.coords:
             input_core_dims = [[feature_dim, self._dim], [self._dim]]
@@ -125,12 +125,12 @@ class PointWiseDownscaler:
         else:
             input_core_dims = [[self._dim], [self._dim]]
 
-        X, y, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=y)
+        # X, y, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=y)
+        dask_option = 'parallelized'
 
         self._models = xr.apply_ufunc(
             _fit_model,
-            X,
-            y,
+            *args,
             vectorize=True,
             dask=dask_option,
             output_dtypes=[np.object],
