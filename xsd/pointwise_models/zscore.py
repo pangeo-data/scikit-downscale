@@ -78,8 +78,9 @@ def _reshape(ds, window_width):
     Helper function for `fit` that splits the year and day
     dimensions of the time-coordinate and bookends the years
     e.g. (Dec15:31 + whole year + Jan1:15) if window_width is 31 days.
-    ---------------------
+    
     Parameters:
+    ----------
     ds : Xarray Dataset
     window_width: the size of the rolling window.
 
@@ -105,8 +106,9 @@ def _calc_stats(df, window_width):
     """
     Helper function for `fit` that calculates the rolling mean and  
     standard deviation for each day of the year across all years.
-    ---------------------
+   
     Parameters:
+    ----------
     df : Pandas dataframe
     window_width: the size of the rolling window.
 
@@ -134,8 +136,9 @@ def _get_params(hist_mean, hist_std, meas_mean, meas_std):
     Helper function for `fit` that calculates the shift and scale parameters
     for z-score correction by comparing the historical and measured
     daily means and standard deviations.
-    ---------------------
+  
     Parameters:
+    ----------
     hist_mean : Mean calculated using the moving window 
         for each day on an average year from the historical
         model
@@ -162,8 +165,9 @@ def _expand_params(df, shift, scale):
     """
     Helper function for `predict` that expands the shift and scale parameters
     from a 365-day average year, to the length of the future dataframe.
-    ---------------------
+    
     Parameters:
+    ----------
     df : Pandas dataframe
     shift : The value by which to adjust the future mean.
     scale : The value by which to adjust the future standard deviation.
@@ -195,8 +199,9 @@ def _get_fut_stats (df, window_width):
     """
     Helper function for `predict` that calculates statistics
     for the future dataset
-    ---------------------
+    
     Parameters:
+    ----------
     df : Pandas dataframe
     window_width: the size of the rolling window.
     
@@ -219,8 +224,9 @@ def _correct_fut_stats(fut_mean, fut_std, shift_expanded, scale_expanded):
     """
     Helper function for `predict` that adjusts future statistics 
     by shift and scale parameters.
-    ---------------------
+
     Parameters:
+    ----------
     fut_mean : Mean calculated using the moving window 
         for each day of the future model
     fut_std : Standard deviation calculated using the 
