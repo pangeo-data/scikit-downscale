@@ -15,7 +15,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
     Parameters:
     ----------
     window_width :  int
-        The size of the moving window for statistical analysis. 
+        The size of the moving window for statistical analysis.
         Default is 31 days.
     var_str :  str
         The key associated with the target dataframe variable.
@@ -273,7 +273,7 @@ def _correct_fut_stats(fut_mean, fut_std, shift_expanded, scale_expanded):
     scale_expanded : pd.Dataframe, shape (n_samples, 1)
         The value by which to adjust the future standard deviation,
         repeated over the length of the dataframe.
-    
+
     Returns:
     -------
     fut_mean_corrected : pd.Dataframe, shape (n_samples, 1)
