@@ -11,6 +11,11 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
 
     Apply a scikit-learn model (e.g. Pipeline) point-by-point. The pipeline
     must implement the fit and predict methods.
+    
+    Parameters
+     ----------
+     window_width :  The size of the moving window for 
+            statistical analysis. Default is 31 days.
     """
 
     def __init__(self, window_width=31, var_str='foo'):
@@ -29,8 +34,6 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
             Training historical model data
         y : pd.Series or pd.DataFrame, shape (n_samples, 1)
             Target measured values.
-        window_width :  The size of the moving window for 
-            statistical analysis. Default is 31 days.
 
         Returns
         -------
