@@ -92,11 +92,11 @@ def test_zscore_scale():
     data_X = np.linspace(0, 1, len(time))
     data_y = data_X * 2
 
-    X = xr.DataArray(data_X, dims=['index'], coords={'index': time}).to_dataframe()
-    y = xr.DataArray(data_y, dims=['index'], coords={'index': time}).to_dataframe()
+    X = xr.DataArray(data_X, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
+    y = xr.DataArray(data_y, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
 
     data_scale_expected = [2 for i in np.zeros(364)]
-    scale_expected = xr.DataArray(data_scale_expected, dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
+    scale_expected = xr.DataArray(data_scale_expected, name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
 
     zscore = ZScoreRegressor()
     zscore.fit(X, y)
@@ -109,10 +109,10 @@ def test_zscore_shift():
     data_X = np.zeros(len(time))
     data_y = np.ones(len(time))
 
-    X = xr.DataArray(data_X, dims=['index'], coords={'index': time}).to_dataframe()
-    y = xr.DataArray(data_y, dims=['index'], coords={'index': time}).to_dataframe()
+    X = xr.DataArray(data_X, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
+    y = xr.DataArray(data_y, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
 
-    shift_expected = xr.DataArray(np.ones(364), dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
+    shift_expected = xr.DataArray(np.ones(364), name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
 
     zscore = ZScoreRegressor()
     zscore.fit(X, y)
@@ -124,19 +124,18 @@ def test_zscore_predict():
     time = pd.date_range(start='2018-01-01', end='2020-01-01')
     data_X = np.linspace(0, 1, len(time))
 
-    X = xr.DataArray(data_X, dims=['index'], coords={'index': time}).to_dataframe()
+    X = xr.DataArray(data_X, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
 
-    shift = xr.DataArray(np.zeros(364), dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
-    scale = xr.DataArray(np.ones(364), dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
+    shift = xr.DataArray(np.zeros(364), name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
+    scale = xr.DataArray(np.ones(364), name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
 
     zscore = ZScoreRegressor()
     zscore.shift = shift
     zscore.scale = scale
 
     i = int(zscore.window_width / 2)
-    expected = xr.DataArray(data_X, dims=['index'], coords={'index': time}).to_dataframe()
+    expected = xr.DataArray(data_X, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
     expected[0:i] = 'NaN'
     expected[-i:] = 'NaN'
 
     np.testing.assert_allclose(zscore.predict(X).astype(float), expected.astype(float))
-    

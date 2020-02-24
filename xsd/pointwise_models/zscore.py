@@ -13,14 +13,17 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
     must implement the fit and predict methods.
 
     Parameters
-     ----------
-     window_width :  The size of the moving window for
+    ----------
+    window_width :  The size of the moving window for
             statistical analysis. Default is 31 days.
+    var_str :  The key associated with the target
+            dataframe variable.
     """
 
-    def __init__(self, window_width=31):
+    def __init__(self, window_width=31, var_str='foo'):
 
         self.window_width = window_width
+        self.var_str = var_str
 
     def fit(self, X, y):
         """ Fit Z-Score Model finds the shift and scale parameters
@@ -64,7 +67,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         """
 
         fut_mean, fut_std, fut_zscore = _get_fut_stats(X, self.window_width)
-        shift_expanded, scale_expanded = _expand_params(X, self.shift, self.scale)
+        shift_expanded, scale_expanded = _expand_params(X, self.var_str, self.shift, self.scale)
 
         fut_mean_corrected, fut_std_corrected = _correct_fut_stats(fut_mean, fut_std, shift_expanded, scale_expanded)
         fut_corrected = (fut_zscore * fut_std_corrected) + fut_mean_corrected
@@ -159,7 +162,7 @@ def _get_params(hist_mean, hist_std, meas_mean, meas_std):
 
 
 # Helpers for Predict
-def _expand_params(df, shift, scale):
+def _expand_params(df, var_str, shift, scale):
     """
     Helper function for `predict` that expands the shift and scale parameters
     from a 365-day average year, to the length of the future dataframe.
@@ -167,6 +170,7 @@ def _expand_params(df, shift, scale):
     Parameters:
     ----------
     df : Pandas dataframe
+    var_str :  The key associated with the target dataframe variable.
     shift : The value by which to adjust the future mean.
     scale : The value by which to adjust the future standard deviation.
 
@@ -176,24 +180,24 @@ def _expand_params(df, shift, scale):
     scale_expanded : The value by which to adjust the future standard deviation,
         repeated over the length of the dataframe.
     """
-    repeats = int(df.shape[0] / shift.shape[0])
-    remainder = df.shape[0] % shift.shape[0]
+    repeats = int(df.shape[0] / shift[var_str].shape[0])
+    remainder = df.shape[0] % shift[var_str].shape[0]
 
-    sh_repeated = np.tile(shift, repeats)
-    sc_repeated = np.tile(scale, repeats)
-    sh_remaining = shift[0:remainder].values
-    sc_remaining = scale[[0:remainder].values
+    sh_repeated = np.tile(shift[var_str], repeats)
+    sc_repeated = np.tile(scale[var_str], repeats)
+    sh_remaining = shift[var_str][0:remainder].values
+    sc_remaining = scale[var_str][0:remainder].values
 
     data_shift_expanded = np.concatenate((sh_repeated, sh_remaining))
     data_scale_expanded = np.concatenate((sc_repeated, sc_remaining))
 
-    shift_expanded = xr.DataArray(data_shift_expanded, dims=['index'], coords = {'index': df.index}).to_dataframe()
-    scale_expanded = xr.DataArray(data_scale_expanded, dims=['index'], coords = {'index': df.index}).to_dataframe()
+    shift_expanded = xr.DataArray(data_shift_expanded, name=var_str, dims=['index'], coords={'index': df.index}).to_dataframe()
+    scale_expanded = xr.DataArray(data_scale_expanded, name=var_str, dims=['index'], coords={'index': df.index}).to_dataframe()
 
     return shift_expanded, scale_expanded
 
 
-def _get_fut_stats (df, window_width):
+def _get_fut_stats(df, window_width):
     """
     Helper function for `predict` that calculates statistics
     for the future dataset
@@ -229,9 +233,6 @@ def _correct_fut_stats(fut_mean, fut_std, shift_expanded, scale_expanded):
         for each day of the future model
     fut_std : Standard deviation calculated using the
         moving window for each day of the future model
-    fut_zscore: Z-Score coefficient calculated by comparing
-        the dataframe values, the means, and standared
-        deviations.
     shift_expanded : The value by which to adjust the future mean,
         repeated over the length of the dataframe.
     scale_expanded : The value by which to adjust the future standard deviation,
