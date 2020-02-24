@@ -12,12 +12,14 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
     Apply a scikit-learn model (e.g. Pipeline) point-by-point. The pipeline
     must implement the fit and predict methods.
 
-    Parameters
+    Parameters:
     ----------
-    window_width :  The size of the moving window for
-            statistical analysis. Default is 31 days.
-    var_str :  The key associated with the target
-            dataframe variable.
+    window_width :  int
+        The size of the moving window for statistical analysis. 
+        Default is 31 days.
+    var_str :  str
+        The key associated with the target dataframe variable.
+        Default is 'foo'
     """
 
     def __init__(self, window_width=31, var_str='foo'):
@@ -29,14 +31,14 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         """ Fit Z-Score Model finds the shift and scale parameters
         to inform bias correction.
 
-        Parameters
+        Parameters:
         ----------
         X : pd.Series or pd.DataFrame, shape (n_samples, 1)
             Training historical model data
         y : pd.Series or pd.DataFrame, shape (n_samples, 1)
             Target measured values.
 
-        Returns
+        Returns:
         -------
         self : returns an instance of self.
         """
@@ -55,12 +57,12 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         """ Predict performs the z-score bias correction
         on the future model dataset, X.
 
-        Parameters
+        Parameters:
         ----------
-        X : DataFrame, shape (n_samples, 1)
-            Samples.
+        X : pd.Series or pd.DataFrame, shape (n_samples, 1)
+            Training historical model data
 
-        Returns
+        Returns:
         -------
         fut_corrected : pd.DataFrame, shape (n_samples, 1)
             Returns corrected values.
@@ -82,12 +84,17 @@ def _reshape(ds, window_width):
 
     Parameters:
     ----------
-    ds : Xarray Dataset
-    window_width: the size of the rolling window.
+    ds : xr.Dataset, shape (n_samples, 1)
+        Samples
+    window_width: int
+        the size of the rolling window.
 
     Returns:
-    ds_rsh : Reshaped Xarray dataset
+    -------
+    ds_rsh : xr.Dataset, shape(day: 364 + n_bookend_days, year: n_years)
+        Reshaped xr.Dataset
     """
+
     if 'time' not in ds.coords and 'index' in ds.coords:
         ds = ds.rename({'index': 'time'})
     assert 'time' in ds.coords
@@ -110,12 +117,17 @@ def _calc_stats(df, window_width):
 
     Parameters:
     ----------
-    df : Pandas dataframe
-    window_width: the size of the rolling window.
+    df : pd.DataFrame, shape (n_samples, 1)
+        Samples.
+    window_width: int
+        the size of the rolling window.
 
     Returns:
-    df_mean : Means for each day of year across all years
-    df_std:  Standard deviations for each day of year across all years
+    -------
+    df_mean : pd.DataFrame, shape (364, 1)
+        Means for each day of year across all years
+    df_std:  pd.DataFrame, shape (364, 1)
+        Standard deviations for each day of year across all years
     """
 
     ds = df.to_xarray()
@@ -140,21 +152,28 @@ def _get_params(hist_mean, hist_std, meas_mean, meas_std):
 
     Parameters:
     ----------
-    hist_mean : Mean calculated using the moving window
+    hist_mean : pd.DataFrame, shape (364, 1)
+        Mean calculated using the moving window
         for each day on an average year from the historical
         model
-    hist_std : Standard deviation calculated using the
+    hist_std : pd.DataFrame, shape (364, 1)
+        Standard deviation calculated using the
         moving window for each day on an average year
         from the historical model
-    meas_mean : Mean calculated using the moving window
+    meas_mean : pd.DataFrame, shape (364, 1)
+        Mean calculated using the moving window
         for each day on an average year from the measurements
-    meas_std : Standard deviation calculated using the
+    meas_std : pd.DataFrame, shape (364, 1)
+        Standard deviation calculated using the
         moving window for each day on an average year
         from the measurements
 
     Returns:
-    shift : The value by which to adjust the future mean.
-    scale : The value by which to adjust the future standard deviation.
+    -------
+    shift : pd.DataFrame, shape (364, 1)
+        The value by which to adjust the future mean.
+    scale : pd.DataFrame, shape (364, 1)
+        The value by which to adjust the future standard deviation.
     """
     shift = meas_mean - hist_mean
     scale = meas_std / hist_std
@@ -162,6 +181,37 @@ def _get_params(hist_mean, hist_std, meas_mean, meas_std):
 
 
 # Helpers for Predict
+def _get_fut_stats(df, window_width):
+    """
+    Helper function for `predict` that calculates statistics
+    for the future dataset
+
+    Parameters:
+    ----------
+    df : pd.Dataframe, shape (n_samples, 1)
+        Samples
+    window_width: int
+        The size of the rolling window.
+
+    Returns:
+    -------
+    fut_mean : pd.Dataframe, shape (n_samples, 1)
+        Mean calculated using the moving window
+        for each day of the future model
+    fut_std : pd.Dataframe, shape (n_samples, 1)
+        Standard deviation calculated using the
+        moving window for each day of the future model
+    fut_zscore: pd.Dataframe, shape (n_samples, 1)
+        Z-Score coefficient calculated by comparing
+        the dataframe values, the means, and standared
+        deviations.
+    """
+    fut_mean = df.rolling(window_width, center=True).mean()
+    fut_std = df.rolling(window_width, center=True).std()
+    fut_zscore = (df - fut_mean) / fut_std
+    return fut_mean, fut_std, fut_zscore
+
+
 def _expand_params(df, var_str, shift, scale):
     """
     Helper function for `predict` that expands the shift and scale parameters
@@ -169,15 +219,22 @@ def _expand_params(df, var_str, shift, scale):
 
     Parameters:
     ----------
-    df : Pandas dataframe
-    var_str :  The key associated with the target dataframe variable.
-    shift : The value by which to adjust the future mean.
-    scale : The value by which to adjust the future standard deviation.
+    df : pd.DataFrame, shape (n_samples, 1)
+        Samples.
+    var_str :  str
+        The key associated with the target dataframe variable.
+    shift : pd.DataFrame, shape (364, 1)
+        The value by which to adjust the future mean.
+    scale : pd.DataFrame, shape (364, 1)
+        The value by which to adjust the future standard deviation.
 
     Returns:
-    shift_expanded : The value by which to adjust the future mean,
+    -------
+    shift_expanded : pd.Dataframe, shape (n_samples, 1)
+        The value by which to adjust the future mean,
         repeated over the length of the dataframe.
-    scale_expanded : The value by which to adjust the future standard deviation,
+    scale_expanded : pd.Dataframe, shape (n_samples, 1)
+        The value by which to adjust the future standard deviation,
         repeated over the length of the dataframe.
     """
     repeats = int(df.shape[0] / shift[var_str].shape[0])
@@ -197,31 +254,6 @@ def _expand_params(df, var_str, shift, scale):
     return shift_expanded, scale_expanded
 
 
-def _get_fut_stats(df, window_width):
-    """
-    Helper function for `predict` that calculates statistics
-    for the future dataset
-
-    Parameters:
-    ----------
-    df : Pandas dataframe
-    window_width: the size of the rolling window.
-
-    Returns:
-    fut_mean : Mean calculated using the moving window
-        for each day of the future model
-    fut_std : Standard deviation calculated using the
-        moving window for each day of the future model
-    fut_zscore: Z-Score coefficient calculated by comparing
-        the dataframe values, the means, and standared
-        deviations.
-    """
-    fut_mean = df.rolling(window_width, center=True).mean()
-    fut_std = df.rolling(window_width, center=True).std()
-    fut_zscore = (df - fut_mean) / fut_std
-    return fut_mean, fut_std, fut_zscore
-
-
 def _correct_fut_stats(fut_mean, fut_std, shift_expanded, scale_expanded):
     """
     Helper function for `predict` that adjusts future statistics
@@ -229,16 +261,25 @@ def _correct_fut_stats(fut_mean, fut_std, shift_expanded, scale_expanded):
 
     Parameters:
     ----------
-    fut_mean : Mean calculated using the moving window
+    fut_mean : pd.Dataframe, shape (n_samples, 1)
+        Mean calculated using the moving window
         for each day of the future model
-    fut_std : Standard deviation calculated using the
+    fut_std : pd.Dataframe, shape (n_samples, 1)
+        Standard deviation calculated using the
         moving window for each day of the future model
-    shift_expanded : The value by which to adjust the future mean,
+    shift_expanded : pd.Dataframe, shape (n_samples, 1)
+        The value by which to adjust the future mean,
         repeated over the length of the dataframe.
-    scale_expanded : The value by which to adjust the future standard deviation,
+    scale_expanded : pd.Dataframe, shape (n_samples, 1)
+        The value by which to adjust the future standard deviation,
         repeated over the length of the dataframe.
+    
     Returns:
-
+    -------
+    fut_mean_corrected : pd.Dataframe, shape (n_samples, 1)
+        Corrected mean for each day of the future model
+    fut_std_corrected : pd.Dataframe, shape (n_samples, 1)
+        Corrected standard deviation for each day of the future model
     """
     fut_mean_corrected = fut_mean + shift_expanded
     fut_std_corrected = fut_std * scale_expanded
