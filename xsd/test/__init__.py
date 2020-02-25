@@ -4,11 +4,9 @@ import dask
 import numpy as np
 import pandas as pd
 import xarray as xr
-
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-
 
 dask.config.set(scheduler="single-threaded")
 

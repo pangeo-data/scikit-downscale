@@ -1,19 +1,17 @@
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
-
 from sklearn.linear_model.base import LinearModel
 
-import pytest
-
-from xsd.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
 from xsd.pointwise_models import (
+    AnalogRegression,
     BcsdPrecipitation,
     BcsdTemperature,
     PureAnalog,
-    AnalogRegression,
-    ZScoreRegressor
+    ZScoreRegressor,
 )
+from xsd.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
 
 
 def test_linear_trend_roundtrip():
