@@ -80,9 +80,6 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
 
         fut_corrected = (fut_zscore * fut_std_corrected) + fut_mean_corrected
 
-        for var in [fut_corrected, fut_zscore, fut_std_corrected, fut_mean_corrected]:
-            print(var.shape)
-
         return fut_corrected.to_frame(name)
 
 
