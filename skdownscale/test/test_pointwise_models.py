@@ -1,18 +1,17 @@
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
 from sklearn.linear_model.base import LinearModel
-import pytest
 
-from xsd.pointwise_models import (
+from skdownscale.pointwise_models import (
     AnalogRegression,
     BcsdPrecipitation,
     BcsdTemperature,
     PureAnalog,
     ZScoreRegressor,
-
 )
-from xsd.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
+from skdownscale.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
 
 
 def test_linear_trend_roundtrip():
@@ -76,9 +75,7 @@ def test_linear_model(model_cls):
     # TODO: add test for time other time ranges (e.g. < 365 days)
     index = pd.date_range("2019-01-01", periods=n)
 
-    X = pd.DataFrame(
-        {"foo": np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10}, index=index
-    )
+    X = pd.DataFrame({"foo": np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10}, index=index)
     y = X + 2
 
     model = model_cls()
@@ -108,12 +105,8 @@ def test_zscore_scale():
     data_X = np.linspace(0, 1, len(time))
     data_y = data_X * 2
 
-    X = xr.DataArray(
-        data_X, name="foo", dims=["index"], coords={"index": time}
-    ).to_dataframe()
-    y = xr.DataArray(
-        data_y, name="foo", dims=["index"], coords={"index": time}
-    ).to_dataframe()
+    X = xr.DataArray(data_X, name="foo", dims=["index"], coords={"index": time}).to_dataframe()
+    y = xr.DataArray(data_y, name="foo", dims=["index"], coords={"index": time}).to_dataframe()
 
     data_scale_expected = [2 for i in np.zeros(364)]
     scale_expected = xr.DataArray(
@@ -131,12 +124,8 @@ def test_zscore_shift():
     data_X = np.zeros(len(time))
     data_y = np.ones(len(time))
 
-    X = xr.DataArray(
-        data_X, name="foo", dims=["index"], coords={"index": time}
-    ).to_dataframe()
-    y = xr.DataArray(
-        data_y, name="foo", dims=["index"], coords={"index": time}
-    ).to_dataframe()
+    X = xr.DataArray(data_X, name="foo", dims=["index"], coords={"index": time}).to_dataframe()
+    y = xr.DataArray(data_y, name="foo", dims=["index"], coords={"index": time}).to_dataframe()
 
     shift_expected = xr.DataArray(
         np.ones(364), name="foo", dims=["day"], coords={"day": np.arange(1, 365)}
@@ -152,9 +141,7 @@ def test_zscore_predict():
     time = pd.date_range(start="2018-01-01", end="2020-01-01")
     data_X = np.linspace(0, 1, len(time))
 
-    X = xr.DataArray(
-        data_X, name="foo", dims=["index"], coords={"index": time}
-    ).to_dataframe()
+    X = xr.DataArray(data_X, name="foo", dims=["index"], coords={"index": time}).to_dataframe()
 
     shift = xr.DataArray(
         np.zeros(364), name="foo", dims=["day"], coords={"day": np.arange(1, 365)}

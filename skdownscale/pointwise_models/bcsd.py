@@ -2,18 +2,19 @@ import collections
 
 import numpy as np
 import pandas as pd
-
 from sklearn.base import RegressorMixin
 from sklearn.linear_model.base import LinearModel
 from sklearn.utils.validation import check_is_fitted
 
 from .utils import QuantileMapper, ensure_samples_features
 
-MONTH_GROUPER = lambda x: x.month
+
+def MONTH_GROUPER(x):
+    return x.month
 
 
 class BcsdBase(LinearModel, RegressorMixin):
-    """ Base class for BCSD model. 
+    """ Base class for BCSD model.
     """
 
     _fit_attributes = ["y_climo_", "quantile_mappers_"]

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 CLASSIFIERS = [
     "Development Status :: 2 - Pre-Alpha",

@@ -1,10 +1,8 @@
 import numpy as np
-
 from scipy.spatial import cKDTree
-
 from sklearn.base import RegressorMixin
-from sklearn.linear_model.base import LinearModel
 from sklearn.linear_model import LinearRegression
+from sklearn.linear_model.base import LinearModel
 from sklearn.utils.validation import check_is_fitted
 
 from .utils import ensure_samples_features
@@ -93,8 +91,8 @@ class AnalogRegression(AnalogBase):
         _, inds = self.kdtree_.query(X, k=kmax, **self.query_kwargs)
 
         # extract data to train linear regression model
-        x = ensure_samples_features(self.kdtree_.data[inds-1])
-        y = ensure_samples_features(self.y_.values[inds-1])
+        x = ensure_samples_features(self.kdtree_.data[inds - 1])
+        y = ensure_samples_features(self.y_.values[inds - 1])
 
         # train linear regression model
         lr_model = LinearRegression(**self.lr_kwargs).fit(x, y)

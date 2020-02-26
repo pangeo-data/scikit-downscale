@@ -14,11 +14,11 @@ jobs:
   - bash: echo "##vso[task.prependpath]$CONDA/bin"
     displayName: Add conda to PATH
 
-  - script: conda env create --quiet --name xsd-tests --file ci/$CONDA_ENV.yml
+  - script: conda env create --quiet --name skdownscale-tests --file ci/$CONDA_ENV.yml
     displayName: Create Anaconda environment
 
   - bash: |
-      source activate xsd-tests
+      source activate skdownscale-tests
       conda list
       pip install pytest pytest-azurepipelines
       pytest

@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import gc
 import os
-import click
 
+import click
 import pandas as pd
 import xarray as xr
 
 from xsd.bcsd import bcsd, disagg
-
-import gc
 
 
 @click.command()
@@ -50,13 +49,9 @@ def run_ak(obs_fname, train_fname, predict_fname):
     out = xr.Dataset()
 
     # get variables from the obs/training/prediction datasets
-    ds_obs = xr.open_mfdataset(
-        obs_fname, chunks=chunks, concat_dim="time", data_vars="minimal"
-    )
+    ds_obs = xr.open_mfdataset(obs_fname, chunks=chunks, concat_dim="time", data_vars="minimal")
     time_bounds = slice(ds_obs.indexes["time"][0], ds_obs.indexes["time"][-1])
-    ds_obs.coords["xc"] = ds_obs["xc"].where(
-        ds_obs["xc"] >= 0, ds_obs.coords["xc"] + 360
-    )
+    ds_obs.coords["xc"] = ds_obs["xc"].where(ds_obs["xc"] >= 0, ds_obs.coords["xc"] + 360)
     attrs_to_delete = [
         "grid_mapping",
         "cell_methods",
@@ -75,9 +70,7 @@ def run_ak(obs_fname, train_fname, predict_fname):
         ds_obs_daily[obs_var] = ds_obs_daily[obs_var].astype("f4")
         times = pd.date_range("1980-01-01", "2017-12-31", freq="D")
         ds_obs_daily = ds_obs_daily.reindex(time=times, method="nearest")
-        ds_obs_1var = (
-            ds_obs_daily.resample(time="MS", keep_attrs=True).mean("time").load()
-        )
+        ds_obs_1var = ds_obs_daily.resample(time="MS", keep_attrs=True).mean("time").load()
 
         for i, v in enumerate(obs_keep_vars):
             ds_obs_1var[v].attrs = ds_obs[v].attrs
@@ -151,9 +144,7 @@ def run_hi(obs_fname, train_fname, predict_fname):
     out = xr.Dataset()
 
     # get variables from the obs/training/prediction datasets
-    ds_obs = xr.open_mfdataset(
-        obs_fname, chunks=chunks, concat_dim="time", data_vars="minimal"
-    )
+    ds_obs = xr.open_mfdataset(obs_fname, chunks=chunks, concat_dim="time", data_vars="minimal")
     time_bounds = slice(ds_obs.indexes["time"][0], ds_obs.indexes["time"][-1])
 
     for obs_var, gcm_var in varnames.items():
@@ -162,9 +153,7 @@ def run_hi(obs_fname, train_fname, predict_fname):
         ds_obs_daily[obs_var] = ds_obs_daily[obs_var].astype("f4")
         times = pd.date_range("1990-01-01", "2014-12-31", freq="D")
         ds_obs_daily = ds_obs_daily.reindex(time=times, method="nearest")
-        ds_obs_1var = (
-            ds_obs_daily.resample(time="MS", keep_attrs=True).mean("time").load()
-        )
+        ds_obs_1var = ds_obs_daily.resample(time="MS", keep_attrs=True).mean("time").load()
 
         for i, v in enumerate(obs_keep_vars):
             ds_obs_1var[v].attrs = ds_obs[v].attrs
