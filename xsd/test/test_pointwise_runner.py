@@ -1,9 +1,9 @@
 import pytest
 import xarray as xr
 
-from . import random_point_data, random_grid_data, make_linear_reg_pipeline
-
 from xsd.pointwise_models import PointWiseDownscaler
+
+from . import make_linear_reg_pipeline, random_grid_data, random_point_data
 
 
 @pytest.mark.parametrize(
