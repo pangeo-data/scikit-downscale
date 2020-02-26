@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
-import pytest
 import xarray as xr
 from sklearn.linear_model.base import LinearModel
+import pytest
 
 from xsd.pointwise_models import (
     AnalogRegression,
@@ -10,6 +10,7 @@ from xsd.pointwise_models import (
     BcsdTemperature,
     PureAnalog,
     ZScoreRegressor,
+
 )
 from xsd.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
 

@@ -25,6 +25,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
 
         assert window_width > 0, window_width
         self.window_width = window_width
+        
 
     def fit(self, X, y):
         """ Fit Z-Score Model finds the shift and scale parameters
@@ -52,7 +53,6 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
 
         self.shift_ = shift
         self.scale_ = scale
-
         return self
 
     def predict(self, X):
@@ -69,6 +69,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         fut_corrected : pd.DataFrame, shape (n_samples, 1)
             Returns corrected values.
         """
+
         check_is_fitted(self, self._fit_attributes)
         assert isinstance(X, pd.DataFrame)
         assert X.shape[1] == 1
@@ -99,7 +100,7 @@ def _reshape(da, window_width):
     da : xr.DataArray, shape (n_samples, )
         Samples
     window_width : int
-        the size of the rolling window.
+        The size of the rolling window.
 
     Returns
     -------
@@ -135,7 +136,7 @@ def _calc_stats(series, window_width):
     series : pd.Series, shape (n_samples, )
         Samples.
     window_width : int
-        the size of the rolling window.
+        The size of the rolling window.
 
     Returns
     -------
@@ -274,7 +275,6 @@ def _expand_params(series, shift, scale):
 
     scale_expanded = scale.iloc[inds]
     scale_expanded.index = series.index
-
     return shift_expanded, scale_expanded
 
 
