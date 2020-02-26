@@ -17,9 +17,7 @@ def random_point_data(n_points=1, n_times=100, n_vars=1):
     dims = ("time", "point")
     times = pd.date_range("1979-01-01", freq="1D", periods=n_times)
     for vname in string.ascii_lowercase[:n_vars]:
-        ds[vname] = xr.DataArray(
-            np.random.random(size=size), dims=(dims), coords={"time": times}
-        )
+        ds[vname] = xr.DataArray(np.random.random(size=size), dims=(dims), coords={"time": times})
     return ds
 
 
@@ -29,9 +27,7 @@ def random_grid_data(grid_shape=(2, 3), n_times=100, n_vars=1):
     dims = ("time", "y", "x")
     times = pd.date_range("1979-01-01", freq="1D", periods=n_times)
     for vname in string.ascii_lowercase[:n_vars]:
-        ds[vname] = xr.DataArray(
-            np.random.random(size=size), dims=(dims), coords={"time": times}
-        )
+        ds[vname] = xr.DataArray(np.random.random(size=size), dims=(dims), coords={"time": times})
     return ds
 
 

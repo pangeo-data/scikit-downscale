@@ -11,7 +11,7 @@ def _reshape_for_sklearn(vals, columns=None):
     return vals
 
 
-def _fit_model(*args, model=None, columns=None, **kwargs):
+def _fit_model(X, y, model=None, columns=None, **kwargs):
     X = _reshape_for_sklearn(X, columns=columns)
     y = _reshape_for_sklearn(y)
 
@@ -66,7 +66,6 @@ class PointWiseDownscaler:
     ----------
     model : sklearn.Pipeline or similar
         Object that implements the scikit-learn fit/predict api.
-
     dim : str, optional
         Dimension to apply the model along. Default is ``time``.
     """
@@ -94,14 +93,11 @@ class PointWiseDownscaler:
             Training data. Must fulfill input requirements of first step of
             the pipeline. If an xarray.Dataset is passed, it will be converted
             to an array using `to_array()`.
-
         y : xarray.DataArray
             Training targets. Must fulfill label requirements for all steps
             of the pipeline.
-            
         feature_dim : str, optional
-            Name of feature dimension. 
-
+            Name of feature dimension.
         **fit_params : dict of string -> object
             Parameters passed to the ``fit`` method of the this model. If the
             model is a sklearn Pipeline, parameters can be passed to each
@@ -120,10 +116,10 @@ class PointWiseDownscaler:
         #     y = y[list(y.data_vars.keys())[0]]
 
         if feature_dim in X.coords:
-            input_core_dims = [[feature_dim, self._dim], [self._dim]]
+            input_core_dims = ([feature_dim, self._dim], [self._dim])
             kwargs["columns"] = X.coords[feature_dim].data
         else:
-            input_core_dims = [[self._dim], [self._dim]]
+            input_core_dims = ([self._dim], [self._dim])
 
         # X, y, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=y)
         dask_option = "parallelized"
@@ -147,10 +143,8 @@ class PointWiseDownscaler:
         X : xarray.DataArray
             Data to predict on. Must fulfill input requirements of first step
             of the model or pipeline.
-
         feature_dim : str, optional
-            Name of feature dimension. 
-
+            Name of feature dimension.
         **predict_params : dict of string -> object
             Parameters to the ``predict`` called at the end of all
             transformations in the pipeline. Note that while this may be
@@ -198,10 +192,8 @@ class PointWiseDownscaler:
         X : xarray.DataArray
             Data to transform on. Must fulfill input requirements of first step
             of the model or pipeline.
-
         feature_dim : str, optional
-            Name of feature dimension. 
-
+            Name of feature dimension.
         **transform_params : dict of string -> object
             Parameters to the ``transform`` called at the end of all
             transformations in the pipeline.

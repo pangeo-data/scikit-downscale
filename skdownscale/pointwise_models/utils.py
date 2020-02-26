@@ -10,8 +10,8 @@ Cdf = collections.namedtuple("CDF", ["pp", "vals"])
 
 
 class LinearTrendTransformer(TransformerMixin, BaseEstimator):
-    """ Transform features by removing linear trends. 
-    
+    """ Transform features by removing linear trends.
+
     Uses Ordinary least squares Linear Regression as implemented in
     sklear.linear_model.LinearRegression.
 
@@ -31,7 +31,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
 
     def fit(self, X):
         """ Compute the linear trend.
-    
+
         Parameters
         ----------
         X : array-like, shape  [n_samples, n_features]
@@ -43,7 +43,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
 
     def transform(self, X):
         """ Perform transformation by removing the trend.
-        
+
         Parameters
         ----------
         X : array-like, shape  [n_samples, n_features]
@@ -53,7 +53,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
 
     def inverse_transform(self, X):
         """ Add the trend back to the data.
-        
+
         Parameters
         ----------
         X : array-like, shape  [n_samples, n_features]
@@ -68,7 +68,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
 
 class QuantileMapper(BaseEstimator, TransformerMixin):
     """ Transform features using quantile mapping.
-    
+
     Parameters
     ----------
     detrend : boolean, optional
@@ -94,7 +94,7 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
 
     def fit(self, X):
         """ Fit the quantile mapping model.
-        
+
         Parameters
         ----------
         X : array-like, shape  [n_samples, n_features]

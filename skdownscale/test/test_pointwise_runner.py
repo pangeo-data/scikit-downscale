@@ -9,10 +9,7 @@ from . import make_linear_reg_pipeline, random_grid_data, random_point_data
     ("X", "y"),
     [
         # with numpy arrays
-        (
-            random_point_data(n_points=3, n_vars=3),
-            random_point_data(n_points=3, n_vars=1)["a"],
-        ),
+        (random_point_data(n_points=3, n_vars=3), random_point_data(n_points=3, n_vars=1)["a"],),
         (
             random_grid_data(grid_shape=(2, 3), n_vars=3),
             random_grid_data(grid_shape=(2, 3), n_vars=1)["a"],
@@ -77,7 +74,7 @@ def test_pointwise_model(X, y):
         ),
     ],
 )
-def test_pointwise_model(X, y):
+def test_pointwise_model_qm(X, y):
     pipeline = QuantileMapper()
     model = PointWiseDownscaler(model=pipeline)
     model.fit(y)
