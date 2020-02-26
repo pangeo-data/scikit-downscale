@@ -67,15 +67,35 @@ def test_quantile_mapper_detrend():
 
 
 @pytest.mark.parametrize(
-    "model_cls", [BcsdPrecipitation, BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor]
+    "model_cls", [BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor]
 )
 def test_linear_model(model_cls):
 
-    n = 100
+    n = 365
+    # TODO: add test for time other time ranges (e.g. < 365 days)
     index = pd.date_range("2019-01-01", periods=n)
 
     X = pd.DataFrame(
         {"foo": np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10}, index=index
+    )
+    y = X + 2
+
+    model = model_cls()
+    model.fit(X, y)
+    model.predict(X)
+    assert isinstance(model, LinearModel)
+
+
+@pytest.mark.parametrize(
+    "model_cls", [BcsdPrecipitation]
+)
+def test_linear_model_prec(model_cls):
+
+    n = 365
+    index = pd.date_range("2019-01-01", periods=n)
+
+    X = pd.DataFrame(
+        {"foo": np.random.random(n)}, index=index
     )
     y = X + 2
 
@@ -94,12 +114,12 @@ def test_zscore_scale():
     y = xr.DataArray(data_y, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
 
     data_scale_expected = [2 for i in np.zeros(364)]
-    scale_expected = xr.DataArray(data_scale_expected, name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
+    scale_expected = xr.DataArray(data_scale_expected, name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_series()
 
     zscore = ZScoreRegressor()
     zscore.fit(X, y)
 
-    np.testing.assert_allclose(zscore.scale, scale_expected)
+    np.testing.assert_allclose(zscore.scale_, scale_expected)
 
 
 def test_zscore_shift():
@@ -110,12 +130,12 @@ def test_zscore_shift():
     X = xr.DataArray(data_X, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
     y = xr.DataArray(data_y, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
 
-    shift_expected = xr.DataArray(np.ones(364), name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
+    shift_expected = xr.DataArray(np.ones(364), name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_series()
 
     zscore = ZScoreRegressor()
     zscore.fit(X, y)
 
-    np.testing.assert_allclose(zscore.shift, shift_expected)
+    np.testing.assert_allclose(zscore.shift_, shift_expected)
 
 
 def test_zscore_predict():
@@ -124,12 +144,12 @@ def test_zscore_predict():
 
     X = xr.DataArray(data_X, name='foo', dims=['index'], coords={'index': time}).to_dataframe()
 
-    shift = xr.DataArray(np.zeros(364), name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
-    scale = xr.DataArray(np.ones(364), name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_dataframe()
+    shift = xr.DataArray(np.zeros(364), name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_series()
+    scale = xr.DataArray(np.ones(364), name='foo', dims=['day'], coords={'day': np.arange(1, 365)}).to_series()
 
     zscore = ZScoreRegressor()
-    zscore.shift = shift
-    zscore.scale = scale
+    zscore.shift_ = shift
+    zscore.scale_ = scale
 
     i = int(zscore.window_width / 2)
     expected = xr.DataArray(data_X, name='foo', dims=['index'], coords={'index': time}).to_dataframe()

@@ -3,6 +3,7 @@ import pandas as pd
 import xarray as xr
 from sklearn.base import RegressorMixin
 from sklearn.linear_model.base import LinearModel
+from sklearn.utils.validation import check_is_fitted
 
 
 class ZScoreRegressor(LinearModel, RegressorMixin):
@@ -17,6 +18,8 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         The size of the moving window for statistical analysis. Default is 31
         days.
     """
+
+    _fit_attributes = ["shift_", "scale_"]
 
     def __init__(self, window_width=31):
 
@@ -47,8 +50,8 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
 
         shift, scale = _get_params(X_mean, X_std, y_mean, y_std)
 
-        self.shift = shift
-        self.scale = scale
+        self.shift_ = shift
+        self.scale_ = scale
 
         return self
 
@@ -66,13 +69,13 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         fut_corrected : pd.DataFrame, shape (n_samples, 1)
             Returns corrected values.
         """
-
+        check_is_fitted(self, self._fit_attributes)
         assert isinstance(X, pd.DataFrame)
         assert X.shape[1] == 1
         name = list(X.keys())[0]
 
         fut_mean, fut_std, fut_zscore = _get_fut_stats(X.squeeze(), self.window_width)
-        shift_expanded, scale_expanded = _expand_params(X, self.shift, self.scale)
+        shift_expanded, scale_expanded = _expand_params(X.squeeze(), self.shift_, self.scale_)
 
         fut_mean_corrected, fut_std_corrected = _correct_fut_stats(
             fut_mean, fut_std, shift_expanded, scale_expanded
@@ -183,10 +186,12 @@ def _get_params(hist_mean, hist_std, meas_mean, meas_std):
         The value by which to adjust the future standard deviation.
     """
 
-    assert len(hist_mean) == 364, len(hist_mean)
-    assert len(hist_std) == 364, len(hist_std)
-    assert len(meas_mean) == 364, len(meas_mean)
-    assert len(meas_std) == 364, len(meas_std)
+    # TODO: Update docstring to relax the assumption that the year is 364 days long
+    # assert len(hist_mean) == 364, len(hist_mean)
+    # assert len(hist_std) == 364, len(hist_std)
+    # assert len(meas_mean) == 364, len(meas_mean)
+    # assert len(meas_std) == 364, len(meas_std)
+    assert all([s.ndim for s in [hist_mean, hist_std, meas_mean, meas_std]])
 
     shift = meas_mean - hist_mean
     scale = meas_std / hist_std
@@ -249,23 +254,24 @@ def _expand_params(series, shift, scale):
     """
 
     n_samples = len(series)
-    len_avgyr = 364
-    assert len(shift) == len_avgyr, len(shift)
-    assert len(scale) == len_avgyr, len(scale)
+    len_avgyr = 364 if n_samples > 364 else n_samples
+    # TODO: update doc string
+    # assert len(shift) == len_avgyr, len(shift)
+    # assert len(scale) == len_avgyr, len(scale)
 
     repeats = int(n_samples / len_avgyr)
     remainder = n_samples % len_avgyr
 
-    sh_repeated = np.tile(shift, repeats)
-    sc_repeated = np.tile(scale, repeats)
-    sh_remaining = shift[0:remainder].values
-    sc_remaining = scale[0:remainder].values
+    inds = np.concatenate(
+        [np.tile(np.arange(len_avgyr), repeats), np.arange(remainder)]
+    )
+    assert len(inds) == n_samples, (len(inds), n_samples)
 
-    data_shift_expanded = np.concatenate((sh_repeated, sh_remaining))
-    data_scale_expanded = np.concatenate((sc_repeated, sc_remaining))
+    shift_expanded = shift.iloc[inds]
+    shift_expanded.index = series.index
 
-    shift_expanded = pd.Series(data_shift_expanded, index=series.index)
-    scale_expanded = pd.Series(data_scale_expanded, index=series.index)
+    scale_expanded = scale.iloc[inds]
+    scale_expanded.index = series.index
 
     return shift_expanded, scale_expanded
 
