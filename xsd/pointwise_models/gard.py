@@ -89,7 +89,8 @@ class AnalogRegression(AnalogBase):
 
     def _predict_one_step(self, X):
         # get analogs
-        _, inds = self.kdtree_.query(X, k=self.n_analogs, **self.query_kwargs)
+        kmax = max(len(self.kdtree_.data), self.n_analogs)
+        _, inds = self.kdtree_.query(X, k=kmax, **self.query_kwargs)
 
         # extract data to train linear regression model
         x = ensure_samples_features(self.kdtree_.data[inds-1])
