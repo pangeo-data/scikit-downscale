@@ -230,7 +230,7 @@ class PointWiseDownscaler:
         ).transpose(*self._ydims)
 
     def __repr__(self):
-        summary = ["<xsd.{}>".format(self.__class__.__name__)]
+        summary = ["<skdownscale.{}>".format(self.__class__.__name__)]
         summary.append("  Fit Status: {}".format(self._models is not None))
         summary.append("  Model:\n    {}".format(self._model))
         return "\n".join(summary)
