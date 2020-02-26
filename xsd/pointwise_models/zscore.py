@@ -75,7 +75,9 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         name = list(X.keys())[0]
 
         fut_mean, fut_std, fut_zscore = _get_fut_stats(X.squeeze(), self.window_width)
-        shift_expanded, scale_expanded = _expand_params(X.squeeze(), self.shift_, self.scale_)
+        shift_expanded, scale_expanded = _expand_params(
+            X.squeeze(), self.shift_, self.scale_
+        )
 
         fut_mean_corrected, fut_std_corrected = _correct_fut_stats(
             fut_mean, fut_std, shift_expanded, scale_expanded
