@@ -11,9 +11,11 @@ sphinx:
 
 # Optionally set the version of Python and requirements required to build your docs
 python:
-  version: 3.7
-  install:
-    - requirements: doc-requirements.txt
-    - requirements: requirements.txt
-    - method: pip
-      path: .
+   version: 3.7
+   install:
+      - requirements: docs-requirements.txt
+      - requirements: requirements.txt
+      - method: pip
+        path: .
+      - method: setuptools
+        path: scikit-downscale
