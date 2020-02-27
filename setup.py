@@ -14,16 +14,19 @@ CLASSIFIERS = [
     "Topic :: Scientific/Engineering",
 ]
 
+with open("requirements.txt") as f:
+    install_requires = f.read().strip().split("\n")
+
 setup(
-    name="xsd",
+    name="scikit-downscale",
     author="Joe Hamman",
     author_email="jhamman@ucar.edu",
     license="Apache",
     classifiers=CLASSIFIERS,
     description="Statistical downscaling and postprocessing models for climate and weather model simulations.",
     python_requires=">=3.6",
-    install_requires=["xarray >= 0.10", "scikit-learn >= 0.21"],
+    install_requires=install_requires,
     tests_require=["pytest >= 2.7.1"],
-    url="https://github.com/jhamman/xsd",
+    url="https://github.com/jhamman/scikit-downscale",
     packages=find_packages(),
 )

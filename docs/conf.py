@@ -23,7 +23,7 @@ import skdownscale
 from pkg_resources import get_distribution
 
 project = "scikit-downscale"
-copyright = "2019, Joe Hamman"
+copyright = "2020, Joe Hamman"
 author = "Joe Hamman"
 
 release = get_distribution("skdownscale").version

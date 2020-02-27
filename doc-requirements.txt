@@ -1,0 +1,8 @@
+scipy
+dask
+netcdf4
+ipython
+sphinx
+numpydoc
+sphinx-gallery
+sphinx_rtd_theme
