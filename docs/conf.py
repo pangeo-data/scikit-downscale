@@ -17,10 +17,10 @@
 # sys.path.insert(0, os.path.abspath('.'))
 
 
-import skdownscale
-
 # -- Project information -----------------------------------------------------
 from pkg_resources import get_distribution
+
+import skdownscale
 
 project = "scikit-downscale"
 copyright = "2020, Joe Hamman"
