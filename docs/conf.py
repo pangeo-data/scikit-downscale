@@ -26,7 +26,7 @@ project = "scikit-downscale"
 copyright = "2020, Joe Hamman"
 author = "Joe Hamman"
 
-release = get_distribution("skdownscale").version
+release = skdownscale.__version__
 # for example take major/minor
 version = ".".join(release.split(".")[:2])
 
