@@ -12,8 +12,7 @@ class TestQM:
         ref = tas_series(r)
         fut_add = tas_series(r + 2)
         qs = qm.train(ref, fut_add, 20, group)
-        d = qs['target'] - qs['source']
-        np.testing.assert_array_almost_equal(d, 2)
+        np.testing.assert_array_almost_equal(qs, 2)
         assert qs.group == group
 
     def test_add_cyclic(self, qds_month):
@@ -164,10 +163,8 @@ class TestPolyval():
 
 class TestDetrend:
     def test_simple(self, tas_series):
-        da = tas_series(np.arange(100)+10)
+        da = tas_series(np.arange(100) + 10)
         detrended, trend, coefs = dqm.detrend(da)
-
-        #np.testing.assert_almost_equal(coefs.sel(degree=1).values, 1)
         np.testing.assert_array_almost_equal(detrended, 0)
 
 
@@ -182,4 +179,3 @@ class TestGetIndex:
         time.encoding['calendar'] = calendar
         x = dqm.get_index(time)
         assert hasattr(x, "dims")
-

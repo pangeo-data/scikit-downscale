@@ -54,7 +54,7 @@ def group_quantile(x, group, q, window=1):
     return xq
 
 
-def train(x, y, nq, group='time.dayofyear', window=1):
+def train(x, y, nq, group='time.dayofyear', kind="+", window=1):
     """Compute quantile bias-adjustment factors.
 
     Parameters
@@ -80,9 +80,18 @@ def train(x, y, nq, group='time.dayofyear', window=1):
     xq = group_quantile(x, group, q, window)
     yq = group_quantile(y, group, q, window)
 
-    out = xr.Dataset(data_vars={"source": xq, "target": yq},
-                     attrs={"group": group, "window": window})
+    # Compute the correction factor
+    if kind == "+":
+        out = yq - xq
+    elif kind == "*":
+        out = yq / xq
+    else:
+        raise ValueError("kind must be + or *.")
 
+    # Save input parameters as attributes of output DataArray.
+    out.attrs["kind"] = kind
+    out.attrs["group"] = group
+    out.attrs["window"] = window
     return out
 
 

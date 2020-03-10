@@ -98,9 +98,9 @@ class PointWiseDownscaler:
         y : xarray.DataArray
             Training targets. Must fulfill label requirements for all steps
             of the pipeline.
-            
+
         feature_dim : str, optional
-            Name of feature dimension. 
+            Name of feature dimension.
 
         **fit_params : dict of string -> object
             Parameters passed to the ``fit`` method of the this model. If the

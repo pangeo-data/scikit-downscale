@@ -3,18 +3,18 @@ import xarray as xr
 from xarray.core.missing import get_clean_interp_index
 import dask.array
 import pandas as pd
-
+from .qm import add_cyclic, add_q_bounds
 
 """
 Basic univariate quantile mapping post-processing algorithms.
 
 Use `train` to estimate the correction factors, and then use `predict`
-to apply the factors to a series. 
+to apply the factors to a series.
 
 """
 
 
-def train(x, y, nq, group='time.dayofyear', kind="+", window=1, detrend_order=0):
+def train(x, y, nq, group='time.dayofyear', kind="+", window=1, detrend_order=1):
     """Compute quantile bias-adjustment factors.
 
     Parameters
@@ -115,6 +115,7 @@ def predict(x, qmf, interp=False, detrend_order=4):
     if '.' in qmf.group:
         dim, prop = qmf.group.split('.')
     else:
+        raise NotImplementedError
         dim, prop = qmf.group, None
 
     if prop == "season" and interp:
@@ -133,7 +134,7 @@ def predict(x, qmf, interp=False, detrend_order=4):
 
     # Compute the percentile of the input array along `dim`
     xq = x.groupby(qmf.group).apply(xr.DataArray.rank, pct=True, dim=dim)
-    #iq = xr.DataArray(q, dims=q.dims, coords=q.coords, name="quantile index")
+    # iq = xr.DataArray(q, dims=q.dims, coords=q.coords, name="quantile index")
 
     # Compute the `dim` value for indexing along grouping dimension
     # TODO: Adjust for different calendars if necessary.
@@ -180,7 +181,6 @@ def predict(x, qmf, interp=False, detrend_order=4):
     return out.drop(["quantile", prop])
 
 
-
 def _calc_slope(x, y):
     """Wrapper that returns the slop from a linear regression fit of x and y."""
     from scipy import stats
@@ -218,7 +218,8 @@ def polyfit(da, deg=1, dim="time"):
 
     # Fit the parameters (lazy computation)
     coefs = dask.array.apply_along_axis(
-            np.polyfit, da.get_axis_num(dim), x, y, deg=deg, shape=(deg+1, ), dtype=float)
+        np.polyfit, da.get_axis_num(dim), x, y, deg=deg, shape=(deg + 1, ), dtype=float
+    )
 
     coords = dict(da.coords.items())
     coords.pop(dim)
@@ -264,7 +265,7 @@ def detrend(obj, dim="time", deg=1, kind="+"):
     coefs = polyfit(obj, dim=dim, deg=deg)
 
     # Set the 0th order coefficient to 0 to preserve the original mean
-    coefs.loc[dict(degree=0)] = 0
+    # coefs = xr.where(coefs.degree == 0, 0, coefs)
 
     # Compute polynomial
     trend = polyval(coefs, obj[dim])
@@ -272,9 +273,9 @@ def detrend(obj, dim="time", deg=1, kind="+"):
     # Remove trend from original series while preserving means
     # TODO: Get the residuals directly from polyfit
     if kind == "+":
-        detrended = obj - trend #- trend.mean() + obj.mean()
+        detrended = obj - trend - trend.mean() + obj.mean()
     elif kind == "*":
-        detrended = obj / trend #/ trend.mean() * obj.mean()
+        detrended = obj / trend / trend.mean() * obj.mean()
 
     return detrended, trend, coefs
 
@@ -291,5 +292,3 @@ def get_index(coord):
         x = coord
 
     return x
-
-

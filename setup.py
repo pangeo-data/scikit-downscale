@@ -23,6 +23,7 @@ setup(
     description="Statistical downscaling and postprocessing models for climate and weather model simulations.",
     python_requires=">=3.6",
     install_requires=["xarray >= 0.10", "scikit-learn >= 0.21"],
+    test_suite="xsd.test",
     tests_require=["pytest >= 2.7.1"],
     url="https://github.com/jhamman/xsd",
     packages=find_packages(),

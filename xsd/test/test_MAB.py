@@ -14,7 +14,7 @@ from xclim import subset
 
 
 # QUANTILE MAPPING FUNCTION
-from xsd.qm import train, predict
+from xsd.dqm import train, predict
 
 
 ############################
