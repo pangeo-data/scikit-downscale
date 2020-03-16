@@ -33,20 +33,20 @@ def group_apply(func, x, group, window=1, **kwargs):
     -------
 
     """
-    dim, group = parse_group(group)
+    dim, prop = parse_group(group)
 
+    dims = dim
     if '.' in group:
         if window > 1:
             # Construct rolling window
             x = x.rolling(center=True, **{dim: window}).construct(window_dim="window")
             dims = ("window", dim)
-        else:
-            dims = dim
 
         sub = x.groupby(group)
 
     else:
         sub = x
+
 
     out = getattr(sub, func)(dim=dims, **kwargs)
 
@@ -56,7 +56,7 @@ def group_apply(func, x, group, window=1, **kwargs):
     return out
 
 
-def correction(x, y, kind):
+def get_correction(x, y, kind):
     """Return the additive or multiplicative correction factor."""
     with xr.set_options(keep_attrs=True):
         if kind == "+":
@@ -69,6 +69,27 @@ def correction(x, y, kind):
     out.attrs["kind"] = kind
     return out
 
+
+def apply_correction(x, factor, kind):
+    with xr.set_options(keep_attrs=True):
+        if kind == "+":
+            out = x + factor
+        elif kind == "*":
+            out = x * factor
+        else:
+            raise ValueError
+
+    out.attrs["bias_corrected"] = True
+    return out
+
+def nodes(n):
+    """Return nodes with `n` equally spaced points within [0, 1] plus two end-points.
+
+    E.g. for nq=4 :  0---x------x------x------x---1
+    """
+    dq = 1 / n / 2
+    q = np.linspace(dq, 1 - dq, n)
+    return sorted(np.append([0.0001, 0.9999], q))
 
 
 # TODO: use xr.pad once it's implemented.
@@ -85,9 +106,27 @@ def add_cyclic(da, att):
     return qmf
 
 
+# TODO: use xr.pad once it's implemented.
+def add_q_bounds(qmf):
+    """Reindex the scaling factors to set the quantile at 0 and 1 to the first and last quantile respectively.
+
+    This is a naive approach that won't work well for extremes.
+    """
+    att = "quantile"
+    q = qmf.coords[att]
+    i = np.concatenate(([0], range(len(q)), [-1]))
+    qmf = qmf.reindex({att: q[i]})
+    qmf.coords[att] = np.concatenate(([0], q, [1]))
+    return qmf
+
+
 def get_index(da, dim, prop, interp):
     # Compute the `dim` value for indexing along grouping dimension.
     # TODO: Adjust for different calendars if necessary.
+
+    if prop == "season" and interp:
+        raise NotImplementedError
+
     ind = da.indexes[dim]
     i = getattr(ind, prop)
 

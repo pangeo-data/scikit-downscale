@@ -6,8 +6,24 @@ import numpy as np
 
 
 @pytest.fixture
+def mon_triangular():
+    return np.array(list(range(0, 6)) + list(range(6, 0, -1)))
+
+
+@pytest.fixture
+def mon_tas(tas_series, mon_triangular):
+    def _mon_tas(values):
+        """Random time series whose mean varies over a monthly cycle."""
+        tas = tas_series(values)
+        m = mon_triangular
+        factor = tas_series(m[tas.time.dt.month - 1])
+        return tas + factor
+    return _mon_tas
+
+
+@pytest.fixture
 def tas_series():
-    def _tas_series(values, start="7/1/2000"):
+    def _tas_series(values, start="2000-01-01"):
         coords = collections.OrderedDict()
         for dim, n in zip(("time", "lon", "lat"), values.shape):
             if dim == "time":

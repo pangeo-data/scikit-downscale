@@ -7,7 +7,7 @@ TODO
 
 """
 
-from .utils import group_apply, parse_group, correction, add_cyclic, get_index
+from .utils import group_apply, parse_group, get_correction, apply_correction, add_cyclic, get_index
 
 
 def train(x, y, group="time.month", kind="+", window=1):
@@ -15,7 +15,7 @@ def train(x, y, group="time.month", kind="+", window=1):
     sx = group_apply("mean", x, group, window)
     sy = group_apply("mean", y, group, window)
 
-    return correction(sx, sy, kind)
+    return get_correction(sx, sy, kind)
 
 
 def predict(x, obj, interp=False):
@@ -30,18 +30,12 @@ def predict(x, obj, interp=False):
     index = get_index(x, dim, prop, interp)
 
     if interp:  # Interpolate the time group correction
-        factor = obj.interp({prop: index, "x": x})
+        factor = obj.interp({prop: index})
     else:  # Find quantile for nearest time group
-        factor = obj.sel({prop: index, "x": x}, method="nearest")
+        factor = obj.sel({prop: index}, method="nearest")
 
-    if obj.kind == "+":
-        out = x + factor
-    elif obj.kind == "*":
-        out = x * factor
-    else:
-        raise ValueError
+    out = apply_correction(x, factor, obj.kind)
 
-    out.attrs["bias_corrected"] = True
     return out.drop([prop, ])
 
 
