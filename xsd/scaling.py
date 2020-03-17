@@ -1,9 +1,11 @@
 """
-Delta method
+Scaling method
 ============
 
 TODO
 
+References
+----------
 
 """
 

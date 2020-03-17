@@ -1,3 +1,12 @@
+"""
+Empirical quantile mapping
+==========================
+
+References
+----------
+
+"""
+
 import numpy as np
 import xarray as xr
 from .utils import group_apply, parse_group, get_correction, apply_correction, add_cyclic, get_index, nodes, \
