@@ -107,7 +107,8 @@ def add_cyclic(da, att):
 
 
 # TODO: use xr.pad once it's implemented.
-def add_q_bounds(qmf):
+# Rename to extrapolate_q ?
+def add_q_bounds(qmf, method="constant"):
     """Reindex the scaling factors to set the quantile at 0 and 1 to the first and last quantile respectively.
 
     This is a naive approach that won't work well for extremes.
@@ -116,7 +117,10 @@ def add_q_bounds(qmf):
     q = qmf.coords[att]
     i = np.concatenate(([0], range(len(q)), [-1]))
     qmf = qmf.reindex({att: q[i]})
-    qmf.coords[att] = np.concatenate(([0], q, [1]))
+    if method == "constant":
+        qmf.coords[att] = np.concatenate(([0], q, [1]))
+    else:
+        raise ValueError
     return qmf
 
 

@@ -17,7 +17,8 @@ def mon_tas(tas_series, mon_triangular):
         tas = tas_series(values)
         m = mon_triangular
         factor = tas_series(m[tas.time.dt.month - 1])
-        return tas + factor
+        with xr.set_options(keep_attrs=True):
+            return tas + factor
     return _mon_tas
 
 

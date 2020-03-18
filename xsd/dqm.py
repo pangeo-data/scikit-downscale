@@ -3,7 +3,7 @@ import xarray as xr
 from xarray.core.missing import get_clean_interp_index
 import dask.array
 import pandas as pd
-from .qm import add_cyclic, add_q_bounds
+from .utils import add_cyclic, add_q_bounds
 
 """
 Basic univariate quantile mapping post-processing algorithms.

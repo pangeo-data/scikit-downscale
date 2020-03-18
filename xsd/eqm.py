@@ -13,7 +13,7 @@ from .utils import group_apply, parse_group, get_correction, apply_correction, a
     add_q_bounds
 
 
-def train(x, y, nq, group='time.dayofyear', kind="+", window=1):
+def train(x, y, nq, group='time.dayofyear', kind="+", window=1, extrapolation="constant"):
     """Compute quantile bias-adjustment factors.
 
     Parameters
@@ -36,67 +36,76 @@ def train(x, y, nq, group='time.dayofyear', kind="+", window=1):
       Quantiles for the source and target series.
     """
     q = nodes(nq)
-    xq = group_apply("quantile", x, group, q, window, q=q)
-    yq = group_apply("quantile". y, group, q, window, q=q)
+    xq = group_apply("quantile", x, group, window, q=q)
+    yq = group_apply("quantile", y, group, window, q=q)
 
-    return get_correction(xq, yq, kind)
+    qqm = get_correction(xq, yq, kind)
+    xqm = reindex(qqm, xq, extrapolation)
+    return xqm
 
 
-def predict(x, qm, interp=False, detrend_order=4):
-    """Apply quantile mapping delta to an array.
+def reindex(qm, xq, extrapolation="constant"):
+    """Create a mapping between x values and y values based on their respective quantiles.
+
+    Notes
+    -----
+    The original qm object has `quantile` coordinates and some grouping coordinate (e.g. month). This function
+    reindexes the array based on the values of x, instead of the quantiles. Since the x values are different from
+    group to group, the index can get fairly large.
+    """
+    dim, prop = parse_group(xq.group)
+    ds = xr.Dataset({'xq': xq, 'qm': qm})
+    gr = ds.groupby(prop)
+
+    # X coordinates common to all groupings
+    xs = list(map(lambda x: extrapolate_qm(x[1].qm, x[1].xq, extrapolation)[0], gr))
+    newx = np.unique(np.concatenate(xs))
+
+    # Interpolation from quantile to values.
+    def func(d):
+        x, y = extrapolate_qm(d.qm, d.xq, extrapolation)
+        return xr.DataArray(dims="x", data=np.interp(newx, x, y), coords={'x': newx})
+
+    out = gr.map(func, shortcut=True)
+    return out
+
+
+
+def extrapolate_qm(qm, xq, method="constant"):
+    """Extrapolate quantile correction factors beyond the computed quantiles.
 
     Parameters
     ----------
-    x : xr.DataArray
-      Data to predict on.
     qm : xr.DataArray
-      Quantile mapping computed by the `train` function.
-    interp : bool
-      Whether to interpolate between the groupings.
+      Correction factors over `quantile` coordinates.
+    xq : xr.DataArray
+      Values at each `quantile`.
+    method : {"constant"}
+      Extrapolation method. See notes below.
 
     Returns
     -------
-    xr.DataArray
-      Input array with delta applied.
+    array, array
+        Extrapolated correction factors and x-values.
+
+    Notes
+    -----
+    constant
+      The correction factor above and below the computed values are equal to the last and first values
+      respectively.
+    constant_iqr
+      Same as `constant`, but values are set to NaN if farther than one interquartile range from the min and max.
     """
-    dim, prop = parse_group(qm.group)
+    if method == "constant":
+        x = np.concatenate(([-np.inf, ], xq, [np.inf, ]))
+        q = np.concatenate((qm[:1], qm, qm[-1:]))
+    elif method == "constant_iqr":
+        iqr = np.diff(xq.interp(quantile=[.25, .75]))[0]
+        x = np.concatenate(([-np.inf, xq[0] - iqr], xq, [xq[-1] + iqr, np.inf]))
+        q = np.concatenate(([np.nan, qm[0]], qm, [qm[-1], np.nan]))
+    else:
+        raise ValueError
 
-    coord = x.coords[dim]
-
-    # Add cyclical values to the scaling factors for interpolation
-    if interp:
-        qm = add_cyclic(qm, prop)
-        qm = add_q_bounds(qm)
-
-    # Invert the source quantiles
-    isource = invert(qm.source, prop)
-
-    xt = get_index(x, dim, prop, interp)
-
-    # Extract the correct quantile for each time step.
-    if interp:  # Interpolate both the time group and the quantile.
-        factor = qm.interp({prop: xt, "x": x})
-    else:  # Find quantile for nearest time group and quantile.
-        factor = qm.sel({prop: xt, "x": x}, method="nearest")
-
-    # Apply the correction factors
-    out = apply_correction(x, factor, qm.kind)
-
-    # Remove time grouping and quantile coordinates
-    return out.drop(["quantile", prop])
-
-
-
-
-def invert(qm, dim):
-    """Invert a quantile array. Quantiles become coordinates and q becomes the data."""
-
-    newx = np.unique(qm.values.flat)
-    # TODO: cluster the values to reduce size.
-
-    func = lambda x: xr.Variable(dims="x", data=np.interp(newx, x, qm["quantile"].values))
-
-    out = qm.groupby(dim).map(func, shortcut=True)
-    return out.assign_coords(x=newx)
+    return x, q
 
 
