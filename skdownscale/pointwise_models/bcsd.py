@@ -25,11 +25,13 @@ class BcsdBase(LinearModel, RegressorMixin):
             if time_grouper == 'daily_nasa-nex':
                 self.time_grouper = PaddedDOYGrouper
                 self.timestep = 'daily'
+                self.upsample = True
             else:
                 self.time_grouper = pd.Grouper(freq=time_grouper)
         else:
             self.time_grouper = time_grouper
             self.timestep = 'monthly'
+            self.upsample = False
 
         self.qm_kwargs = qm_kwargs
         
@@ -217,13 +219,14 @@ class BcsdTemperature(BcsdBase):
         def rolling_func(x):
             return x.rolling(9, center=True, min_periods=1).mean()
         
-        X_climo_groups, upsample = self._create_temperature_climatology_groups(X)
+        # X_climo_groups, upsample = self._create_temperature_climatology_groups(X)
         # X_rolling_mean = X.groupby(self.time_grouper).apply(rolling_func)
-        X_rolling_mean = X_climo_groups.apply(rolling_func)
+        X_rolling_mean = X.groupby(MONTH_GROUPER).apply(rolling_func)
+        # X_rolling_mean = X_climo_groups.apply(rolling_func)
         
         # if X is daily data, need to upsample X_rolling_mean to daily 
-        if upsample:
-            X_rolling_mean = X_rolling_mean.resample('D')
+        if self.upsample:
+            X_rolling_mean = X_rolling_mean.resample('D').mean()
 
         # calc shift
         # why isn't this working??
@@ -231,7 +234,8 @@ class BcsdTemperature(BcsdBase):
         X_shift = self._remove_climatology(X_rolling_mean, self._x_climo)
 
         # remove shift
-        X_no_shift = X - X_shift
+        #X_no_shift = X - X_shift
+        X_no_shift = check_datetime_index(X, self.timestep) - check_datetime_index(X_shift, self.timestep)
 
         # Bias correction
         # apply quantile mapping by month
@@ -241,12 +245,17 @@ class BcsdTemperature(BcsdBase):
         # restore the shift
         X_qm_with_shift = X_shift + Xqm
         # calculate the anomalies
-        return self._remove_climatology(X_qm_with_shift, self.y_climo_)
+        # return self._remove_climatology(X_qm_with_shift, self.y_climo_)
+        return X_rolling_mean, self._x_climo, self.y_climo_, Xqm, X_no_shift, X, X_shift, self._remove_climatology(X_qm_with_shift, self.y_climo_)
 
     def _remove_climatology(self, obj, climatology):
         dfs = []
-        for key, group in obj.groupby(self.time_grouper):
-            dfs.append(group - climatology.loc[key].values)
+        #for key, group in obj.groupby(self.time_grouper):
+        for key, group in self._create_groups(obj):
+            if self.timestep == 'monthly':
+                dfs.append(group - climatology.loc[key].values)
+            elif self.timestep == 'daily':
+                dfs.append(group - climatology.loc[key])
 
         out = pd.concat(dfs).sort_index()
         assert obj.shape == out.shape
