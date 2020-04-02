@@ -1,10 +1,10 @@
-.. currentmodule:: xsd.pointwise_models
+.. currentmodule:: skdownscale.pointwise_models
 
 #############
 API reference
 #############
 
-This page provides an auto-generated summary of xsd's API. For more details
+This page provides an auto-generated summary of skdownscale's API. For more details
 and examples, refer to the relevant chapters in the main part of the
 documentation.
 

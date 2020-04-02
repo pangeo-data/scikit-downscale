@@ -9,16 +9,16 @@ Date:September 15, 2019
 Background and scope
 --------------------
 
-`xsd` is a toolkit for statistical downscaling usising Xarray. It is meant to
-support the development of new and existing downscaling methods in a common
-framework. It implements a fit/predict API that accepts Xarray objects,
+Scikit-downscale is a toolkit for statistical downscaling usising Xarray. It is
+meant to support the development of new and existing downscaling methods in a
+common framework. It implements a fit/predict API that accepts Xarray objects,
 similiar to Python's Scikit-Learn, for building a range of downscaling models.
 For example, implementing a BCSD workflow may look something like this:
 
 .. code-block:: Python
 
-    from xsd.pointwise_models import PointWiseDownscaler
-    from xsd.models.bcsd import BCSDTemperature, bcsd_disaggregator
+    from skdownscale.pointwise_models import PointWiseDownscaler
+    from skdownscale.models.bcsd import BCSDTemperature, bcsd_disaggregator
 
     # da_temp_train: xarray.DataArray (monthly)
     # da_temp_obs: xarray.DataArray (monthly)
@@ -66,9 +66,9 @@ Components
 Models
 ------
 
-XSD should provide a collection of a common set of downscaling models and the
-building blocks to construct new models. As a starter, I intend to implement
-the following models:
+Scikit-downscale should provide a collection of a common set of downscaling
+models and the building blocks to construct new models. As a starter, I intend
+to implement the following models:
 
 Pointwise models
 ~~~~~~~~~~~~~~~~
@@ -92,8 +92,8 @@ look like:
 
 .. code-block:: Python
 
-    from xsd.global_models import GlobalDownscaler
-    from xsd.global_models.deepsd import DeepSD
+    from skdownscale.global_models import GlobalDownscaler
+    from skdownscale.global_models.deepsd import DeepSD
 
     # ...
 

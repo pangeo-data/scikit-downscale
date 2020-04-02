@@ -1,4 +1,4 @@
-name: xsd-tests
+name: skdownscale-tests
 channels:
   - conda-forge
 dependencies:

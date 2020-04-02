@@ -19,13 +19,14 @@
 
 # -- Project information -----------------------------------------------------
 from pkg_resources import get_distribution
-import xsd
 
-project = "xsd"
-copyright = "2019, Joe Hamman"
+import skdownscale
+
+project = "scikit-downscale"
+copyright = "2020, Joe Hamman"
 author = "Joe Hamman"
 
-release = get_distribution("xsd").version
+release = skdownscale.__version__
 # for example take major/minor
 version = ".".join(release.split(".")[:2])
 
@@ -106,7 +107,7 @@ html_static_path = ["_static"]
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "xsddoc"
+htmlhelp_basename = "skdownscaledoc"
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -129,14 +130,16 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
-latex_documents = [(master_doc, "xsd.tex", "xsd Documentation", "Joe Hamman", "manual")]
+latex_documents = [
+    (master_doc, "skdownscale.tex", "scikit-downscale Documentation", "Joe Hamman", "manual",)
+]
 
 
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "xsd", "xsd Documentation", [author], 1)]
+man_pages = [(master_doc, "scikit-downscale", "scikit-downscale Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output ----------------------------------------------
@@ -147,10 +150,10 @@ man_pages = [(master_doc, "xsd", "xsd Documentation", [author], 1)]
 texinfo_documents = [
     (
         master_doc,
-        "xsd",
-        "xsd Documentation",
+        "scikit-downscale",
+        "scikit-downscale Documentation",
         author,
-        "xsd",
+        "scikit-downscale",
         "Statistical Downscaling in Python",
         "Miscellaneous",
     )

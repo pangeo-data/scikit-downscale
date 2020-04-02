@@ -10,10 +10,10 @@ sphinx:
   configuration: docs/conf.py
 
 # Optionally set the version of Python and requirements required to build your docs
-conda:
-  environment: docs/environment.yml
 python:
   version: 3.7
   install:
+    - requirements: doc-requirements.txt
+    - requirements: requirements.txt
     - method: pip
       path: .
