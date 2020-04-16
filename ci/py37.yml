@@ -9,4 +9,4 @@ dependencies:
   - xarray
   - pip
   - pip:
-      - git+https://github.com/dcherian/xarray.git@map-blocks-dask-args
+      - git+https://github.com/jhamman/xarray@skdownscale-working
