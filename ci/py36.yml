@@ -7,4 +7,3 @@ dependencies:
   - pytest
   - scikit-learn
   - xarray
-

@@ -88,7 +88,7 @@ Global models
 This category of methods is really what is motivating the development of this
 package. We've seen some early work from TJ Vandal in this area but there is
 more work to be done. For now, I'll just jot down what a possible API might
-look like: 
+look like:
 
 .. code-block:: Python
 
@@ -97,7 +97,7 @@ look like:
 
     # ...
 
-    # create a model 
+    # create a model
     model = GlobalDownscaler(DeepSD())
 
     # train the model
