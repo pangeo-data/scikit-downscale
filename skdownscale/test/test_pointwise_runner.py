@@ -6,6 +6,8 @@ from skdownscale.pointwise_models import PointWiseDownscaler, QuantileMapper
 
 from . import make_linear_reg_pipeline, random_grid_data, random_point_data
 
+dask = pytest.importorskip('dask')
+
 
 @pytest.mark.parametrize(
     ('X', 'y'),
