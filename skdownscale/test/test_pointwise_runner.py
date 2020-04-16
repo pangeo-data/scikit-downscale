@@ -4,9 +4,15 @@ from sklearn.preprocessing import StandardScaler
 
 from skdownscale.pointwise_models import PointWiseDownscaler, QuantileMapper
 
-from . import make_linear_reg_pipeline, random_grid_data, random_point_data
+from . import (
+    make_linear_reg_pipeline,
+    random_grid_data,
+    random_point_data,
+    requires_dask,
+)
 
 
+@requires_dask
 @pytest.mark.parametrize(
     ('X', 'y'),
     [
@@ -45,6 +51,7 @@ def test_pointwise_model(X, y):
     assert y.chunks == y_pred.chunks
 
 
+@requires_dask
 @pytest.mark.parametrize(
     'X',
     [
