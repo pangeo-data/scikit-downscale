@@ -6,7 +6,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import QuantileTransformer, quantile_transform
 
-Cdf = collections.namedtuple("CDF", ["pp", "vals"])
+Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
 
 
 class LinearTrendTransformer(TransformerMixin, BaseEstimator):
@@ -104,8 +104,8 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
 
         qt_kws = self.qt_kwargs.copy()
 
-        if "n_quantiles" not in qt_kws:
-            qt_kws["n_quantiles"] = len(X)
+        if 'n_quantiles' not in qt_kws:
+            qt_kws['n_quantiles'] = len(X)
 
         # maybe detrend the input datasets
         if self.detrend:
@@ -139,8 +139,8 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
 
         # do the final mapping
         qt_kws = self.qt_kwargs.copy()
-        if "n_quantiles" not in qt_kws:
-            qt_kws["n_quantiles"] = len(X)
+        if 'n_quantiles' not in qt_kws:
+            qt_kws['n_quantiles'] = len(X)
 
         x_quantiles = quantile_transform(x_to_cdf, copy=True, **qt_kws)
         x_qmapped = self.x_cdf_fit_.inverse_transform(x_quantiles)
