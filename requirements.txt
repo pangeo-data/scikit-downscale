@@ -1,3 +1,2 @@
-# xarray>=0.15
-git+git://github.com/jhamman/xarray@skdownscale-working
+xarray>=0.15
 scikit-learn>=0.21
