@@ -1,17 +1,15 @@
 import numpy as np
-
 from scipy.spatial import cKDTree
-
 from sklearn.base import RegressorMixin
-from sklearn.linear_model.base import LinearModel
 from sklearn.linear_model import LinearRegression
+from sklearn.linear_model.base import LinearModel
 from sklearn.utils.validation import check_is_fitted
 
 from .utils import ensure_samples_features
 
 
 class AnalogBase(LinearModel, RegressorMixin):
-    _fit_attributes = ["kdtree_", "y_"]
+    _fit_attributes = ['kdtree_', 'y_']
 
     def fit(self, X, y):
         """ Fit Analog model using a KDTree
@@ -93,8 +91,8 @@ class AnalogRegression(AnalogBase):
         _, inds = self.kdtree_.query(X, k=kmax, **self.query_kwargs)
 
         # extract data to train linear regression model
-        x = ensure_samples_features(self.kdtree_.data[inds-1])
-        y = ensure_samples_features(self.y_.values[inds-1])
+        x = ensure_samples_features(self.kdtree_.data[inds - 1])
+        y = ensure_samples_features(self.y_.values[inds - 1])
 
         # train linear regression model
         lr_model = LinearRegression(**self.lr_kwargs).fit(x, y)
@@ -126,7 +124,7 @@ class PureAnalog(AnalogBase):
     def __init__(
         self,
         n_analogs=200,
-        kind="best_analog",
+        kind='best_analog',
         thresh=None,
         stats=True,
         kdtree_kwargs={},
@@ -137,9 +135,9 @@ class PureAnalog(AnalogBase):
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
 
-        if kind == "best_analog" or n_analogs == 1:
+        if kind == 'best_analog' or n_analogs == 1:
             self.n_analogs = 1
-            self.kind = "best_analog"
+            self.kind = 'best_analog'
         else:
             self.n_analogs = n_analogs
             self.kind = kind
@@ -171,16 +169,16 @@ class PureAnalog(AnalogBase):
             analog_mask = analogs > self.thresh
             masked_analogs = analogs[analog_mask]
 
-        if self.kind == "best_analog":
+        if self.kind == 'best_analog':
             predicted = analogs
 
-        elif self.kind == "sample_analogs":
+        elif self.kind == 'sample_analogs':
             # get 1 random index to sample from the analogs
             rand_inds = np.random.randint(low=0, high=self.n_analogs, size=len(X))
             # select the analog now
             predicted = select_analogs(analogs, rand_inds)
 
-        elif self.kind == "weight_analogs":
+        elif self.kind == 'weight_analogs':
             # take weighted average
             # work around for zero distances (perfect matches)
             tiny = 1e-20
@@ -190,14 +188,14 @@ class PureAnalog(AnalogBase):
             else:
                 predicted = np.average(analogs.squeeze(), weights=weights, axis=1)
 
-        elif self.kind == "mean_analogs":
+        elif self.kind == 'mean_analogs':
             if self.thresh is not None:
                 predicted = masked_analogs.mean(axis=1)
             else:
                 predicted = analogs.mean(axis=1)
 
         else:
-            raise ValueError("got unexpected kind %s" % self.kind)
+            raise ValueError('got unexpected kind %s' % self.kind)
 
         if self.thresh is not None:
             # for mean/weight cases, this fills nans when all analogs
@@ -207,11 +205,11 @@ class PureAnalog(AnalogBase):
         if self.stats:
             # calculate the standard deviation of the anlogs
             if self.thresh is None:
-                self.stats_["error"] = analogs.std(axis=1)
+                self.stats_['error'] = analogs.std(axis=1)
             else:
-                self.stats_["error"] = analogs.where(analog_mask).std(axis=1)
+                self.stats_['error'] = analogs.where(analog_mask).std(axis=1)
                 # calculate the probability of precip
-                self.stats_["pop"] = np.where(analog_mask, 1, 0).mean(axis=1)
+                self.stats_['pop'] = np.where(analog_mask, 1, 0).mean(axis=1)
 
         return predicted
 

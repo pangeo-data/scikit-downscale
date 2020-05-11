@@ -19,13 +19,12 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         days.
     """
 
-    _fit_attributes = ["shift_", "scale_"]
+    _fit_attributes = ['shift_', 'scale_']
 
     def __init__(self, window_width=31):
 
         assert window_width > 0, window_width
         self.window_width = window_width
-        
 
     def fit(self, X, y):
         """ Fit Z-Score Model finds the shift and scale parameters
@@ -76,9 +75,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         name = list(X.keys())[0]
 
         fut_mean, fut_std, fut_zscore = _get_fut_stats(X.squeeze(), self.window_width)
-        shift_expanded, scale_expanded = _expand_params(
-            X.squeeze(), self.shift_, self.scale_
-        )
+        shift_expanded, scale_expanded = _expand_params(X.squeeze(), self.shift_, self.scale_)
 
         fut_mean_corrected, fut_std_corrected = _correct_fut_stats(
             fut_mean, fut_std, shift_expanded, scale_expanded
@@ -110,19 +107,19 @@ def _reshape(da, window_width):
 
     assert da.ndim == 1
 
-    if "time" not in da.coords and "index" in da.coords:
-        da = da.rename({"index": "time"})
-    assert "time" in da.coords
+    if 'time' not in da.coords and 'index' in da.coords:
+        da = da.rename({'index': 'time'})
+    assert 'time' in da.coords
 
     def split(g):
-        return g.rename({"time": "day"}).assign_coords(day=g.time.dt.dayofyear.values)
+        return g.rename({'time': 'day'}).assign_coords(day=g.time.dt.dayofyear.values)
 
-    da_split = da.groupby("time.year").map(split)
+    da_split = da.groupby('time.year').map(split)
 
     early_jans = da_split.isel(day=slice(None, window_width // 2))
     late_decs = da_split.isel(day=slice(-window_width // 2, None))
 
-    da_rsh = xr.concat([late_decs, da_split, early_jans], dim="day")
+    da_rsh = xr.concat([late_decs, da_split, early_jans], dim='day')
     return da_rsh
 
 
@@ -149,11 +146,11 @@ def _calc_stats(series, window_width):
     da = series.to_xarray()
     da_rsh = _reshape(da, window_width)
 
-    ds_rolled = da_rsh.rolling(day=window_width, center=True).construct("win_day")
+    ds_rolled = da_rsh.rolling(day=window_width, center=True).construct('win_day')
 
     n = window_width // 2 + 1
-    ds_mean = ds_rolled.mean(dim=["year", "win_day"]).isel(day=slice(n, -n))
-    ds_std = ds_rolled.std(dim=["year", "win_day"]).isel(day=slice(n, -n))
+    ds_mean = ds_rolled.mean(dim=['year', 'win_day']).isel(day=slice(n, -n))
+    ds_std = ds_rolled.std(dim=['year', 'win_day']).isel(day=slice(n, -n))
 
     mean = ds_mean.to_series()
     std = ds_std.to_series()
@@ -265,9 +262,7 @@ def _expand_params(series, shift, scale):
     repeats = int(n_samples / len_avgyr)
     remainder = n_samples % len_avgyr
 
-    inds = np.concatenate(
-        [np.tile(np.arange(len_avgyr), repeats), np.arange(remainder)]
-    )
+    inds = np.concatenate([np.tile(np.arange(len_avgyr), repeats), np.arange(remainder)])
     assert len(inds) == n_samples, (len(inds), n_samples)
 
     shift_expanded = shift.iloc[inds]

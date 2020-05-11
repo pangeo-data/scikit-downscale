@@ -1,5 +1,6 @@
 # scikit-downscale
+
 Statistical downscaling and postprocessing models for climate and weather
 model simulations.
 
-[![Build Status](https://dev.azure.com/jhamman1/jhamman1/_apis/build/status/jhamman.scikit-downscale?branchName=master)](https://dev.azure.com/jhamman1/jhamman1/_build/latest?definitionId=2&branchName=master)
+[![CI](https://github.com/jhamman/scikit-downscale/workflows/CI/badge.svg)](https://github.com/jhamman/scikit-downscale/actions?query=workflow%3ACI+branch%3Amaster+) [![Documentation Status](https://readthedocs.org/projects/scikit-downscale/badge/?version=latest)](https://scikit-downscale.readthedocs.io/en/latest/?badge=latest)

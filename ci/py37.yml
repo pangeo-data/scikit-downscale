@@ -1,4 +1,4 @@
-name: xsd-tests
+name: skdownscale-tests
 channels:
   - conda-forge
 dependencies:
@@ -7,4 +7,6 @@ dependencies:
   - pytest
   - scikit-learn
   - xarray
-
+  - pip
+  - pip:
+      - git+https://github.com/jhamman/xarray@skdownscale-working
