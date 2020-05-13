@@ -47,7 +47,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
 
         X_mean, X_std = _calc_stats(X.squeeze(), self.window_width)
         y_mean, y_std = _calc_stats(y.squeeze(), self.window_width)
-        stats_dict = {'X_mean':X_mean, 'X_std':X_std, 'y_mean':y_mean, 'y_std':y_std}
+        stats_dict = {'X_mean' : X_mean, 'X_std' : X_std, 'y_mean' : y_mean, 'y_std' : y_std}
         
         self.stats_dict_ = stats_dict
 
@@ -72,10 +72,9 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
             Returns corrected values.
         """
 
-        # check_is_fitted(self, self._fit_attributes)
-        # assert isinstance(X.squeeze(), pd.Series)
-        # assert isinstance(X, pd.DataFrame)
-        # assert X.shape[1] == 1
+        check_is_fitted(self, self._fit_attributes)
+        assert isinstance(X, pd.DataFrame)
+        assert X.shape[1] == 1
         
         name = list(X.keys())[0]
 
@@ -86,7 +85,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
             fut_mean, fut_std, shift_expanded, scale_expanded
         )
 
-        stats_dict = {'meani':fut_mean, 'stdi':fut_std, 'meanf':fut_mean_corrected, 'stdf':fut_std_corrected}
+        stats_dict = {'meani' : fut_mean, 'stdi' : fut_std, 'meanf' : fut_mean_corrected, 'stdf' : fut_std_corrected}
         
         fut_corrected = (fut_zscore * fut_std_corrected) + fut_mean_corrected
 
