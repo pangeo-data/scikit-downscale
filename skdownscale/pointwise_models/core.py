@@ -59,9 +59,7 @@ def _fit_wrapper(X, *args, along_dim="time", feature_dim=DEFAULT_FEATURE_DIM, **
     mask = _make_mask(X, reduce_dims)
 
     # create the empty output array
-    models = xr.DataArray(
-        np.empty(mask.shape, dtype=np.object), coords=mask.coords, dims=mask.dims
-    )
+    models = xr.DataArray(np.empty(mask.shape, dtype=np.object), coords=mask.coords, dims=mask.dims)
 
     scalar_obj = np.empty((1), dtype=np.object)
     for index, val in xenumerate(mask):
@@ -77,9 +75,7 @@ def _fit_wrapper(X, *args, along_dim="time", feature_dim=DEFAULT_FEATURE_DIM, **
     return models
 
 
-def _predict_wrapper(
-    X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM, **kwargs
-):
+def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
 
     ydims = list(X.dims)
     yshape = list(X.shape)
@@ -172,9 +168,7 @@ class PointWiseDownscaler:
             reduce_dims = [self._dim, kws["feature_dim"]]
             mask = _make_mask(X, reduce_dims)
             template = xr.full_like(mask, None, dtype=np.object)
-            self._models = xr.map_blocks(
-                _fit_wrapper, X, args=args, kwargs=kws, template=template
-            )
+            self._models = xr.map_blocks(_fit_wrapper, X, args=args, kwargs=kws, template=template)
         else:
             self._models = _fit_wrapper(X, *args, **kws)
 

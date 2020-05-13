@@ -13,10 +13,7 @@ dask = pytest.importorskip("dask")
     ("X", "y"),
     [
         # with numpy arrays
-        (
-            random_point_data(n_points=3, n_vars=3),
-            random_point_data(n_points=3, n_vars=1)["a"],
-        ),
+        (random_point_data(n_points=3, n_vars=3), random_point_data(n_points=3, n_vars=1)["a"],),
         (
             random_grid_data(grid_shape=(2, 3), n_vars=3),
             random_grid_data(grid_shape=(2, 3), n_vars=1)["a"],
