@@ -161,4 +161,4 @@ def test_zscore_predict():
     expected[0:i] = 'NaN'
     expected[-i:] = 'NaN'
 
-    np.testing.assert_allclose(zscore.predict(X).astype(float), expected.astype(float))
+    np.testing.assert_allclose(zscore.predict(X)['foo'].astype(float), expected.astype(float))
