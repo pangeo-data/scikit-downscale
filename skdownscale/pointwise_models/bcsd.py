@@ -17,7 +17,7 @@ class BcsdBase(LinearModel, RegressorMixin):
     """ Base class for BCSD model.
     """
 
-    _fit_attributes = ['y_climo_', 'quantile_mappers_']
+    _fit_attributes = ["y_climo_", "quantile_mappers_"]
 
     def __init__(self, time_grouper=MONTH_GROUPER, **qm_kwargs):
         if isinstance(time_grouper, str):
@@ -88,7 +88,7 @@ class BcsdPrecipitation(BcsdBase):
         # calculate the climatologies
         self.y_climo_ = y_groups.mean()
         if self.y_climo_.values.min() <= 0:
-            raise ValueError('Invalid value in target climatology')
+            raise ValueError("Invalid value in target climatology")
 
         # fit the quantile mappers
         self._qm_fit_by_group(y_groups)
