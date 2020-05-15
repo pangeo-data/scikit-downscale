@@ -1,8 +1,10 @@
+import copy
+
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-DEFAULT_FEATURE_DIM = "variable"
+DEFAULT_FEATURE_DIM = 'variable'
 
 
 def xenumerate(arr):
@@ -38,15 +40,15 @@ def _da_to_df(da, feature_dim=DEFAULT_FEATURE_DIM):
             columns = da.coords[feature_dim]
         else:
             size_fd = dict(zip(da.dims, da.shape))[feature_dim]
-            columns = [f"feature{i}" for i in range(size_fd)]
+            columns = [f'feature{i}' for i in range(size_fd)]
     else:
-        columns = [f"{feature_dim}_0"]
-    data = da.transpose("time", ...).data
-    df = pd.DataFrame(data, columns=columns, index=da.indexes["time"])
+        columns = [f'{feature_dim}_0']
+    data = da.transpose('time', ...).data
+    df = pd.DataFrame(data, columns=columns, index=da.indexes['time'])
     return df
 
 
-def _fit_wrapper(X, *args, along_dim="time", feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
+def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
 
     if len(args) == 2:
         y, model = args
@@ -63,14 +65,15 @@ def _fit_wrapper(X, *args, along_dim="time", feature_dim=DEFAULT_FEATURE_DIM, **
 
     scalar_obj = np.empty((1), dtype=np.object)
     for index, val in xenumerate(mask):
+        mod = copy.deepcopy(model)
         if not val:
             continue
-        xdf = X[index].pipe(_da_to_df, feature_dim).drop(mask.coords.keys())
+        xdf = X[index].pipe(_da_to_df, feature_dim)
         if y is not None:
-            ydf = y[index].pipe(_da_to_df, feature_dim).drop(mask.coords.keys())
-            scalar_obj[:] = [model.fit(xdf, ydf, **kwargs)]
+            ydf = y[index].pipe(_da_to_df, feature_dim)
+            scalar_obj[:] = [mod.fit(xdf, ydf, **kwargs)]
         else:
-            scalar_obj[:] = [model.fit(xdf, **kwargs)]
+            scalar_obj[:] = [mod.fit(xdf, **kwargs)]
         models[index] = scalar_obj.squeeze()
     return models
 
@@ -88,7 +91,7 @@ def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM,
     y = xr.DataArray(np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims)
 
     for index, model in xenumerate(models):
-        xdf = X[index].pipe(_da_to_df, feature_dim).drop(models.coords.keys())
+        xdf = X[index].pipe(_da_to_df, feature_dim)
         ydf = model.item().predict(xdf, **kwargs)
         y[index] = ydf.squeeze()
 
@@ -121,15 +124,15 @@ class PointWiseDownscaler:
         Dimension to apply the model along. Default is ``time``.
     """
 
-    def __init__(self, model, dim="time"):
+    def __init__(self, model, dim='time'):
         self._dim = dim
         self._model = model
         self._models = None
 
-        if not hasattr(model, "fit"):
+        if not hasattr(model, 'fit'):
             raise TypeError(
-                "Type %s does not have the fit method required"
-                " by PointWiseDownscaler" % type(model)
+                'Type %s does not have the fit method required'
+                ' by PointWiseDownscaler' % type(model)
             )
 
     def fit(self, X, *args, **kwargs):
@@ -155,17 +158,17 @@ class PointWiseDownscaler:
             step, where each parameter name is prefixed such that parameter
             ``p`` for step ``s`` has key ``s__p``.
         """
-        kws = {"along_dim": self._dim, "feature_dim": DEFAULT_FEATURE_DIM}
+        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM}
         kws.update(kwargs)
 
         assert len(args) <= 1
         args = list(args)
         args.append(self._model)
 
-        X = self._to_feature_x(X, feature_dim=kws["feature_dim"])
+        X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         if X.chunks:
-            reduce_dims = [self._dim, kws["feature_dim"]]
+            reduce_dims = [self._dim, kws['feature_dim']]
             mask = _make_mask(X, reduce_dims)
             template = xr.full_like(mask, None, dtype=np.object)
             self._models = xr.map_blocks(_fit_wrapper, X, args=args, kwargs=kws, template=template)
@@ -195,10 +198,10 @@ class PointWiseDownscaler:
         y_pred : xarray.DataArray
         """
 
-        kws = {"along_dim": self._dim, "feature_dim": DEFAULT_FEATURE_DIM}
+        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM}
         kws.update(kwargs)
 
-        X = self._to_feature_x(X, feature_dim=kws["feature_dim"])
+        X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         if X.chunks:
             return xr.map_blocks(_predict_wrapper, X, args=[self._models], kwargs=kws)
@@ -224,10 +227,10 @@ class PointWiseDownscaler:
         y_trans : xarray.DataArray
         """
 
-        kws = {"feature_dim": DEFAULT_FEATURE_DIM}
+        kws = {'feature_dim': DEFAULT_FEATURE_DIM}
         kws.update(kwargs)
 
-        X = self._to_feature_x(X, feature_dim=kws["feature_dim"])
+        X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         if X.chunks:
             return xr.map_blocks(_transform_wrapper, X, args=[self._models], kwargs=kws)
@@ -240,14 +243,14 @@ class PointWiseDownscaler:
             X = X.to_array(feature_dim)
 
         if feature_dim not in X.dims:
-            X = X.expand_dims(**{feature_dim: [f"{feature_dim}_0"]}, axis=1)
+            X = X.expand_dims(**{feature_dim: [f'{feature_dim}_0']}, axis=1)
 
         X = X.transpose(self._dim, feature_dim, ...)
 
         return X
 
     def __repr__(self):
-        summary = ["<skdownscale.{}>".format(self.__class__.__name__)]
-        summary.append("  Fit Status: {}".format(self._models is not None))
-        summary.append("  Model:\n    {}".format(self._model))
-        return "\n".join(summary)
+        summary = ['<skdownscale.{}>'.format(self.__class__.__name__)]
+        summary.append('  Fit Status: {}'.format(self._models is not None))
+        summary.append('  Model:\n    {}'.format(self._model))
+        return '\n'.join(summary)

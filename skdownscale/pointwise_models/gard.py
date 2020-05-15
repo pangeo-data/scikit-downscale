@@ -63,6 +63,7 @@ class AnalogRegression(AnalogBase):
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
         self.lr_kwargs = lr_kwargs
+        self.lr_model = LinearRegression(**self.lr_kwargs)
 
     def predict(self, X):
         """ Predict using the AnalogRegression model
@@ -101,10 +102,10 @@ class AnalogRegression(AnalogBase):
         y = self.y_.values[inds]
 
         # train linear regression model
-        lr_model = LinearRegression(**self.lr_kwargs).fit(x, y)
+        self.lr_model.fit(x, y)
 
         # predict for this time step
-        predicted = lr_model.predict(ensure_samples_features(X))
+        predicted = self.lr_model.predict(ensure_samples_features(X))
         return predicted
 
 
@@ -165,6 +166,8 @@ class PureAnalog(AnalogBase):
         self.stats_ = {}
 
         dist, inds = self.kdtree_.query(X, k=self.n_analogs, **self.query_kwargs)
+        dist = dist.squeeze()
+        inds = inds.squeeze()
 
         analogs = np.take(self.y_.values, inds, axis=0)
 
