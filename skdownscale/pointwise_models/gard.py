@@ -1,8 +1,10 @@
+import warnings
+
 import numpy as np
-from scipy.spatial import cKDTree
 from sklearn.base import RegressorMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model.base import LinearModel
+from sklearn.neighbors import KDTree
 from sklearn.utils.validation import check_is_fitted
 
 from .utils import ensure_samples_features
@@ -25,7 +27,11 @@ class AnalogBase(LinearModel, RegressorMixin):
         -------
         self : returns an instance of self.
         """
-        self.kdtree_ = cKDTree(X, **self.kdtree_kwargs)
+        if len(X) < self.n_analogs:
+            warnings.warn('length of X is less than n_analogs, setting n_analogs = len(X)')
+            self.n_analogs = len(X)
+
+        self.kdtree_ = KDTree(X, **self.kdtree_kwargs)
         self.y_ = y
 
         return self
@@ -39,16 +45,16 @@ class AnalogRegression(AnalogBase):
     n_analogs: int
         Number of analogs to use when building linear regression
     kdtree_kwargs : dict
-        Keyword arguments to pass to the scipy.spatial.cKDTree constructor
+        Keyword arguments to pass to the sklearn.neighbors.KDTree constructor
     query_kwargs : dict
-        Keyword arguments to pass to the scipy.spatial.cKDTree.query method
+        Keyword arguments to pass to the sklearn.neighbors.KDTree.query method
     lr_kwargs : dict
         Keyword arguments to pass to the sklear.linear_model.LinearRegression
         constructor
 
     Attributes
     ----------
-    kdtree_ : scipy.spatial.cKDTree
+    kdtree_ : sklearn.neighbors.KDTree
         KDTree object
     """
 
@@ -81,18 +87,19 @@ class AnalogRegression(AnalogBase):
 
         for i, (_, row) in enumerate(X.iterrows()):
             # predict for this time step
-            predicted[i] = self._predict_one_step(row.values)
+            predicted[i] = self._predict_one_step(ensure_samples_features(row.values))
 
         return predicted
 
     def _predict_one_step(self, X):
         # get analogs
-        kmax = max(len(self.kdtree_.data), self.n_analogs)
-        _, inds = self.kdtree_.query(X, k=kmax, **self.query_kwargs)
+        inds = self.kdtree_.query(
+            X, k=self.n_analogs, return_distance=False, **self.query_kwargs
+        ).squeeze()
 
         # extract data to train linear regression model
-        x = ensure_samples_features(self.kdtree_.data[inds - 1])
-        y = ensure_samples_features(self.y_.values[inds - 1])
+        x = np.asarray(self.kdtree_.data)[inds]
+        y = self.y_.values[inds]
 
         # train linear regression model
         lr_model = LinearRegression(**self.lr_kwargs).fit(x, y)
@@ -107,7 +114,7 @@ class PureAnalog(AnalogBase):
 
     Attributes
     ----------
-    kdtree_ : scipy.spatial.cKDTree
+    kdtree_ : sklearn.neighbors.KDTree
         KDTree object
     n_analogs : int
         Number of analogs to use
