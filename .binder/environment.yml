@@ -15,3 +15,6 @@ dependencies:
   - pydap
   - docopt
   - zarr
+  - pip
+  - pip:
+      - git+https://github.com/jhamman/scikit-downscale.git
