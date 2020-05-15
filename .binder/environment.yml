@@ -5,11 +5,11 @@ dependencies:
   - pandas
   - xarray
   - seaborn
-  - probscale
+  - mpl-probscale
   - matplotlib
   - scipy
   - numpy
-  - sklearn
+  - scikit-learn
   - dask
   - distributed
   - pydap
