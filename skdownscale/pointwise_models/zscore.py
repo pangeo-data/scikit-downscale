@@ -19,7 +19,7 @@ class ZScoreRegressor(AbstractDownscaler):
         days.
     """
 
-    _fit_attributes = ['shift_', 'scale_']
+    _fit_attributes = ["shift_", "scale_"]
 
     def __init__(self, window_width=31):
 
@@ -48,10 +48,10 @@ class ZScoreRegressor(AbstractDownscaler):
         X_mean, X_std = _calc_stats(X.squeeze(), self.window_width)
         y_mean, y_std = _calc_stats(y.squeeze(), self.window_width)
         self.fit_stats_dict_ = {
-            'X_mean': X_mean,
-            'X_std': X_std,
-            'y_mean': y_mean,
-            'y_std': y_std,
+            "X_mean": X_mean,
+            "X_std": X_std,
+            "y_mean": y_mean,
+            "y_std": y_std,
         }
 
         shift, scale = _get_params(X_mean, X_std, y_mean, y_std)
@@ -89,10 +89,10 @@ class ZScoreRegressor(AbstractDownscaler):
         )
 
         self.predict_stats_dict_ = {
-            'meani': fut_mean,
-            'stdi': fut_std,
-            'meanf': fut_mean_corrected,
-            'stdf': fut_std_corrected,
+            "meani": fut_mean,
+            "stdi": fut_std,
+            "meanf": fut_mean_corrected,
+            "stdf": fut_std_corrected,
         }
 
         fut_corrected = (fut_zscore * fut_std_corrected) + fut_mean_corrected
@@ -121,19 +121,19 @@ def _reshape(da, window_width):
 
     assert da.ndim == 1
 
-    if 'time' not in da.coords and 'index' in da.coords:
-        da = da.rename({'index': 'time'})
-    assert 'time' in da.coords
+    if "time" not in da.coords and "index" in da.coords:
+        da = da.rename({"index": "time"})
+    assert "time" in da.coords
 
     def split(g):
-        return g.rename({'time': 'day'}).assign_coords(day=g.time.dt.dayofyear.values)
+        return g.rename({"time": "day"}).assign_coords(day=g.time.dt.dayofyear.values)
 
-    da_split = da.groupby('time.year').map(split)
+    da_split = da.groupby("time.year").map(split)
 
     early_jans = da_split.isel(day=slice(None, window_width // 2))
     late_decs = da_split.isel(day=slice(-window_width // 2, None))
 
-    da_rsh = xr.concat([late_decs, da_split, early_jans], dim='day')
+    da_rsh = xr.concat([late_decs, da_split, early_jans], dim="day")
     return da_rsh
 
 
@@ -160,11 +160,11 @@ def _calc_stats(series, window_width):
     da = series.to_xarray()
     da_rsh = _reshape(da, window_width)
 
-    ds_rolled = da_rsh.rolling(day=window_width, center=True).construct('win_day')
+    ds_rolled = da_rsh.rolling(day=window_width, center=True).construct("win_day")
 
     n = window_width // 2 + 1
-    ds_mean = ds_rolled.mean(dim=['year', 'win_day']).isel(day=slice(n, -n))
-    ds_std = ds_rolled.std(dim=['year', 'win_day']).isel(day=slice(n, -n))
+    ds_mean = ds_rolled.mean(dim=["year", "win_day"]).isel(day=slice(n, -n))
+    ds_std = ds_rolled.std(dim=["year", "win_day"]).isel(day=slice(n, -n))
 
     mean = ds_mean.to_series()
     std = ds_std.to_series()
