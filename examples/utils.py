@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import probscale
+import scipy
 import seaborn as sns
 import xarray as xr
-import numpy as np
-import scipy
 
 
 def get_sample_data(kind):
