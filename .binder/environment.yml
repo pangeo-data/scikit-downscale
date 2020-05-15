@@ -1,0 +1,14 @@
+name: skdownscale
+channels:
+  - conda-forge
+dependencies:
+  - pandas
+  - xarray
+  - seaborn
+  - probscale
+  - matplotlib
+  - scipy
+  - numpy
+  - sklearn
+  - dask
+  - distributed
