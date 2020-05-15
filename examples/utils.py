@@ -3,6 +3,8 @@ import pandas as pd
 import probscale
 import seaborn as sns
 import xarray as xr
+import numpy as np
+import scipy
 
 
 def get_sample_data(kind):
@@ -83,3 +85,70 @@ def prob_plots(x, y, y_hat, shape=(2, 2), figsize=(8, 8)):
     fig.tight_layout()
 
     return fig
+
+def zscore_ds_plot(training, target, future, corrected):
+    labels = ['training', 'future', 'target', 'corrected']
+    colors = {k: c for (k, c) in zip(labels, sns.color_palette("Paired", n_colors=4))}
+
+    alpha = 0.5
+
+    time_target = pd.date_range('1980-01-01','1989-12-31', freq='D')
+    time_training = time_target[~((time_target.month==2) & (time_target.day==29))]
+    time_future = pd.date_range('1990-01-01','1999-12-31', freq='D')
+    time_future = time_future[~((time_future.month==2) & (time_future.day==29))]
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(time_training,training.uas, label='training', alpha=alpha, c=colors['training'])
+    plt.plot(time_target,target.uas, label='target', alpha=alpha, c=colors['target'])
+
+    plt.plot(time_future,future.uas, label='future', alpha=alpha, c=colors['future'])
+    plt.plot(time_future,corrected.uas, label='corrected', alpha=alpha, c=colors['corrected'])
+
+
+    plt.xlabel('Time')
+    plt.ylabel('Eastward Near-Surface Wind (m s-1)')
+    plt.legend()
+
+    return
+
+
+def zscore_correction_plot(zscore):
+    training_mean = zscore.fit_stats_dict_['X_mean']
+    training_std = zscore.fit_stats_dict_['X_std']
+    target_mean = zscore.fit_stats_dict_['y_mean']
+    target_std = zscore.fit_stats_dict_['y_std']
+
+    future_mean = zscore.predict_stats_dict_['meani']
+    future_mean = future_mean.groupby(future_mean.index.dayofyear).mean()
+    future_std = zscore.predict_stats_dict_['stdi']
+    future_std = future_std.groupby(future_std.index.dayofyear).mean()
+    corrected_mean = zscore.predict_stats_dict_['meanf']
+    corrected_mean = corrected_mean.groupby(corrected_mean.index.dayofyear).mean()
+    corrected_std = zscore.predict_stats_dict_['stdf']
+    corrected_std = corrected_std.groupby(corrected_std.index.dayofyear).mean()
+
+    labels = ['training', 'future', 'target', 'corrected']
+    colors = {k: c for (k, c) in zip(labels, sns.color_palette("Paired", n_colors=4))}
+
+    doy=20
+
+    plt.figure()
+    x,y = _gaus(training_mean, training_std, doy)
+    plt.plot(x, y, c=colors['training'], label = 'training')
+    x,y = _gaus(target_mean, target_std, doy)
+    plt.plot(x, y, c=colors['target'], label = 'target')
+    x,y = _gaus(future_mean, future_std, doy)
+    plt.plot(x, y, c=colors['future'], label = 'future')
+    x,y = _gaus(corrected_mean, corrected_std, doy)
+    plt.plot(x, y, c=colors['corrected'], label = 'corrected')
+    plt.legend()
+    
+    return
+
+def _gaus(mean, std, doy):
+    mu = mean[doy]
+    sigma = std[doy]
+
+    x = np.linspace(mu - 3*sigma, mu + 3*sigma, 100)
+    y = scipy.stats.norm.pdf(x, mu, sigma)
+    return x, y

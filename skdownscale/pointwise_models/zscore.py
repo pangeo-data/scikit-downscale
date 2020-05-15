@@ -47,7 +47,7 @@ class ZScoreRegressor(AbstractDownscaler):
 
         X_mean, X_std = _calc_stats(X.squeeze(), self.window_width)
         y_mean, y_std = _calc_stats(y.squeeze(), self.window_width)
-        self.stats_dict_ = {
+        self.fit_stats_dict_ = {
             'X_mean': X_mean,
             'X_std': X_std,
             'y_mean': y_mean,
@@ -88,7 +88,7 @@ class ZScoreRegressor(AbstractDownscaler):
             fut_mean, fut_std, shift_expanded, scale_expanded
         )
 
-        self.fut_stats_dict_ = {
+        self.predict_stats_dict_ = {
             'meani': fut_mean,
             'stdi': fut_std,
             'meanf': fut_mean_corrected,
