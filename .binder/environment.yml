@@ -21,4 +21,4 @@ dependencies:
   - gcsfs
   - pip
   - pip:
-      - git+https://github.com/pydata/xarray.git@master
+      - git+https://github.com/dcherian/xarray.git@map-blocks-dask-args
