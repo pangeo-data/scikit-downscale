@@ -2,6 +2,7 @@ name: skdownscale
 channels:
   - conda-forge
 dependencies:
+  - pangeo-notebook
   - pandas
   - xarray
   - seaborn
@@ -17,4 +18,5 @@ dependencies:
   - zarr
   - netcdf4
   - intake-esm
+  - gcsfs
   - pip
