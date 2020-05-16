@@ -16,4 +16,5 @@ dependencies:
   - docopt
   - zarr
   - netcdf4
+  - intake-esm
   - pip
