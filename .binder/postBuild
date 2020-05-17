@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # install skdownscale
-pip install -e .
+pip install -e . --no-deps
 
 # install jupyter labextensions
 jupyter labextension install --clean \
