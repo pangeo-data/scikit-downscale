@@ -1,2 +1,2 @@
-git+git://github.com/dcherian/xarray.git@map-blocks-dask-args
+xarray>=0.15
 scikit-learn>=0.21

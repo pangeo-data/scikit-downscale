@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
+set -e
+
 # install skdownscale
 pip install -e . --no-deps
+pip install --upgrade git+git://github.com/dcherian/xarray.git@map-blocks-dask-args --no-deps
 
 # install jupyter labextensions
 jupyter labextension install --clean \
