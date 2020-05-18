@@ -20,5 +20,3 @@ dependencies:
   - intake-esm
   - gcsfs
   - pip
-  - pip:
-      - git+https://github.com/dcherian/xarray.git@map-blocks-dask-args
