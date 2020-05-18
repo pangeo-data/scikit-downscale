@@ -1,0 +1,1 @@
+FROM pangeo/base-image
