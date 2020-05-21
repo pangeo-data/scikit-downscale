@@ -5,6 +5,8 @@ set -x
 
 # install skdownscale
 /srv/conda/envs/notebook/bin/python -m pip install -e .
+
+# dev version of xarray (TODO, remove after next Xarray release)
 /srv/conda/envs/notebook/bin/python -m pip install --upgrade git+git://github.com/dcherian/xarray.git@map-blocks-dask-args --no-deps
 
 # install jupyter labextensions
