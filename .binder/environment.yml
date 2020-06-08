@@ -1,0 +1,22 @@
+name: skdownscale
+channels:
+  - conda-forge
+dependencies:
+  - pangeo-notebook
+  - pandas
+  - xarray
+  - seaborn
+  - mpl-probscale
+  - matplotlib
+  - scipy
+  - numpy
+  - scikit-learn
+  - dask
+  - distributed
+  - pydap
+  - docopt
+  - zarr
+  - netcdf4
+  - intake-esm
+  - gcsfs
+  - pip

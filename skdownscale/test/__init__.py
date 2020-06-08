@@ -1,14 +1,35 @@
+import importlib
 import string
+from distutils.version import LooseVersion
 
-import dask
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-dask.config.set(scheduler="single-threaded")
+
+def _importorskip(modname, minversion=None):
+    try:
+        mod = importlib.import_module(modname)
+        has = True
+        if minversion is not None:
+            if LooseVersion(mod.__version__) < LooseVersion(minversion):
+                raise ImportError("Minimum version not satisfied")
+    except ImportError:
+        has = False
+    func = pytest.mark.skipif(not has, reason=f"requires {modname}")
+    return has, func
+
+
+has_dask, requires_dask = _importorskip("dask")
+
+if has_dask:
+    import dask
+
+    dask.config.set(scheduler="single-threaded")
 
 
 def random_point_data(n_points=1, n_times=100, n_vars=1):

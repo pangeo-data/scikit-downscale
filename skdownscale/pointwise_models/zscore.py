@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
-from sklearn.base import RegressorMixin
-from sklearn.linear_model.base import LinearModel
 from sklearn.utils.validation import check_is_fitted
 
+from .base import AbstractDownscaler
 
-class ZScoreRegressor(LinearModel, RegressorMixin):
+
+class ZScoreRegressor(AbstractDownscaler):
     """ Z Score Regressor bias correction model wrapper
 
     Apply a scikit-learn model (e.g. Pipeline) point-by-point. The pipeline
@@ -47,6 +47,12 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
 
         X_mean, X_std = _calc_stats(X.squeeze(), self.window_width)
         y_mean, y_std = _calc_stats(y.squeeze(), self.window_width)
+        self.fit_stats_dict_ = {
+            "X_mean": X_mean,
+            "X_std": X_std,
+            "y_mean": y_mean,
+            "y_std": y_std,
+        }
 
         shift, scale = _get_params(X_mean, X_std, y_mean, y_std)
 
@@ -61,7 +67,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         Parameters
         ----------
         X : pd.Series or pd.DataFrame, shape (n_samples, 1)
-            Training historical model data.
+            Training future model data.
 
         Returns
         -------
@@ -72,6 +78,7 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         check_is_fitted(self, self._fit_attributes)
         assert isinstance(X, pd.DataFrame)
         assert X.shape[1] == 1
+
         name = list(X.keys())[0]
 
         fut_mean, fut_std, fut_zscore = _get_fut_stats(X.squeeze(), self.window_width)
@@ -80,6 +87,13 @@ class ZScoreRegressor(LinearModel, RegressorMixin):
         fut_mean_corrected, fut_std_corrected = _correct_fut_stats(
             fut_mean, fut_std, shift_expanded, scale_expanded
         )
+
+        self.predict_stats_dict_ = {
+            "meani": fut_mean,
+            "stdi": fut_std,
+            "meanf": fut_mean_corrected,
+            "stdf": fut_std_corrected,
+        }
 
         fut_corrected = (fut_zscore * fut_std_corrected) + fut_mean_corrected
 

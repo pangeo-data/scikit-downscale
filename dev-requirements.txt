@@ -1,4 +1,5 @@
 netcdf4
+pre-commit
 pytest
 pytest-sugar
 pytest-cov

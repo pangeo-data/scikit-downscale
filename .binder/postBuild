@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -e
+set -x
+
+# install skdownscale
+/srv/conda/envs/notebook/bin/python -m pip install -e .
+
+# dev version of xarray (TODO, remove after next Xarray release)
+/srv/conda/envs/notebook/bin/python -m pip install --upgrade git+git://github.com/dcherian/xarray.git@map-blocks-dask-args --no-deps
+
+# install jupyter labextensions
+jupyter labextension install --clean \
+    @jupyter-widgets/jupyterlab-manager \
+    dask-labextension
+
+# add dask config
+mkdir -p ${KERNEL_PYTHON_PREFIX}/etc/dask
+cp .binder/dask_config.yaml ${KERNEL_PYTHON_PREFIX}/etc/dask/dask.yaml

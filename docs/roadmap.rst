@@ -9,7 +9,7 @@ Date:September 15, 2019
 Background and scope
 --------------------
 
-Scikit-downscale is a toolkit for statistical downscaling usising Xarray. It is
+Scikit-downscale is a toolkit for statistical downscaling using Xarray. It is
 meant to support the development of new and existing downscaling methods in a
 common framework. It implements a fit/predict API that accepts Xarray objects,
 similiar to Python's Scikit-Learn, for building a range of downscaling models.
@@ -88,7 +88,7 @@ Global models
 This category of methods is really what is motivating the development of this
 package. We've seen some early work from TJ Vandal in this area but there is
 more work to be done. For now, I'll just jot down what a possible API might
-look like: 
+look like:
 
 .. code-block:: Python
 
@@ -97,7 +97,7 @@ look like:
 
     # ...
 
-    # create a model 
+    # create a model
     model = GlobalDownscaler(DeepSD())
 
     # train the model

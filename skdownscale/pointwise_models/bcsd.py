@@ -6,6 +6,7 @@ from sklearn.base import RegressorMixin
 from sklearn.linear_model.base import LinearModel
 from sklearn.utils.validation import check_is_fitted
 
+from .base import AbstractDownscaler
 from .utils import QuantileMapper, ensure_samples_features
 from .groupers import PaddedDOYGrouper
 
@@ -14,13 +15,13 @@ def MONTH_GROUPER(x):
     return x.month
 
 
-class BcsdBase(LinearModel, RegressorMixin):
+class BcsdBase(AbstractDownscaler):
     """ Base class for BCSD model.
     """
 
     _fit_attributes = ["y_climo_", "quantile_mappers_"]
 
-    def __init__(self, time_grouper=MONTH_GROUPER, **qm_kwargs):
+    def __init__(self, time_grouper=MONTH_GROUPER, return_anoms=True, **qm_kwargs):
         if isinstance(time_grouper, str):
             if time_grouper == 'daily_nasa-nex':
                 self.time_grouper = PaddedDOYGrouper
@@ -33,6 +34,7 @@ class BcsdBase(LinearModel, RegressorMixin):
             self.timestep = 'monthly'
             self.upsample = False
 
+        self.return_anoms = return_anoms
         self.qm_kwargs = qm_kwargs
         
     def _create_groups(self, df):
@@ -156,7 +158,10 @@ class BcsdPrecipitation(BcsdBase):
         Xqm = self._qm_transform_by_group(X.groupby(self.time_grouper))
 
         # calculate the anomalies as a ratio of the training data
-        return self._calc_ratio_anoms(Xqm, self.y_climo_)
+        if self.return_anoms:
+            return self._calc_ratio_anoms(Xqm, self.y_climo_)
+        else:
+            return Xqm
 
     def _calc_ratio_anoms(self, obj, climatology):
         dfs = []

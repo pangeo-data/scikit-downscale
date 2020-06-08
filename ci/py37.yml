@@ -7,4 +7,6 @@ dependencies:
   - pytest
   - scikit-learn
   - xarray
-
+  - pip
+  - pip:
+      - git+https://github.com/jhamman/xarray@skdownscale-working

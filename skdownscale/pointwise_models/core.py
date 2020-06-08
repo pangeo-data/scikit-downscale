@@ -1,58 +1,112 @@
-import dask.array
+import copy
+
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-
-def _reshape_for_sklearn(vals, columns=None):
-    vals = np.atleast_2d(vals).transpose()  # reshape input data
-    if columns is not None:
-        return pd.DataFrame(data=vals, columns=columns)
-    return vals
+DEFAULT_FEATURE_DIM = 'variable'
 
 
-def _fit_model(X, y, model=None, columns=None, **kwargs):
-    X = _reshape_for_sklearn(X, columns=columns)
-    y = _reshape_for_sklearn(y)
+def xenumerate(arr):
+    """
+    Multidimensional index iterator for xarray objects
 
-    # return a len 1 scalar of dtype np.object, there is likely a better way
-    # to do this
-    # this is required because sklearn pipelines are iterable and can be cast
-    # to arrays
-    out = np.empty((1), dtype=np.object)
-    out[:] = [model.fit(X, y)]
-    out = out.squeeze()
-    return out
+    Return an iterator yielding pairs of array indexers (dicts) and values.
 
+    Parameters
+    ----------
+    arr : xarray.DataArray
+        Input array.
 
-def _predict(model, X, columns=None):
-    X = _reshape_for_sklearn(X, columns=columns)
-    # pull item() out because model is wrapped in np.scalar
-    out = model.item().predict(X).squeeze()
-    return out
+    See Also
+    --------
+    numpy.ndenumerate
+    """
 
-
-def _transform(model, X, columns=None):
-    X = _reshape_for_sklearn(X, columns=columns)
-    # pull item() out because model is wrapped in np.scalar
-    out = model.item().transform(X).squeeze()
-    return out
+    for index, _ in np.ndenumerate(arr):
+        xindex = dict(zip(arr.dims, index))
+        yield xindex, arr.isel(**xindex)
 
 
-def _maybe_use_dask(a, dims, b=None):
-    dask_option = "allowed"
-    if isinstance(a.data, dask.array.Array):
-        dask_option = "parallelized"
+def _make_mask(da, reduce_dims):
+    _reduce = {d: 0 for d in reduce_dims}
+    return da.isel(**_reduce, drop=True).notnull()
 
-    if isinstance(b.data, dask.array.Array):
-        dask_option = "parallelized"
 
-    if dask_option == "parallelized":
-        a = a.chunk({d: -1 for d in dims if d in a.dims})
-        if b is not None:
-            b = b.chunk({d: -1 for d in dims if d in b.dims})
+def _da_to_df(da, feature_dim=DEFAULT_FEATURE_DIM):
+    """ manually construct dataframe """
+    if feature_dim in da.dims:
+        if feature_dim in da.coords:
+            columns = da.coords[feature_dim]
+        else:
+            size_fd = dict(zip(da.dims, da.shape))[feature_dim]
+            columns = [f'feature{i}' for i in range(size_fd)]
+    else:
+        columns = [f'{feature_dim}_0']
+    data = da.transpose('time', ...).data
+    df = pd.DataFrame(data, columns=columns, index=da.indexes['time'])
+    return df
 
-    return a, b, dask_option
+
+def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
+
+    if len(args) == 2:
+        y, model = args
+    else:
+        model = args[0]
+        y = None
+
+    # create a mask for this block
+    reduce_dims = [along_dim, feature_dim]
+    mask = _make_mask(X, reduce_dims)
+
+    # create the empty output array
+    models = xr.DataArray(np.empty(mask.shape, dtype=np.object), coords=mask.coords, dims=mask.dims)
+
+    scalar_obj = np.empty((1), dtype=np.object)
+    for index, val in xenumerate(mask):
+        mod = copy.deepcopy(model)
+        if not val:
+            continue
+        xdf = X[index].pipe(_da_to_df, feature_dim)
+        if y is not None:
+            ydf = y[index].pipe(_da_to_df, feature_dim)
+            scalar_obj[:] = [mod.fit(xdf, ydf, **kwargs)]
+        else:
+            scalar_obj[:] = [mod.fit(xdf, **kwargs)]
+        models[index] = scalar_obj.squeeze()
+    return models
+
+
+def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
+
+    ydims = list(X.dims)
+    yshape = list(X.shape)
+    ycoords = dict(X.coords)
+    ycoords.pop(feature_dim)
+    if feature_dim in ydims:
+        ydims.pop(X.get_axis_num(feature_dim))
+        yshape.pop(X.get_axis_num(feature_dim))
+
+    y = xr.DataArray(np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims)
+
+    for index, model in xenumerate(models):
+        xdf = X[index].pipe(_da_to_df, feature_dim)
+        ydf = model.item().predict(xdf, **kwargs)
+        y[index] = ydf.squeeze()
+
+    return y
+
+
+def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
+
+    xtrans = xr.full_like(X, np.nan)
+
+    for index, model in xenumerate(models):
+        xdf = X[index].pipe(_da_to_df, feature_dim).drop(models.coords.keys())
+        xtrans_df = model.item().transform(xdf, **kwargs)
+        xtrans[index] = xtrans_df.squeeze()
+    return xtrans
 
 
 class PointWiseDownscaler:
@@ -70,18 +124,18 @@ class PointWiseDownscaler:
         Dimension to apply the model along. Default is ``time``.
     """
 
-    def __init__(self, model, dim="time"):
+    def __init__(self, model, dim='time'):
         self._dim = dim
         self._model = model
         self._models = None
 
-        if not hasattr(model, "fit"):
+        if not hasattr(model, 'fit'):
             raise TypeError(
-                "Type %s does not have the fit method required"
-                " by PointWiseDownscaler" % type(model)
+                'Type %s does not have the fit method required'
+                ' by PointWiseDownscaler' % type(model)
             )
 
-    def fit(self, X, *args, feature_dim="variable"):
+    def fit(self, X, *args, **kwargs):
         """Fit the model
 
         Fit all the transforms one after the other and transform the
@@ -93,7 +147,7 @@ class PointWiseDownscaler:
             Training data. Must fulfill input requirements of first step of
             the pipeline. If an xarray.Dataset is passed, it will be converted
             to an array using `to_array()`.
-        y : xarray.DataArray
+        y : xarray.DataArray, optional
             Training targets. Must fulfill label requirements for all steps
             of the pipeline.
         feature_dim : str, optional
@@ -104,38 +158,24 @@ class PointWiseDownscaler:
             step, where each parameter name is prefixed such that parameter
             ``p`` for step ``s`` has key ``s__p``.
         """
-        # self._ydims = y.dims
+        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM}
+        kws.update(kwargs)
 
-        kwargs = dict(model=self._model)
+        assert len(args) <= 1
+        args = list(args)
+        args.append(self._model)
 
-        # xarray.Dataset --> xarray.DataArray
-        if isinstance(X, xr.Dataset):
-            X = X.to_array(feature_dim)
-        # if isinstance(y, xr.Dataset):
-        #     assert len(y.data_vars) == 1, y.data_vars
-        #     y = y[list(y.data_vars.keys())[0]]
+        X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
-        if feature_dim in X.coords:
-            input_core_dims = ([feature_dim, self._dim], [self._dim])
-            kwargs["columns"] = X.coords[feature_dim].data
+        if X.chunks:
+            reduce_dims = [self._dim, kws['feature_dim']]
+            mask = _make_mask(X, reduce_dims)
+            template = xr.full_like(mask, None, dtype=np.object)
+            self._models = xr.map_blocks(_fit_wrapper, X, args=args, kwargs=kws, template=template)
         else:
-            input_core_dims = ([self._dim], [self._dim])
+            self._models = _fit_wrapper(X, *args, **kws)
 
-        # X, y, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=y)
-        dask_option = "parallelized"
-
-        self._models = xr.apply_ufunc(
-            _fit_model,
-            *args,
-            vectorize=True,
-            dask=dask_option,
-            output_dtypes=[np.object],
-            input_core_dims=input_core_dims,
-            kwargs=kwargs,
-        )
-        return self
-
-    def predict(self, X, feature_dim="variable", **predict_params):
+    def predict(self, X, **kwargs):
         """Apply transforms to the data, and predict with the final estimator
 
         Parameters
@@ -158,33 +198,17 @@ class PointWiseDownscaler:
         y_pred : xarray.DataArray
         """
 
-        kwargs = dict(**predict_params)
+        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM}
+        kws.update(kwargs)
 
-        # xarray.Dataset --> xarray.DataArray
-        if isinstance(X, xr.Dataset):
-            X = X.to_array(feature_dim)
+        X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
-        if feature_dim in X.coords:
-            input_core_dims = [[], [feature_dim, self._dim]]
-            kwargs["columns"] = X.coords[feature_dim].data
+        if X.chunks:
+            return xr.map_blocks(_predict_wrapper, X, args=[self._models], kwargs=kws)
         else:
-            input_core_dims = [[self._dim], [self._dim]]
+            return _predict_wrapper(X, self._models, **kws)
 
-        X, _, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=self._models)
-
-        return xr.apply_ufunc(
-            _predict,
-            self._models,
-            X,
-            vectorize=True,
-            dask=dask_option,
-            output_dtypes=[X.dtype],
-            input_core_dims=input_core_dims,
-            output_core_dims=[[self._dim]],
-            kwargs=kwargs,
-        ).transpose(*self._ydims)
-
-    def transform(self, X, feature_dim="variable", **transform_params):
+    def transform(self, X, **kwargs):
         """Apply transforms to the data, and transform with the final estimator
 
         Parameters
@@ -203,34 +227,30 @@ class PointWiseDownscaler:
         y_trans : xarray.DataArray
         """
 
-        kwargs = dict(**transform_params)
+        kws = {'feature_dim': DEFAULT_FEATURE_DIM}
+        kws.update(kwargs)
 
+        X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
+
+        if X.chunks:
+            return xr.map_blocks(_transform_wrapper, X, args=[self._models], kwargs=kws)
+        else:
+            return _transform_wrapper(X, self._models, **kws)
+
+    def _to_feature_x(self, X, feature_dim=DEFAULT_FEATURE_DIM):
         # xarray.Dataset --> xarray.DataArray
         if isinstance(X, xr.Dataset):
             X = X.to_array(feature_dim)
 
-        if feature_dim in X.coords:
-            input_core_dims = [[], [feature_dim, self._dim]]
-            kwargs["columns"] = X.coords[feature_dim].data
-        else:
-            input_core_dims = [[self._dim], [self._dim]]
+        if feature_dim not in X.dims:
+            X = X.expand_dims(**{feature_dim: [f'{feature_dim}_0']}, axis=1)
 
-        X, _, dask_option = _maybe_use_dask(X, (self._dim, feature_dim), b=self._models)
+        X = X.transpose(self._dim, feature_dim, ...)
 
-        return xr.apply_ufunc(
-            _transform,
-            self._models,
-            X,
-            vectorize=True,
-            dask=dask_option,
-            output_dtypes=[X.dtype],
-            input_core_dims=input_core_dims,
-            output_core_dims=[[self._dim]],
-            kwargs=kwargs,
-        ).transpose(*self._ydims)
+        return X
 
     def __repr__(self):
-        summary = ["<skdownscale.{}>".format(self.__class__.__name__)]
-        summary.append("  Fit Status: {}".format(self._models is not None))
-        summary.append("  Model:\n    {}".format(self._model))
-        return "\n".join(summary)
+        summary = ['<skdownscale.{}>'.format(self.__class__.__name__)]
+        summary.append('  Fit Status: {}'.format(self._models is not None))
+        summary.append('  Model:\n    {}'.format(self._model))
+        return '\n'.join(summary)
