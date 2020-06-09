@@ -178,4 +178,4 @@ def check_datetime_index(obj, timestep):
             obj.index = obj.index.values.astype('datetime64[M]')
             return(obj)
         else:
-            raise ValueError('this frequency has not yet been implemented in xsd')
+            raise ValueError('this frequency has not yet been implemented in scikit-downscale')
