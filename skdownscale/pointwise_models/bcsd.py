@@ -14,6 +14,9 @@ from .groupers import PaddedDOYGrouper
 def MONTH_GROUPER(x):
     return x.month
 
+def DAY_GROUPER(x):
+    return x.day
+
 
 class BcsdBase(AbstractDownscaler):
     """ Base class for BCSD model.
@@ -21,10 +24,12 @@ class BcsdBase(AbstractDownscaler):
 
     _fit_attributes = ["y_climo_", "quantile_mappers_"]
 
-    def __init__(self, time_grouper=MONTH_GROUPER, return_anoms=True, **qm_kwargs):
+    def __init__(self, time_grouper=MONTH_GROUPER, return_anoms=True, climate_trend_grouper=DAY_GROUPER,
+                 **qm_kwargs):
         if isinstance(time_grouper, str):
             if time_grouper == 'daily_nasa-nex':
                 self.time_grouper = PaddedDOYGrouper
+                self.climate_trend_grouper = climate_trend_grouper
                 self.timestep = 'daily'
                 self.upsample = True
             else:
@@ -34,37 +39,21 @@ class BcsdBase(AbstractDownscaler):
             self.timestep = 'monthly'
             self.upsample = False
 
+        self.climate_trend = MONTH_GROUPER
         self.return_anoms = return_anoms
         self.qm_kwargs = qm_kwargs
         
-    def _create_groups(self, df):
+    def _create_groups(self, df, climate_trend=False):
         """ helper function to create groups by either daily or month,
         depending on whether we are bias correcting daily or monthly data
         """
         if self.timestep == 'monthly':
             return df.groupby(self.time_grouper)
         elif self.timestep== 'daily':
-            return self.time_grouper(df)
-        else:
-            raise TypeError('unexpected time grouper type %s' % self.time_grouper)
-        
-    def _create_temperature_climatology_groups(self, df):
-        """ helper function to create climatology groups for either daily or monthly data. 
-        Note: the reason we need this function in addition to the above one is that for BC'ing 
-        daily data, we still want to calculate the 9-year running average of monthly data, so we 
-        can't use the above function. Instead we want to groupby month if we are BCing monthly data, 
-        and we want to resample to monthly data if we are BCing daily data. 
-        
-        Note: this is variable specific, since I think we want to sum for precip rather than 
-        taking the mean. 
-        """
-        if isinstance(self.time_grouper, pd.Grouper):
-            upsample = False
-            return (df.groupby(self.time_grouper), upsample)
-        elif isinstance(self.time_grouper, XsdGroupGeneratorBase):
-            df_monthly = df.resample('M').mean()
-            upsample = True
-            return (df_monthly(pd.Grouper(freq='M')), upsample)
+            if climate_trend:
+                return df.groupby(self.climate_trend_grouper)
+            else:
+                return self.time_grouper(df)
         else:
             raise TypeError('unexpected time grouper type %s' % self.time_grouper)
 
@@ -226,37 +215,40 @@ class BcsdTemperature(BcsdBase):
         
         # X_climo_groups, upsample = self._create_temperature_climatology_groups(X)
         # X_rolling_mean = X.groupby(self.time_grouper).apply(rolling_func)
-        X_rolling_mean = X.groupby(MONTH_GROUPER).apply(rolling_func)
+        # X_rolling_mean = X.groupby(MONTH_GROUPER).apply(rolling_func)
+        X_rolling_mean = X.groupby(self.climate_trend).apply(rolling_func)
         # X_rolling_mean = X_climo_groups.apply(rolling_func)
         
         # if X is daily data, need to upsample X_rolling_mean to daily 
-        if self.upsample:
-            X_rolling_mean = X_rolling_mean.resample('D').mean()
+        # if self.upsample:
+            # X_rolling_mean = X_rolling_mean.resample('D').mean()
 
         # calc shift
         # why isn't this working??
         # X_shift = X_rolling_mean.groupby(self.time_grouper) - self._x_climo
-        X_shift = self._remove_climatology(X_rolling_mean, self._x_climo)
+        X_shift = self._remove_climatology(X_rolling_mean, self._x_climo, climate_trend=True)
 
         # remove shift
-        #X_no_shift = X - X_shift
-        X_no_shift = check_datetime_index(X, self.timestep) - check_datetime_index(X_shift, self.timestep)
+        #X_no_shift = check_datetime_index(X, self.timestep) - check_datetime_index(X_shift, self.timestep)
+        X_no_shift = X - X_shift
 
         # Bias correction
         # apply quantile mapping by month
         # Xqm = self._qm_transform_by_group(X_no_shift.groupby(self.time_grouper))
-        Xqm = self._qm_transform_by_group(self._create_groups(X_no_shift))
+        Xqm = self._qm_transform_by_group(self._create_groups(X_no_shift, climate_trend=True))
 
         # restore the shift
         X_qm_with_shift = X_shift + Xqm
         # calculate the anomalies
-        # return self._remove_climatology(X_qm_with_shift, self.y_climo_)
-        return X_rolling_mean, self._x_climo, self.y_climo_, Xqm, X_no_shift, X, X_shift, self._remove_climatology(X_qm_with_shift, self.y_climo_)
+        if self.return_anoms:
+            return self._remove_climatology(X_qm_with_shift, self.y_climo_)
+        else:
+            # return X_rolling_mean, self._x_climo
+            return X_qm_with_shift
 
-    def _remove_climatology(self, obj, climatology):
+    def _remove_climatology(self, obj, climatology, climate_trend=False):
         dfs = []
-        #for key, group in obj.groupby(self.time_grouper):
-        for key, group in self._create_groups(obj):
+        for key, group in self._create_groups(obj, climate_trend):
             if self.timestep == 'monthly':
                 dfs.append(group - climatology.loc[key].values)
             elif self.timestep == 'daily':

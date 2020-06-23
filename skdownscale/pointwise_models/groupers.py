@@ -7,11 +7,11 @@ class XsdGroupGeneratorBase:
 
 
 class PaddedDOYGrouper(XsdGroupGeneratorBase):
-    def __init__(self, df, offset=0):
+    def __init__(self, df, offset=15):
         self.df = df
         self.offset = offset 
-        self.max = 366
-        self.days_of_year = np.arange(1, 367)
+        self.max = 365
+        self.days_of_year = np.arange(1, 366)
         self.days_of_year_wrapped = np.pad(self.days_of_year, 15, mode='wrap')
         self.n = 1
         
@@ -28,8 +28,8 @@ class PaddedDOYGrouper(XsdGroupGeneratorBase):
         total_days = (2 * self.offset) + 1
         
         first_half = self.days_of_year_wrapped[i:i+self.offset]
-        sec_half = self.days_of_year_wrapped[i+self.offset:i+total_days]
-        all_days = np.concatenate((first_half, sec_half))
+        sec_half = self.days_of_year_wrapped[self.n+self.offset:i+total_days]
+        all_days = np.concatenate((first_half, np.array([self.n]), sec_half), axis=0)
 
         assert len(set(all_days)) == total_days, all_days
 

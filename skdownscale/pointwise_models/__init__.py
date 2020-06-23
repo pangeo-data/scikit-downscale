@@ -3,3 +3,4 @@ from .core import PointWiseDownscaler
 from .gard import AnalogRegression, PureAnalog
 from .utils import LinearTrendTransformer, QuantileMapper
 from .zscore import ZScoreRegressor
+from .groupers import PaddedDOYGrouper
