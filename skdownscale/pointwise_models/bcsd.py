@@ -79,6 +79,9 @@ class BcsdBase(AbstractDownscaler):
         return pd.concat(dfs).sort_index()
 
     def _remove_climatology(self, obj, climatology, climate_trend=False):
+        """helper function to remove climatologies 
+
+        """
         dfs = []
         for key, group in self._create_groups(obj, climate_trend):
             if self.timestep == 'monthly':
@@ -86,9 +89,9 @@ class BcsdBase(AbstractDownscaler):
             elif self.timestep == 'daily':
                 dfs.append(group - climatology.loc[key])
 
-        out = pd.concat(dfs).sort_index()
-        assert obj.shape == out.shape
-        return out
+        result = pd.concat(dfs).sort_index()
+        assert obj.shape == result.shape
+        return result
 
 class BcsdPrecipitation(BcsdBase):
     """ Classic BCSD model for Precipitation
@@ -123,9 +126,11 @@ class BcsdPrecipitation(BcsdBase):
         -------
         self : returns an instance of self.
         """
-        y_groups = y.groupby(self.time_grouper)
+        y_groups = self._create_groups(y)
+
         # calculate the climatologies
         self.y_climo_ = y_groups.mean()
+        
         if self.y_climo_.values.min() <= 0:
             raise ValueError("Invalid value in target climatology")
 
@@ -152,8 +157,9 @@ class BcsdPrecipitation(BcsdBase):
         X = ensure_samples_features(X)
 
         # Bias correction
-        # apply quantile mapping by month
-        Xqm = self._qm_transform_by_group(X.groupby(self.time_grouper))
+        # apply quantile mapping by month or day
+        # Xqm = self._qm_transform_by_group(X.groupby(self.time_grouper))
+        Xqm = self._qm_transform_by_group(self._create_groups(X, climate_trend=True))
 
         # calculate the anomalies as a ratio of the training data
         if self.return_anoms:
@@ -161,6 +167,7 @@ class BcsdPrecipitation(BcsdBase):
         else:
             return Xqm
 
+    '''
     def _calc_ratio_anoms(self, obj, climatology):
         dfs = []
         for key, group in obj.groupby(self.time_grouper):
@@ -169,7 +176,22 @@ class BcsdPrecipitation(BcsdBase):
         out = pd.concat(dfs).sort_index()
         assert obj.shape == out.shape
         return out
+    '''
 
+    def _calc_ratio_anoms(self, obj, climatology, climate_trend=False):
+        """ helper function for dividing day groups by climatology
+        """
+        dfs = []
+        for key, group in self._create_groups(obj, climate_trend):
+            if self.timestep == 'monthly':
+                dfs.append(group / climatology.loc[key].values)
+            else:
+                dfs.append(group / climatology.loc[key])
+
+        result = pd.concat(dfs).sort_index()
+        assert obj.shape == result.shape
+        
+        return result
 
 class BcsdTemperature(BcsdBase):
     def fit(self, X, y):
