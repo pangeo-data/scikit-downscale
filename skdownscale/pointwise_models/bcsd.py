@@ -167,17 +167,6 @@ class BcsdPrecipitation(BcsdBase):
         else:
             return Xqm
 
-    '''
-    def _calc_ratio_anoms(self, obj, climatology):
-        dfs = []
-        for key, group in obj.groupby(self.time_grouper):
-            dfs.append(group / climatology.loc[key].values)
-
-        out = pd.concat(dfs).sort_index()
-        assert obj.shape == out.shape
-        return out
-    '''
-
     def _calc_ratio_anoms(self, obj, climatology, climate_trend=False):
         """ helper function for dividing day groups by climatology
         """
