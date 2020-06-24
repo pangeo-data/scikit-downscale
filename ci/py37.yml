@@ -9,4 +9,4 @@ dependencies:
   - xarray
   - pip
   - pip:
-      - git+https://github.com/jhamman/xarray@skdownscale-working
+      - git+https://github.com/pydata/xarray

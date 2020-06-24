@@ -3,17 +3,19 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to Scikit-downscale's documentation!
+Scikit-downscale: toolkit for statistical downscaling
 ===============================
 
-Scikit-downscale is a toolkit for statistical downscaling usising Xarray_.
+Scikit-downscale is a toolkit for statistical downscaling using Scikit-Learn_.
 It is meant to support the development of new and existing downscaling
-methods in a common framework. It implements a fit/predict API that
-accepts Xarray objects, similiar to Python's Scikit-Learn_, for building
-a wide range of statitical downscaling models.
+methods in a common framework. It implements Scikit-learn's `fit`/`predict` API
+facilitating the development of a wide range of statitical downscaling models.
+Utilities and a high-level API built on Xarray_ and Dask_ support both
+point-wise and global downscaling applications.
 
 .. _Xarray: http://xarray.pydata.org
 .. _Scikit-Learn: https://scikit-learn.org
+.. _Dask: https://dask.org
 
 Under Active Development
 ~~~~~~~~~~~~~~~~~~~~~~~~

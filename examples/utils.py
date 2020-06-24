@@ -89,7 +89,7 @@ def prob_plots(x, y, y_hat, shape=(2, 2), figsize=(8, 8)):
 
 def zscore_ds_plot(training, target, future, corrected):
     labels = ["training", "future", "target", "corrected"]
-    colors = {k: c for (k, c) in zip(labels, sns.color_palette("Paired", n_colors=4))}
+    colors = {k: c for (k, c) in zip(labels, sns.color_palette("Set2", n_colors=4))}
 
     alpha = 0.5
 
@@ -128,7 +128,7 @@ def zscore_correction_plot(zscore):
     corrected_std = corrected_std.groupby(corrected_std.index.dayofyear).mean()
 
     labels = ["training", "future", "target", "corrected"]
-    colors = {k: c for (k, c) in zip(labels, sns.color_palette("Paired", n_colors=4))}
+    colors = {k: c for (k, c) in zip(labels, sns.color_palette("Set2", n_colors=4))}
 
     doy = 20
 

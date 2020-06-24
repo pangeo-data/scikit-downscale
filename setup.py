@@ -32,7 +32,7 @@ setup(
     install_requires=install_requires,
     tests_require=["pytest >= 2.7.1"],
     url="https://github.com/jhamman/scikit-downscale",
-    packages=["skdownscale"],
+    packages=PACKAGES,
     use_scm_version={"version_scheme": "post-release", "local_scheme": "dirty-tag"},
     setup_requires=["setuptools_scm", "setuptools>=30.3.0"],
 )
