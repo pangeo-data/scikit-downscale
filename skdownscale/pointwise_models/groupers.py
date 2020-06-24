@@ -2,11 +2,11 @@ import numpy as np
 import pandas as pd
 
 
-class XsdGroupGeneratorBase:
+class SkdownscaleGroupGeneratorBase:
     pass
 
 
-class PaddedDOYGrouper(XsdGroupGeneratorBase):
+class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
     def __init__(self, df, offset=15):
         self.df = df
         self.offset = offset 
@@ -27,6 +27,8 @@ class PaddedDOYGrouper(XsdGroupGeneratorBase):
         i = self.n - 1
         total_days = (2 * self.offset) + 1
         
+        # create day groups with +/- days 
+        # number of days defined by offset
         first_half = self.days_of_year_wrapped[i:i+self.offset]
         sec_half = self.days_of_year_wrapped[self.n+self.offset:i+total_days]
         all_days = np.concatenate((first_half, np.array([self.n]), sec_half), axis=0)
@@ -40,7 +42,6 @@ class PaddedDOYGrouper(XsdGroupGeneratorBase):
         return self.n - 1, result
     
     def mean(self):
-        # result = pd.Series()
         list_result = []
         for key, group in self:
             list_result.append(group.mean().values[0])
