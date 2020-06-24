@@ -158,7 +158,6 @@ class BcsdPrecipitation(BcsdBase):
 
         # Bias correction
         # apply quantile mapping by month or day
-        # Xqm = self._qm_transform_by_group(X.groupby(self.time_grouper))
         Xqm = self._qm_transform_by_group(self._create_groups(X, climate_trend=True))
 
         # calculate the anomalies as a ratio of the training data
