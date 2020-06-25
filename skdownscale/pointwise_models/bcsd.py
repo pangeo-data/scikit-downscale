@@ -7,8 +7,8 @@ from sklearn.linear_model.base import LinearModel
 from sklearn.utils.validation import check_is_fitted
 
 from .base import AbstractDownscaler
-from .utils import QuantileMapper, ensure_samples_features, check_datetime_index
 from .groupers import PaddedDOYGrouper
+from .utils import QuantileMapper, check_datetime_index, ensure_samples_features
 
 
 def MONTH_GROUPER(x):
