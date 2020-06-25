@@ -240,18 +240,14 @@ class BcsdTemperature(BcsdBase):
         X_rolling_mean = X.groupby(self.climate_trend).apply(rolling_func)
 
         # remove climatology from 9-year monthly mean climate trend
-        X_shift = self._remove_climatology(
-            X_rolling_mean, self._x_climo, climate_trend=True
-        )
+        X_shift = self._remove_climatology(X_rolling_mean, self._x_climo, climate_trend=True)
 
         # remove shift from model data
         X_no_shift = X - X_shift
 
         # Bias correction
         # apply quantile mapping by month or day
-        Xqm = self._qm_transform_by_group(
-            self._create_groups(X_no_shift, climate_trend=True)
-        )
+        Xqm = self._qm_transform_by_group(self._create_groups(X_no_shift, climate_trend=True))
 
         # restore the climate trend
         X_qm_with_shift = X_shift + Xqm
