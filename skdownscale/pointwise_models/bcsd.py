@@ -14,6 +14,7 @@ from .groupers import PaddedDOYGrouper
 def MONTH_GROUPER(x):
     return x.month
 
+
 def DAY_GROUPER(x):
     return x.day
 
@@ -24,36 +25,41 @@ class BcsdBase(AbstractDownscaler):
 
     _fit_attributes = ["y_climo_", "quantile_mappers_"]
 
-    def __init__(self, time_grouper=MONTH_GROUPER, climate_trend_grouper=DAY_GROUPER,
-                 return_anoms=True, **qm_kwargs):
+    def __init__(
+        self,
+        time_grouper=MONTH_GROUPER,
+        climate_trend_grouper=DAY_GROUPER,
+        return_anoms=True,
+        **qm_kwargs
+    ):
         if isinstance(time_grouper, str):
-            if time_grouper == 'daily_nasa-nex':
+            if time_grouper == "daily_nasa-nex":
                 self.time_grouper = PaddedDOYGrouper
                 self.climate_trend_grouper = climate_trend_grouper
-                self.timestep = 'daily'
+                self.timestep = "daily"
             else:
                 raise TypeError("this functionality has not yet been implemented")
         else:
             self.time_grouper = time_grouper
-            self.timestep = 'monthly'
+            self.timestep = "monthly"
 
         self.climate_trend = MONTH_GROUPER
         self.return_anoms = return_anoms
         self.qm_kwargs = qm_kwargs
-        
+
     def _create_groups(self, df, climate_trend=False):
         """ helper function to create groups by either daily or month
         """
-        if self.timestep == 'monthly':
+        if self.timestep == "monthly":
             return df.groupby(self.time_grouper)
-        elif self.timestep == 'daily':
+        elif self.timestep == "daily":
             if climate_trend:
                 # group by day only rather than also +/- offset days
                 return df.groupby(self.climate_trend_grouper)
             else:
                 return self.time_grouper(df)
         else:
-            raise TypeError('unexpected time grouper type %s' % self.time_grouper)
+            raise TypeError("unexpected time grouper type %s" % self.time_grouper)
 
     def _qm_fit_by_group(self, groups):
         """ helper function to fit quantile mappers by group
@@ -84,14 +90,15 @@ class BcsdBase(AbstractDownscaler):
         """
         dfs = []
         for key, group in self._create_groups(obj, climate_trend):
-            if self.timestep == 'monthly':
+            if self.timestep == "monthly":
                 dfs.append(group - climatology.loc[key].values)
-            elif self.timestep == 'daily':
+            elif self.timestep == "daily":
                 dfs.append(group - climatology.loc[key])
 
         result = pd.concat(dfs).sort_index()
         assert obj.shape == result.shape
         return result
+
 
 class BcsdPrecipitation(BcsdBase):
     """ Classic BCSD model for Precipitation
@@ -130,7 +137,7 @@ class BcsdPrecipitation(BcsdBase):
 
         # calculate the climatologies
         self.y_climo_ = y_groups.mean()
-        
+
         if self.y_climo_.values.min() <= 0:
             raise ValueError("Invalid value in target climatology")
 
@@ -171,15 +178,16 @@ class BcsdPrecipitation(BcsdBase):
         """
         dfs = []
         for key, group in self._create_groups(obj, climate_trend):
-            if self.timestep == 'monthly':
+            if self.timestep == "monthly":
                 dfs.append(group / climatology.loc[key].values)
             else:
                 dfs.append(group / climatology.loc[key])
 
         result = pd.concat(dfs).sort_index()
         assert obj.shape == result.shape
-        
+
         return result
+
 
 class BcsdTemperature(BcsdBase):
     def fit(self, X, y):
@@ -197,7 +205,7 @@ class BcsdTemperature(BcsdBase):
         self : returns an instance of self.
         """
 
-        # make groups for day or month 
+        # make groups for day or month
         y_groups = self._create_groups(y)
 
         # calculate the climatologies
@@ -228,20 +236,24 @@ class BcsdTemperature(BcsdBase):
         # Calculate the 9-year running mean for each month
         def rolling_func(x):
             return x.rolling(9, center=True, min_periods=1).mean()
-        
+
         X_rolling_mean = X.groupby(self.climate_trend).apply(rolling_func)
 
         # remove climatology from 9-year monthly mean climate trend
-        X_shift = self._remove_climatology(X_rolling_mean, self._x_climo, climate_trend=True)
+        X_shift = self._remove_climatology(
+            X_rolling_mean, self._x_climo, climate_trend=True
+        )
 
-        # remove shift from model data 
+        # remove shift from model data
         X_no_shift = X - X_shift
 
         # Bias correction
         # apply quantile mapping by month or day
-        Xqm = self._qm_transform_by_group(self._create_groups(X_no_shift, climate_trend=True))
+        Xqm = self._qm_transform_by_group(
+            self._create_groups(X_no_shift, climate_trend=True)
+        )
 
-        # restore the climate trend 
+        # restore the climate trend
         X_qm_with_shift = X_shift + Xqm
 
         # return bias corrected absolute values or calculate the anomalies
