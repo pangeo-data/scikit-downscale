@@ -85,7 +85,7 @@ class BcsdBase(AbstractDownscaler):
         return pd.concat(dfs).sort_index()
 
     def _remove_climatology(self, obj, climatology, climate_trend=False):
-        """helper function to remove climatologies 
+        """helper function to remove climatologies
 
         """
         dfs = []
