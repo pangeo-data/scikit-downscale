@@ -6,4 +6,4 @@ dependencies:
   - dask
   - pytest
   - scikit-learn
-  - xarray
+  - xarray>=0.16
