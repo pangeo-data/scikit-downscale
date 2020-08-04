@@ -178,7 +178,7 @@ class BcsdTemperature(BcsdBase):
         def rolling_func(x):
             return x.rolling(9, center=True, min_periods=1).mean()
 
-        X_rolling_mean = X.groupby(self.time_grouper).apply(rolling_func)
+        X_rolling_mean = X.groupby(self.time_grouper, group_keys=False).apply(rolling_func)
 
         # calc shift
         # why isn't this working??
