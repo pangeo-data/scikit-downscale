@@ -103,7 +103,9 @@ def zscore_ds_plot(training, target, future, corrected):
     plt.plot(time_target, target.uas, label='target', alpha=alpha, c=colors['target'])
 
     plt.plot(time_future, future.uas, label='future', alpha=alpha, c=colors['future'])
-    plt.plot(time_future, corrected.uas, label='corrected', alpha=alpha, c=colors['corrected'])
+    plt.plot(
+        time_future, corrected.uas, label='corrected', alpha=alpha, c=colors['corrected'],
+    )
 
     plt.xlabel('Time')
     plt.ylabel('Eastward Near-Surface Wind (m s-1)')
