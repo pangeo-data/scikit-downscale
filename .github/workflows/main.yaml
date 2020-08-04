@@ -54,13 +54,13 @@ jobs:
           python -m pip install isort
       - name: isort check
         run: |
-          isort --recursive --check-only .
+          isort --check-only .
   test:
     name: ${{ matrix.python-version }}-build
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8]
+        python-version: [3.7, 3.8]
     steps:
       - uses: actions/checkout@v2
       - name: Setup Python

@@ -6,7 +6,4 @@ dependencies:
   - dask
   - pytest
   - scikit-learn
-  - xarray
-  - pip
-  - pip:
-      - git+https://github.com/pydata/xarray
+  - xarray>=0.16
