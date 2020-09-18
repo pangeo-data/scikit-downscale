@@ -19,6 +19,4 @@ dependencies:
   - netcdf4
   - intake-esm
   - gcsfs
-  - pip
-  - pip:
-      - git+git://github.com/pydata/xarray.git
+  - pwlf
