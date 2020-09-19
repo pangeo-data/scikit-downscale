@@ -1,6 +1,5 @@
-from sklearn.base import RegressorMixin
-from sklearn.linear_model.base import LinearModel
+from sklearn.base import BaseEstimator
 
 
-class AbstractDownscaler(LinearModel, RegressorMixin):
+class AbstractDownscaler(BaseEstimator):
     pass

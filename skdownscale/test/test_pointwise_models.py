@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-from sklearn.linear_model.base import LinearModel
+from sklearn.utils.estimator_checks import parametrize_with_checks
 
 from skdownscale.pointwise_models import (
     AnalogRegression,
@@ -12,6 +12,21 @@ from skdownscale.pointwise_models import (
     ZScoreRegressor,
 )
 from skdownscale.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
+
+
+@parametrize_with_checks(
+    [
+        AnalogRegression(),
+        BcsdPrecipitation(),
+        BcsdTemperature(),
+        PureAnalog(),
+        ZScoreRegressor(),
+        LinearTrendTransformer(),
+        QuantileMapper(),
+    ]
+)
+def test_sklearn_compatible_estimator(estimator, check):
+    check(estimator)
 
 
 def test_linear_trend_roundtrip():
@@ -80,8 +95,8 @@ def test_linear_model(model_cls):
 
     model = model_cls()
     model.fit(X, y)
-    model.predict(X)
-    assert isinstance(model, LinearModel)
+    y_hat = model.predict(X)
+    assert len(y_hat) == len(X)
 
 
 @pytest.mark.parametrize('model_cls', [BcsdPrecipitation])
@@ -96,8 +111,8 @@ def test_linear_model_prec(model_cls):
 
     model = model_cls()
     model.fit(X, y)
-    model.predict(X)
-    assert isinstance(model, LinearModel)
+    y_hat = model.predict(X)
+    assert len(y_hat) == len(X)
 
 
 def test_zscore_scale():
