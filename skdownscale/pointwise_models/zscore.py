@@ -3,10 +3,10 @@ import pandas as pd
 import xarray as xr
 from sklearn.utils.validation import check_is_fitted
 
-from .base import AbstractDownscaler
+from .base import TimeSynchronousDownscaler
 
 
-class ZScoreRegressor(AbstractDownscaler):
+class ZScoreRegressor(TimeSynchronousDownscaler):
     """ Z Score Regressor bias correction model wrapper
 
     Apply a scikit-learn model (e.g. Pipeline) point-by-point. The pipeline
@@ -20,6 +20,7 @@ class ZScoreRegressor(AbstractDownscaler):
     """
 
     _fit_attributes = ['shift_', 'scale_']
+    _timestep = 'M'
 
     def __init__(self, window_width=31):
 
@@ -41,6 +42,9 @@ class ZScoreRegressor(AbstractDownscaler):
         -------
         self : returns an instance of self.
         """
+        X, y = self._validate_data(X, y, y_numeric=True)
+        if self.n_features_in_ != 1:
+            raise ValueError(f'Zscore only supports 1 feature, found {self.n_features_in_}')
 
         assert isinstance(X.squeeze(), pd.Series)
         assert isinstance(y.squeeze(), pd.Series)
@@ -75,7 +79,9 @@ class ZScoreRegressor(AbstractDownscaler):
             Returns corrected values.
         """
 
-        check_is_fitted(self, self._fit_attributes)
+        check_is_fitted(self)
+        X = self._validate_data(X)
+
         assert isinstance(X, pd.DataFrame)
         assert X.shape[1] == 1
 
@@ -98,6 +104,28 @@ class ZScoreRegressor(AbstractDownscaler):
         fut_corrected = (fut_zscore * fut_std_corrected) + fut_mean_corrected
 
         return fut_corrected.to_frame(name)
+
+    def _more_tags(self):
+        return {
+            '_xfail_checks': {
+                'check_estimators_dtypes': 'Zscore only suppers 1 feature',
+                'check_fit_score_takes_y': 'Zscore only suppers 1 feature',
+                'check_estimators_fit_returns_self': 'Zscore only suppers 1 feature',
+                'check_estimators_fit_returns_self(readonly_memmap=True)': 'Zscore only suppers 1 feature',
+                'check_dtype_object': 'Zscore only suppers 1 feature',
+                'check_pipeline_consistency': 'Zscore only suppers 1 feature',
+                'check_estimators_nan_inf': 'Zscore only suppers 1 feature',
+                'check_estimators_overwrite_params': 'Zscore only suppers 1 feature',
+                'check_estimators_pickle': 'Zscore only suppers 1 feature',
+                'check_fit2d_predict1d': 'Zscore only suppers 1 feature',
+                'check_methods_subset_invariance': 'Zscore only suppers 1 feature',
+                'check_fit2d_1sample': 'Zscore only suppers 1 feature',
+                'check_dict_unchanged': 'Zscore only suppers 1 feature',
+                'check_dont_overwrite_parameters': 'Zscore only suppers 1 feature',
+                'check_fit_idempotent': 'Zscore only suppers 1 feature',
+                'check_n_features_in': 'Zscore only suppers 1 feature',
+            },
+        }
 
 
 def _reshape(da, window_width):
