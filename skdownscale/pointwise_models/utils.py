@@ -5,6 +5,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import QuantileTransformer, quantile_transform
+from sklearn.utils.validation import check_is_fitted
 
 Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
 
@@ -26,10 +27,10 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         Linear Regression object.
     """
 
-    def __init__(self, **lr_kwargs):
+    def __init__(self, lr_kwargs={}):
         self.lr_kwargs = lr_kwargs
 
-    def fit(self, X):
+    def fit(self, X, y=None):
         """ Compute the linear trend.
 
         Parameters
@@ -37,6 +38,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         X : array-like, shape  [n_samples, n_features]
             Training data.
         """
+        X = self._validate_data(X)
         self.lr_model_ = LinearRegression(**self.lr_kwargs)
         self.lr_model_.fit(np.arange(len(X)).reshape(-1, 1), X)
         return self
@@ -49,6 +51,9 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         X : array-like, shape  [n_samples, n_features]
             The data that should be detrended.
         """
+        # validate input data
+        check_is_fitted(self)
+        X = self._validate_data(X)
         return X - self._trendline(X)
 
     def inverse_transform(self, X):
@@ -59,11 +64,18 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         X : array-like, shape  [n_samples, n_features]
             The data that should be transformed back.
         """
+        # validate input data
+        check_is_fitted(self)
+        X = self._validate_data(X)
         return X + self._trendline(X)
 
     def _trendline(self, X):
         """ helper function to calculate a linear trendline """
+        X = self._validate_data(X)
         return self.lr_model_.predict(np.arange(len(X)).reshape(-1, 1))
+
+    def _more_tags(self):
+        return {'_xfail_checks': {'check_methods_subset_invariance': 'because'}}
 
 
 class QuantileMapper(BaseEstimator, TransformerMixin):
@@ -87,12 +99,11 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
 
     def __init__(self, detrend=False, lt_kwargs={}, qt_kwargs={}):
 
+        self.detrend = detrend
         self.lt_kwargs = lt_kwargs
         self.qt_kwargs = qt_kwargs
 
-        self.detrend = detrend
-
-    def fit(self, X):
+    def fit(self, X, y=None):
         """ Fit the quantile mapping model.
 
         Parameters
@@ -100,7 +111,7 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         X : array-like, shape  [n_samples, n_features]
             Training data.
         """
-        X = ensure_samples_features(X)
+        X = self._validate_data(X)
 
         qt_kws = self.qt_kwargs.copy()
 
@@ -116,7 +127,9 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         # calculate the cdfs for X
         # TODO: replace this transformer with something that uses robust
         # empirical cdf plotting positions
-        self.x_cdf_fit_ = QuantileTransformer(**qt_kws).fit(x_to_cdf)
+        qt = QuantileTransformer(**qt_kws)
+
+        self.x_cdf_fit_ = qt.fit(x_to_cdf)
 
         return self
 
@@ -128,7 +141,9 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         X : array_like, shape [n_samples, n_features]
             Samples.
         """
-        X = ensure_samples_features(X)
+        # validate input data
+        check_is_fitted(self)
+        X = self._validate_data(X)
 
         # maybe detrend the datasets
         if self.detrend:
@@ -151,18 +166,5 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
 
         return x_qmapped
 
-
-def ensure_samples_features(obj):
-    """ helper function to ensure sammples conform to sklearn format
-    requirements
-    """
-    if isinstance(obj, pd.DataFrame):
-        return obj
-    if isinstance(obj, pd.Series):
-        return obj.to_frame()
-    if isinstance(obj, np.ndarray):
-        if obj.ndim == 2:
-            return obj
-        if obj.ndim == 1:
-            return obj.reshape(-1, 1)
-    return obj  # hope for the best, probably better to raise an error here
+    def _more_tags(self):
+        return {'_xfail_checks': {'check_methods_subset_invariance': 'because'}}

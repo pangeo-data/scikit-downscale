@@ -16,6 +16,8 @@ from skdownscale.pointwise_models.utils import LinearTrendTransformer, QuantileM
 
 @parametrize_with_checks(
     [
+        LinearTrendTransformer(),
+        QuantileMapper(),
         AnalogRegression(),
         BcsdPrecipitation(),
         BcsdTemperature(),
@@ -36,7 +38,9 @@ def test_linear_trend_roundtrip():
     yint = 15
 
     trendline = trend * np.arange(n) + yint
+    trendline = trendline.reshape(-1, 1)
     noise = np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10
+    noise = noise.reshape(-1, 1)
     data = trendline + noise
 
     ltt = LinearTrendTransformer()
@@ -55,12 +59,13 @@ def test_linear_trend_roundtrip():
 def test_quantile_mapper():
     n = 100
     expected = np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10
+    expected = expected.reshape(-1, 1)
     with_bias = expected + 2
 
     mapper = QuantileMapper()
     mapper.fit(expected)
     actual = mapper.transform(with_bias)
-    np.testing.assert_almost_equal(actual.squeeze(), expected)
+    np.testing.assert_almost_equal(actual, expected)
 
 
 @pytest.mark.xfail(reason='Need 3 part QM routine to handle bias removal')

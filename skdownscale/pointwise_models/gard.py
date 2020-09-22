@@ -1,16 +1,15 @@
 import warnings
 
 import numpy as np
+from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KDTree
+from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
-from .base import AbstractDownscaler
-from .utils import ensure_samples_features
 
-
-class AnalogBase(AbstractDownscaler):
-    _fit_attributes = ['kdtree_', 'y_']
+class AnalogBase(RegressorMixin, BaseEstimator):
+    _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_']
 
     def fit(self, X, y):
         """ Fit Analog model using a KDTree
@@ -26,11 +25,18 @@ class AnalogBase(AbstractDownscaler):
         -------
         self : returns an instance of self.
         """
-        if len(X) < self.n_analogs:
+        X, y = self._validate_data(X, y=y, y_numeric=True)
+        self.stats_ = {}  # populated in predict methods
+
+        if len(X) >= self.n_analogs:
+            self.k_ = self.n_analogs
+        else:
             warnings.warn('length of X is less than n_analogs, setting n_analogs = len(X)')
-            self.n_analogs = len(X)
+            self.k_ = len(X)
 
         self.kdtree_ = KDTree(X, **self.kdtree_kwargs)
+
+        self.X_ = X
         self.y_ = y
 
         return self
@@ -63,7 +69,6 @@ class AnalogRegression(AnalogBase):
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
         self.lr_kwargs = lr_kwargs
-        self.lr_model = LinearRegression(**self.lr_kwargs)
 
     def predict(self, X):
         """ Predict using the AnalogRegression model
@@ -78,34 +83,38 @@ class AnalogRegression(AnalogBase):
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
         """
-        check_is_fitted(self, self._fit_attributes)
+        # validate input data
+        check_is_fitted(self)
+        X = check_array(X)
 
         predicted = np.empty(len(X))
 
-        # TODO - extract from lr_model's below.
-        self.stats = {}
+        lr_model = LinearRegression(**self.lr_kwargs)
 
-        for i, (_, row) in enumerate(X.iterrows()):
+        # TODO - extract from lr_model's below.
+
+        for i in range(len(X)):
             # predict for this time step
-            predicted[i] = self._predict_one_step(ensure_samples_features(row.values))
+            predicted[i] = self._predict_one_step(lr_model, X[None, i])
 
         return predicted
 
-    def _predict_one_step(self, X):
+    def _predict_one_step(self, lr_model, X):
+
         # get analogs
         inds = self.kdtree_.query(
-            X, k=self.n_analogs, return_distance=False, **self.query_kwargs
+            X, k=self.k_, return_distance=False, **self.query_kwargs
         ).squeeze()
 
         # extract data to train linear regression model
         x = np.asarray(self.kdtree_.data)[inds]
-        y = self.y_.values[inds]
+        y = self.y_[inds]
 
         # train linear regression model
-        self.lr_model.fit(x, y)
+        lr_model.fit(x, y)
 
         # predict for this time step
-        predicted = self.lr_model.predict(ensure_samples_features(X))
+        predicted = lr_model.predict(X)
         return predicted
 
 
@@ -137,17 +146,12 @@ class PureAnalog(AnalogBase):
         kdtree_kwargs={},
         query_kwargs={},
     ):
+        self.n_analogs = n_analogs
+        self.kind = kind
         self.thresh = thresh
         self.stats = stats
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
-
-        if kind == 'best_analog' or n_analogs == 1:
-            self.n_analogs = 1
-            self.kind = 'best_analog'
-        else:
-            self.n_analogs = n_analogs
-            self.kind = kind
 
     def predict(self, X):
         """Predict using the PureAnalog model
@@ -162,14 +166,19 @@ class PureAnalog(AnalogBase):
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
         """
-        check_is_fitted(self, self._fit_attributes)
-        self.stats_ = {}
+        # validate input data
+        check_is_fitted(self)
+        X = check_array(X)
 
-        dist, inds = self.kdtree_.query(X, k=self.n_analogs, **self.query_kwargs)
-        dist = dist.squeeze()
-        inds = inds.squeeze()
+        if self.kind == 'best_analog' or self.n_analogs == 1:
+            k = 1
+            kind = 'best_analog'
+        else:
+            k = self.k_
+            kind = self.kind
+        dist, inds = self.kdtree_.query(X, k=k, **self.query_kwargs)
 
-        analogs = np.take(self.y_.values, inds, axis=0)
+        analogs = np.take(self.y_, inds, axis=0)
 
         if self.thresh is not None:
             # TODO: rethink how the analog threshold is applied.
@@ -178,16 +187,16 @@ class PureAnalog(AnalogBase):
             analog_mask = analogs > self.thresh
             masked_analogs = analogs[analog_mask]
 
-        if self.kind == 'best_analog':
-            predicted = analogs
+        if kind == 'best_analog':
+            predicted = analogs[:, 0]
 
-        elif self.kind == 'sample_analogs':
+        elif kind == 'sample_analogs':
             # get 1 random index to sample from the analogs
-            rand_inds = np.random.randint(low=0, high=self.n_analogs, size=len(X))
+            rand_inds = np.random.randint(low=0, high=k, size=len(X))
             # select the analog now
             predicted = select_analogs(analogs, rand_inds)
 
-        elif self.kind == 'weight_analogs':
+        elif kind == 'weight_analogs':
             # take weighted average
             # work around for zero distances (perfect matches)
             tiny = 1e-20
@@ -197,14 +206,14 @@ class PureAnalog(AnalogBase):
             else:
                 predicted = np.average(analogs.squeeze(), weights=weights, axis=1)
 
-        elif self.kind == 'mean_analogs':
+        elif kind == 'mean_analogs':
             if self.thresh is not None:
                 predicted = masked_analogs.mean(axis=1)
             else:
                 predicted = analogs.mean(axis=1)
 
         else:
-            raise ValueError('got unexpected kind %s' % self.kind)
+            raise ValueError('got unexpected kind %s' % kind)
 
         if self.thresh is not None:
             # for mean/weight cases, this fills nans when all analogs
