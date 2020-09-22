@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-from sklearn.linear_model.base import LinearModel
+from sklearn.utils.estimator_checks import parametrize_with_checks
 
 from skdownscale.pointwise_models import (
     AnalogRegression,
@@ -14,6 +14,23 @@ from skdownscale.pointwise_models import (
 from skdownscale.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
 
 
+@parametrize_with_checks(
+    [
+        LinearTrendTransformer(),
+        QuantileMapper(),
+        AnalogRegression(),
+        BcsdPrecipitation(),
+        BcsdTemperature(),
+        PureAnalog(),
+        ZScoreRegressor(),
+        LinearTrendTransformer(),
+        QuantileMapper(),
+    ]
+)
+def test_sklearn_compatible_estimator(estimator, check):
+    check(estimator)
+
+
 def test_linear_trend_roundtrip():
     # TODO: there is probably a better analytic test here
     n = 100
@@ -21,7 +38,9 @@ def test_linear_trend_roundtrip():
     yint = 15
 
     trendline = trend * np.arange(n) + yint
+    trendline = trendline.reshape(-1, 1)
     noise = np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10
+    noise = noise.reshape(-1, 1)
     data = trendline + noise
 
     ltt = LinearTrendTransformer()
@@ -40,12 +59,13 @@ def test_linear_trend_roundtrip():
 def test_quantile_mapper():
     n = 100
     expected = np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10
+    expected = expected.reshape(-1, 1)
     with_bias = expected + 2
 
     mapper = QuantileMapper()
     mapper.fit(expected)
     actual = mapper.transform(with_bias)
-    np.testing.assert_almost_equal(actual.squeeze(), expected)
+    np.testing.assert_almost_equal(actual, expected)
 
 
 @pytest.mark.xfail(reason='Need 3 part QM routine to handle bias removal')
@@ -80,8 +100,8 @@ def test_linear_model(model_cls):
 
     model = model_cls()
     model.fit(X, y)
-    model.predict(X)
-    assert isinstance(model, LinearModel)
+    y_hat = model.predict(X)
+    assert len(y_hat) == len(X)
 
 
 @pytest.mark.parametrize('model_cls', [BcsdPrecipitation])
@@ -96,8 +116,8 @@ def test_linear_model_prec(model_cls):
 
     model = model_cls()
     model.fit(X, y)
-    model.predict(X)
-    assert isinstance(model, LinearModel)
+    y_hat = model.predict(X)
+    assert len(y_hat) == len(X)
 
 
 def test_zscore_scale():
