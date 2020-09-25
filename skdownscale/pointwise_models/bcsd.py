@@ -5,15 +5,8 @@ import pandas as pd
 from sklearn.utils.validation import check_is_fitted
 
 from .base import TimeSynchronousDownscaler
-from .groupers import PaddedDOYGrouper
+from .groupers import DAY_GROUPER, MONTH_GROUPER, PaddedDOYGrouper
 from .utils import QuantileMapper, check_datetime_index, ensure_samples_features
-
-
-def MONTH_GROUPER(x):
-    return x.month
-
-def DAY_GROUPER(x):
-    return x.day
 
 
 class BcsdBase(TimeSynchronousDownscaler):

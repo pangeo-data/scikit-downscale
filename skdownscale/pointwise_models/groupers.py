@@ -6,6 +6,12 @@ class SkdownscaleGroupGeneratorBase:
     pass
 
 
+def MONTH_GROUPER(x):
+    return x.month
+
+def DAY_GROUPER(x):
+    return x.day
+
 class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
     def __init__(self, df, offset=15):
         self.df = df
