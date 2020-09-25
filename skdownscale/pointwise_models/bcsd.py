@@ -21,7 +21,7 @@ class BcsdBase(TimeSynchronousDownscaler):
         time_grouper=MONTH_GROUPER,
         climate_trend_grouper=DAY_GROUPER,
         return_anoms=True,
-        **qm_kwargs):
+        qm_kwargs={}):
         
         self.time_grouper = time_grouper
         self.climate_trend_grouper = climate_trend_grouper
