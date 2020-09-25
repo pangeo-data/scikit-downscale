@@ -129,8 +129,9 @@ class BcsdPrecipitation(BcsdBase):
 
         self._pre_fit()
         X, y = self._validate_data(X, y, y_numeric=True)
-        if self.n_features_in_ != 1:
-            raise ValueError(f'BCSD only supports 1 feature, found {self.n_features_in_}')
+        # TO-DO: set n_features_n attribute
+        #if self.n_features_in_ != 1:
+            #raise ValueError(f'BCSD only supports 1 feature, found {self.n_features_in_}')
 
         y_groups = self._create_groups(y)
         # calculate the climatologies
@@ -227,8 +228,9 @@ class BcsdTemperature(BcsdBase):
 
         self._pre_fit()
         X, y = self._validate_data(X, y, y_numeric=True)
-        if self.n_features_in_ != 1:
-            raise ValueError(f'BCSD only supports 1 feature, found {self.n_features_in_}')
+        # TO-DO: set n_features_in attribute
+        #if self.n_features_in_ != 1:
+            #raise ValueError(f'BCSD only supports up to 4 features, found {self.n_features_in_}')
 
         # make groups for day or month
         y_groups = self._create_groups(y)
@@ -283,14 +285,19 @@ class BcsdTemperature(BcsdBase):
         else:
             return X_qm_with_shift
 
-    def _remove_climatology(self, obj, climatology):
+    def _remove_climatology(self, obj, climatology, climate_trend=False):
+        """helper function to remove climatologies
+        """
         dfs = []
-        for key, group in obj.groupby(self.time_grouper):
-            dfs.append(group - climatology.loc[key].values)
+        for key, group in self._create_groups(obj, climate_trend):
+            if self.timestep == "monthly":
+                dfs.append(group - climatology.loc[key].values)
+            elif self.timestep == "daily":
+                dfs.append(group - climatology.loc[key])
 
-        out = pd.concat(dfs).sort_index()
-        assert obj.shape == out.shape
-        return out
+        result = pd.concat(dfs).sort_index()
+        assert obj.shape == result.shape
+        return result
 
     def _more_tags(self):
         return {
