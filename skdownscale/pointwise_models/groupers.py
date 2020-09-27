@@ -40,6 +40,8 @@ class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
         all_days = np.concatenate((first_half, np.array([self.n]), sec_half), axis=0)
 
         assert len(set(all_days)) == total_days, all_days
+        if len(set(all_days)) != total_days:
+            raise ValueError("day groups do not contain the correct set of days")
 
         result = self.df[self.df.index.dayofyear.isin(all_days)]
 
@@ -48,8 +50,8 @@ class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
         return self.n - 1, result
 
     def mean(self):
-        list_result = []
+        arr_means = np.full((self.max, 1), np.inf)
         for key, group in self:
-            list_result.append(group.mean().values[0])
-        result = pd.Series(list_result, index=self.days_of_year)
+            arr_means[key - 1] = group.mean().values[0]
+        result = pd.DataFrame(arr_means, index=self.days_of_year)
         return result

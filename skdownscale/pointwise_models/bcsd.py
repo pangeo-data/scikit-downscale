@@ -32,12 +32,12 @@ class BcsdBase(TimeSynchronousDownscaler):
 
     def _pre_fit(self):
         if isinstance(self.time_grouper, str):
-            if time_grouper == "daily_nasa-nex":
+            if self.time_grouper == "daily_nasa-nex":
                 self.time_grouper = PaddedDOYGrouper
-                self.climate_trend_grouper = climate_trend_grouper
                 self.timestep = "daily"
             else:  
                 self.time_grouper_ = pd.Grouper(freq=self.time_grouper)
+                self.timestep = "monthly"
         else:
             self.time_grouper_ = self.time_grouper
             self.timestep = "monthly" 
@@ -293,10 +293,11 @@ class BcsdTemperature(BcsdBase):
             if self.timestep == "monthly":
                 dfs.append(group - climatology.loc[key].values)
             elif self.timestep == "daily":
-                dfs.append(group - climatology.loc[key])
+                dfs.append(group - climatology.loc[key].values)
 
         result = pd.concat(dfs).sort_index()
-        assert obj.shape == result.shape
+        if obj.shape != result.shape:
+            raise ValueError("shape of climo is not equal to input array")
         return result
 
     def _more_tags(self):
