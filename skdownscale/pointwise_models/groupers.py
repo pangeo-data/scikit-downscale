@@ -14,12 +14,18 @@ def DAY_GROUPER(x):
 
 class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
     def __init__(self, df, offset=15):
-        self.df = df
-        self.offset = offset
-        self.max = 365
-        self.days_of_year = np.arange(1, 366)
-        self.days_of_year_wrapped = np.pad(self.days_of_year, 15, mode="wrap")
         self.n = 1
+        self.df = df
+        # split up data by leap and non leap years
+        # necessary because pandas dayofyear
+        self.df_leap = self.df[self.df.index.is_leap_year]
+        self.df_noleap = self.df[~self.df.index.is_leap_year]
+        self.offset = offset
+        self.max = 366
+        self.days_of_nonleap_year = np.arange(self.n, self.max)
+        self.days_of_leap_year = np.arange(self.n, self.max + 1)
+        self.days_of_nonleap_year_wrapped = np.pad(self.days_of_nonleap_year, self.offset, mode="wrap")
+        self.days_of_leap_year_wrapped = np.pad(self.days_of_leap_year, self.offset, mode="wrap")
 
     def __iter__(self):
         self.n = 1
@@ -33,17 +39,25 @@ class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
         i = self.n - 1
         total_days = (2 * self.offset) + 1
 
-        # create day groups with +/- days
-        # number of days defined by offset
-        first_half = self.days_of_year_wrapped[i : i + self.offset]
-        sec_half = self.days_of_year_wrapped[self.n + self.offset : i + total_days]
-        all_days = np.concatenate((first_half, np.array([self.n]), sec_half), axis=0)
+        # create day groups with +/- offset # of days
+        first_set_leap = self.days_of_leap_year_wrapped[i : i + self.offset]
+        first_set_noleap = self.days_of_nonleap_year_wrapped[i : i + self.offset]
+        
+        sec_set_leap = self.days_of_leap_year_wrapped[self.n + self.offset : i + total_days]
+        sec_set_noleap = self.days_of_nonleap_year_wrapped[self.n + self.offset : i + total_days]
+        
+        all_days_leap = np.concatenate((first_set_leap, np.array([self.n]), sec_set_leap), axis=0)
+        all_days_noleap = np.concatenate((first_set_noleap, np.array([self.n]), sec_set_noleap), axis=0)
+        
+        # check that day groups contain the correct number of days 
+        if len(set(all_days_leap)) != total_days:
+            raise ValueError("leap day groups do not contain the correct set of days")
+        
+        if len(set(all_days_noleap)) != total_days and self.n != 366:
+            raise ValueError("no leap day groups do not contain the correct set of days")
 
-        assert len(set(all_days)) == total_days, all_days
-        if len(set(all_days)) != total_days:
-            raise ValueError("day groups do not contain the correct set of days")
-
-        result = self.df[self.df.index.dayofyear.isin(all_days)]
+        result = pd.concat([self.df_leap[self.df_leap.index.dayofyear.isin(all_days_leap)], 
+                           self.df_noleap[self.df_noleap.index.dayofyear.isin(all_days_noleap)]])
 
         self.n += 1
 
