@@ -112,7 +112,7 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
             Training data.
         """
         # TO-DO: fix validate data fctn 
-        #X = self._validate_data(X)
+        X = self._validate_data(X)
 
         qt_kws = self.qt_kwargs.copy()
 
@@ -145,7 +145,7 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         # validate input data
         check_is_fitted(self)
         # TO-DO: fix validate_data fctn 
-        #X = self._validate_data(X)
+        X = self._validate_data(X)
 
         # maybe detrend the datasets
         if self.detrend:

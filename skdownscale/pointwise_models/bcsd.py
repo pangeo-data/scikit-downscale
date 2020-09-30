@@ -130,8 +130,8 @@ class BcsdPrecipitation(BcsdBase):
         self._pre_fit()
         X, y = self._validate_data(X, y, y_numeric=True)
         # TO-DO: set n_features_n attribute
-        #if self.n_features_in_ != 1:
-            #raise ValueError(f'BCSD only supports 1 feature, found {self.n_features_in_}')
+        if self.n_features_in_ != 1:
+            raise ValueError(f'BCSD only supports 1 feature, found {self.n_features_in_}')
 
         y_groups = self._create_groups(y)
         # calculate the climatologies
@@ -229,8 +229,8 @@ class BcsdTemperature(BcsdBase):
         self._pre_fit()
         X, y = self._validate_data(X, y, y_numeric=True)
         # TO-DO: set n_features_in attribute
-        #if self.n_features_in_ != 1:
-            #raise ValueError(f'BCSD only supports up to 4 features, found {self.n_features_in_}')
+        if self.n_features_in_ != 1:
+            raise ValueError(f'BCSD only supports up to 4 features, found {self.n_features_in_}')
 
         # make groups for day or month
         y_groups = self._create_groups(y)
