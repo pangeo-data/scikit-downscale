@@ -10,8 +10,7 @@ from .utils import QuantileMapper, check_datetime_index, ensure_samples_features
 
 
 class BcsdBase(TimeSynchronousDownscaler):
-    """ Base class for BCSD model.
-    """
+    """Base class for BCSD model."""
 
     _fit_attributes = ["y_climo_", "quantile_mappers_"]
     _timestep = 'M'
@@ -22,8 +21,9 @@ class BcsdBase(TimeSynchronousDownscaler):
         climate_trend_grouper=DAY_GROUPER,
         climate_trend=MONTH_GROUPER,
         return_anoms=True,
-        qm_kwargs={}):
-        
+        qm_kwargs={},
+    ):
+
         self.time_grouper = time_grouper
         self.climate_trend_grouper = climate_trend_grouper
         self.climate_trend = climate_trend
@@ -35,16 +35,15 @@ class BcsdBase(TimeSynchronousDownscaler):
             if self.time_grouper == "daily_nasa-nex":
                 self.time_grouper = PaddedDOYGrouper
                 self.timestep = "daily"
-            else:  
+            else:
                 self.time_grouper_ = pd.Grouper(freq=self.time_grouper)
                 self.timestep = "monthly"
         else:
             self.time_grouper_ = self.time_grouper
-            self.timestep = "monthly" 
+            self.timestep = "monthly"
 
     def _create_groups(self, df, climate_trend=False):
-        """ helper function to create groups by either daily or month
-        """
+        """helper function to create groups by either daily or month"""
         if self.timestep == "monthly":
             return df.groupby(self.time_grouper)
         elif self.timestep == "daily":
@@ -55,9 +54,9 @@ class BcsdBase(TimeSynchronousDownscaler):
                 return self.time_grouper(df)
         else:
             raise TypeError("unexpected time grouper type %s" % self.time_grouper)
-    
+
     def _qm_fit_by_group(self, groups):
-        """ helper function to fit quantile mappers by group
+        """helper function to fit quantile mappers by group
 
         Note that we store these mappers for later
         """
@@ -66,7 +65,7 @@ class BcsdBase(TimeSynchronousDownscaler):
             self.quantile_mappers_[key] = QuantileMapper(**self.qm_kwargs).fit(group)
 
     def _qm_transform_by_group(self, groups):
-        """ helper function to apply quantile mapping by group
+        """helper function to apply quantile mapping by group
 
         Note that we recombine the dataframes using pd.concat, there may be a better way to do this
         """
@@ -78,9 +77,7 @@ class BcsdBase(TimeSynchronousDownscaler):
         return pd.concat(dfs).sort_index()
 
     def _remove_climatology(self, obj, climatology, climate_trend=False):
-        """helper function to remove climatologies
-
-        """
+        """helper function to remove climatologies"""
         dfs = []
         for key, group in self._create_groups(obj, climate_trend):
             if self.timestep == "monthly":
@@ -94,7 +91,7 @@ class BcsdBase(TimeSynchronousDownscaler):
 
 
 class BcsdPrecipitation(BcsdBase):
-    """ Classic BCSD model for Precipitation
+    """Classic BCSD model for Precipitation
 
     Parameters
     ----------
@@ -113,7 +110,7 @@ class BcsdPrecipitation(BcsdBase):
     """
 
     def fit(self, X, y):
-        """ Fit BcsdPrecipitation model
+        """Fit BcsdPrecipitation model
 
         Parameters
         ----------
@@ -173,8 +170,7 @@ class BcsdPrecipitation(BcsdBase):
             return Xqm
 
     def _calc_ratio_anoms(self, obj, climatology, climate_trend=False):
-        """ helper function for dividing day groups by climatology
-        """
+        """helper function for dividing day groups by climatology"""
         dfs = []
         for key, group in self._create_groups(obj, climate_trend):
             if self.timestep == "monthly":
@@ -212,7 +208,7 @@ class BcsdPrecipitation(BcsdBase):
 
 class BcsdTemperature(BcsdBase):
     def fit(self, X, y):
-        """ Fit BcsdTemperature model
+        """Fit BcsdTemperature model
 
         Parameters
         ----------
@@ -245,7 +241,7 @@ class BcsdTemperature(BcsdBase):
         return self
 
     def predict(self, X):
-        """ Predict using the BcsdTemperature model
+        """Predict using the BcsdTemperature model
 
         Parameters
         ----------
@@ -286,8 +282,7 @@ class BcsdTemperature(BcsdBase):
             return X_qm_with_shift
 
     def _remove_climatology(self, obj, climatology, climate_trend=False):
-        """helper function to remove climatologies
-        """
+        """helper function to remove climatologies"""
         dfs = []
         for key, group in self._create_groups(obj, climate_trend):
             if self.timestep == "monthly":
