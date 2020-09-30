@@ -24,9 +24,9 @@ class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
         # check for leap days
         # if leap days present, flag for day groups count
         if len(self.df[((self.df.index.month == 2) & (self.df.index.day == 29))]) > 0:
-            self.leap = "leap"
+            self.leap = 'leap'
         else:
-            self.leap = "noleap"
+            self.leap = 'noleap'
         # split up data by leap and non leap years
         # necessary because pandas dayofyear
         self.df_leap = self.df[self.df.index.is_leap_year]
@@ -35,9 +35,9 @@ class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
         self.days_of_nonleap_year = np.arange(self.n, self.max)
         self.days_of_leap_year = np.arange(self.n, self.max + 1)
         self.days_of_nonleap_year_wrapped = np.pad(
-            self.days_of_nonleap_year, self.offset, mode="wrap"
+            self.days_of_nonleap_year, self.offset, mode='wrap'
         )
-        self.days_of_leap_year_wrapped = np.pad(self.days_of_leap_year, self.offset, mode="wrap")
+        self.days_of_leap_year_wrapped = np.pad(self.days_of_leap_year, self.offset, mode='wrap')
 
     def __iter__(self):
         self.n = 1
@@ -64,11 +64,11 @@ class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
         )
 
         # check that day groups contain the correct number of days
-        if len(set(all_days_leap)) != total_days and self.leap == "noleap":
-            warnings.warn("leap days not included, day groups in leap years missing leap days")
+        if len(set(all_days_leap)) != total_days and self.leap == 'noleap':
+            warnings.warn('leap days not included, day groups in leap years missing leap days')
 
         if len(set(all_days_noleap)) != total_days and self.n != 366:
-            raise ValueError("no leap day groups do not contain the correct set of days")
+            raise ValueError('no leap day groups do not contain the correct set of days')
 
         result = pd.concat(
             [

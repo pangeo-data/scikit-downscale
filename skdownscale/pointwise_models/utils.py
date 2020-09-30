@@ -191,11 +191,11 @@ def ensure_samples_features(obj):
 def check_datetime_index(obj, timestep):
     """helper function to check datetime index for compatibility"""
     if isinstance(obj, pd.DataFrame):
-        if timestep == "daily":
-            obj.index = obj.index.values.astype("datetime64[D]")
+        if timestep == 'daily':
+            obj.index = obj.index.values.astype('datetime64[D]')
             return obj
-        elif timestep == "monthly":
-            obj.index = obj.index.values.astype("datetime64[M]")
+        elif timestep == 'monthly':
+            obj.index = obj.index.values.astype('datetime64[M]')
             return obj
         else:
-            raise ValueError("this frequency has not yet been implemented in scikit-downscale")
+            raise ValueError('this frequency has not yet been implemented in scikit-downscale')

@@ -12,7 +12,7 @@ from .utils import QuantileMapper, check_datetime_index, ensure_samples_features
 class BcsdBase(TimeSynchronousDownscaler):
     """Base class for BCSD model."""
 
-    _fit_attributes = ["y_climo_", "quantile_mappers_"]
+    _fit_attributes = ['y_climo_', 'quantile_mappers_']
     _timestep = 'M'
 
     def __init__(
@@ -32,28 +32,28 @@ class BcsdBase(TimeSynchronousDownscaler):
 
     def _pre_fit(self):
         if isinstance(self.time_grouper, str):
-            if self.time_grouper == "daily_nasa-nex":
+            if self.time_grouper == 'daily_nasa-nex':
                 self.time_grouper = PaddedDOYGrouper
-                self.timestep = "daily"
+                self.timestep = 'daily'
             else:
                 self.time_grouper_ = pd.Grouper(freq=self.time_grouper)
-                self.timestep = "monthly"
+                self.timestep = 'monthly'
         else:
             self.time_grouper_ = self.time_grouper
-            self.timestep = "monthly"
+            self.timestep = 'monthly'
 
     def _create_groups(self, df, climate_trend=False):
         """helper function to create groups by either daily or month"""
-        if self.timestep == "monthly":
+        if self.timestep == 'monthly':
             return df.groupby(self.time_grouper)
-        elif self.timestep == "daily":
+        elif self.timestep == 'daily':
             if climate_trend:
                 # group by day only rather than also +/- offset days
                 return df.groupby(self.climate_trend_grouper)
             else:
                 return self.time_grouper(df)
         else:
-            raise TypeError("unexpected time grouper type %s" % self.time_grouper)
+            raise TypeError('unexpected time grouper type %s' % self.time_grouper)
 
     def _qm_fit_by_group(self, groups):
         """helper function to fit quantile mappers by group
@@ -80,9 +80,9 @@ class BcsdBase(TimeSynchronousDownscaler):
         """helper function to remove climatologies"""
         dfs = []
         for key, group in self._create_groups(obj, climate_trend):
-            if self.timestep == "monthly":
+            if self.timestep == 'monthly':
                 dfs.append(group - climatology.loc[key].values)
-            elif self.timestep == "daily":
+            elif self.timestep == 'daily':
                 dfs.append(group - climatology.loc[key])
 
         result = pd.concat(dfs).sort_index()
@@ -173,7 +173,7 @@ class BcsdPrecipitation(BcsdBase):
         """helper function for dividing day groups by climatology"""
         dfs = []
         for key, group in self._create_groups(obj, climate_trend):
-            if self.timestep == "monthly":
+            if self.timestep == 'monthly':
                 dfs.append(group / climatology.loc[key].values)
             else:
                 dfs.append(group / climatology.loc[key])
@@ -285,14 +285,14 @@ class BcsdTemperature(BcsdBase):
         """helper function to remove climatologies"""
         dfs = []
         for key, group in self._create_groups(obj, climate_trend):
-            if self.timestep == "monthly":
+            if self.timestep == 'monthly':
                 dfs.append(group - climatology.loc[key].values)
-            elif self.timestep == "daily":
+            elif self.timestep == 'daily':
                 dfs.append(group - climatology.loc[key].values)
 
         result = pd.concat(dfs).sort_index()
         if obj.shape != result.shape:
-            raise ValueError("shape of climo is not equal to input array")
+            raise ValueError('shape of climo is not equal to input array')
         return result
 
     def _more_tags(self):
