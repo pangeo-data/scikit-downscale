@@ -10,6 +10,26 @@ from sklearn.utils.validation import check_is_fitted
 Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
 
 
+def plotting_positions(n, alpha=0.4, beta=0.4):
+    '''Returns a monotonic array of plotting positions.
+    Parameters
+    ----------
+    n : int
+        Length of plotting positions to return.
+    alpha, beta : float
+        Plotting positions parameter. Default is 0.4.
+    Returns
+    -------
+    positions : ndarray
+        Quantile mapped data with shape from `input_data` and probability
+            distribution from `data_to_match`.
+    See Also
+    --------
+    scipy.stats.mstats.plotting_positions
+    '''
+    return (np.arange(1, n + 1) - alpha) / (n + 1.0 - alpha - beta)
+
+
 class LinearTrendTransformer(TransformerMixin, BaseEstimator):
     """ Transform features by removing linear trends.
 

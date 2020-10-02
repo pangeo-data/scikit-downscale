@@ -1,4 +1,4 @@
-import warnings
+from sklearn.base import BaseEstimator, RegressorMixin
 
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -6,7 +6,7 @@ from sklearn.utils import check_array, check_X_y
 from sklearn.utils.validation import check_is_fitted
 
 
-class BaseDownscaler(BaseEstimator):
+class AbstractDownscaler(BaseEstimator, RegressorMixin):
     pass
 
 
