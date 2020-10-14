@@ -85,5 +85,5 @@ class PaddedDOYGrouper(SkdownscaleGroupGeneratorBase):
         arr_means = np.full((self.max, 1), np.inf)
         for key, group in self:
             arr_means[key - 1] = group.mean().values[0]
-        result = pd.DataFrame(arr_means, index=self.days_of_year)
+        result = pd.DataFrame(arr_means, index=self.days_of_leap_year)
         return result
