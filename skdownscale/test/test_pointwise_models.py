@@ -195,7 +195,6 @@ def test_paddeddoygrouper():
 
     day_of_year = 123
     days_included = np.arange(day_of_year - 15, day_of_year + 16)
-    days_included_to_fail = np.arange(day_of_year - 15, day_of_year + 18)
     np.testing.assert_array_equal(
         np.unique(doy_group_list[day_of_year].index.dayofyear), days_included
     )
