@@ -10,6 +10,25 @@ from sklearn.utils.validation import check_is_fitted
 Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
 
 
+def check_max_features(array, n=1):
+    if array.ndim == 1:
+        pass
+    elif array.ndim == 2:
+        n_features = array.shape[1]
+        if n_features > n:
+            raise ValueError(
+                'Found array with %d features (shape=%s) while '
+                'a maximum of %d is required' % (n_features, array.shape, n)
+            )
+
+    else:
+        raise ValueError(
+            'Found array with %d dimensions. Unclear which should '
+            'be the feature dim.' % array.ndim
+        )
+    return array
+
+
 def plotting_positions(n, alpha=0.4, beta=0.4):
     '''Returns a monotonic array of plotting positions.
     Parameters

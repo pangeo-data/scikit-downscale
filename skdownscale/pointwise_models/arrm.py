@@ -3,7 +3,7 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 
 from .base import AbstractDownscaler
-from .utils import plotting_positions
+from .utils import check_max_features, plotting_positions
 
 try:
     import pwlf
@@ -31,8 +31,9 @@ def arrm_breakpoints(X, y, window_width, max_breakpoints):
 
     npoints = len(X)
     assert len(X) == len(y)
+    assert X.shape[1] == 1
 
-    X = np.sort(X)
+    X = np.sort(X[:, 0])
     y = np.sort(y)
     quantiles = plotting_positions(len(X))
 
@@ -130,19 +131,18 @@ class PiecewiseLinearRegression(BaseEstimator, RegressorMixin):
 
         # Check that X and y have correct shape
         X, y = check_X_y(X, y, y_numeric=True)
+        X = check_max_features(X)
 
         if self.pwlf_kwargs is None:
             pwlf_kws = {}
         else:
             pwlf_kws = self.pwlf_kwargs
-        self.model_ = pwlf.PiecewiseLinFit(X, y, **pwlf_kws)
-
+        self.model_ = pwlf.PiecewiseLinFit(X[:, 0], y, **pwlf_kws)
         if self.fit_option == 'auto':
             self.fit_breaks_ = self.model_.fit(self.n_segments, **kwargs)
         elif self.fit_option == 'arrm':
-            assert not kwargs
-            self.fit_breaks_ = arrm_breakpoints(X, y)
-            self.fit_with_breaks(self.fit_breaks_, **kwargs)
+            self.fit_breaks_ = arrm_breakpoints(X, y, 0.05, self.n_segments)
+            _ = self.model_.fit_with_breaks(self.fit_breaks_, **kwargs)
         elif self.fit_option == 'fast':
             self.fit_breaks_ = self.model_.fitfast(self.n_segments, **kwargs)
         else:
@@ -161,5 +161,6 @@ class PiecewiseLinearRegression(BaseEstimator, RegressorMixin):
 
         # Input validation
         X = check_array(X)
+        X = check_max_features(X)
 
-        return self.model_.predict(X)
+        return self.model_.predict(X[:, 0])
