@@ -6,7 +6,7 @@ from sklearn.utils.validation import check_is_fitted
 
 from .base import TimeSynchronousDownscaler
 from .groupers import DAY_GROUPER, MONTH_GROUPER, PaddedDOYGrouper
-from .utils import QuantileMapper, check_datetime_index, ensure_samples_features
+from .utils import QuantileMapper, ensure_samples_features
 
 
 class BcsdBase(TimeSynchronousDownscaler):
