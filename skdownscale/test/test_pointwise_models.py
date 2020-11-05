@@ -8,6 +8,7 @@ from skdownscale.pointwise_models import (
     AnalogRegression,
     BcsdPrecipitation,
     BcsdTemperature,
+    PaddedDOYGrouper,
     PureAnalog,
     ZScoreRegressor,
 )
@@ -184,3 +185,24 @@ def test_zscore_predict():
     out = zscore.predict(X)
 
     np.testing.assert_allclose(out.astype(float), expected.astype(float))
+
+
+def test_paddeddoygrouper():
+    index = pd.date_range(start='1980-01-01', end='1982-12-31')
+    X = pd.DataFrame({'foo': np.random.random(len(index))}, index=index)
+    day_groups = PaddedDOYGrouper(X)
+    doy_group_list = dict(list(day_groups))
+
+    day_of_year = 123
+    days_included = np.arange(day_of_year - 15, day_of_year + 16)
+    np.testing.assert_array_equal(
+        np.unique(doy_group_list[day_of_year].index.dayofyear), days_included
+    )
+
+
+def test_BcsdTemperature_nasanex():
+    index = pd.date_range(start='1980-01-01', end='1982-12-31')
+    X = pd.DataFrame({'foo': np.random.random(len(index))}, index=index)
+    y = pd.DataFrame({'foo': np.random.random(len(index))}, index=index)
+    model_nasanex = BcsdTemperature(time_grouper='daily_nasa-nex', return_anoms=False).fit(X, y)
+    assert issubclass(model_nasanex.time_grouper, PaddedDOYGrouper)

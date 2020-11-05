@@ -38,3 +38,13 @@ Transformers
 
    LinearTrendTransformer
    QuantileMapper
+
+Groupers
+~~~~~~~~~~~~
+
+.. autosummary::
+   :toctree: generated/
+
+   DAY_GROUPER
+   MONTH_GROUPER
+   PaddedDOYGrouper
