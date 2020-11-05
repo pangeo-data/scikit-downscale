@@ -83,6 +83,7 @@ class TimeSynchronousDownscaler(BaseEstimator):
                 X, y = self._check_X_y(X, y, **check_params)
             out = X, y
 
+        # TO-DO: add check_n_features attribute
         if check_params.get('ensure_2d', True):
             self._check_n_features(X, reset=reset)
 

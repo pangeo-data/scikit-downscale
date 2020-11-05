@@ -11,7 +11,7 @@ Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
 
 
 class LinearTrendTransformer(TransformerMixin, BaseEstimator):
-    """ Transform features by removing linear trends.
+    """Transform features by removing linear trends.
 
     Uses Ordinary least squares Linear Regression as implemented in
     sklear.linear_model.LinearRegression.
@@ -31,7 +31,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         self.lr_kwargs = lr_kwargs
 
     def fit(self, X, y=None):
-        """ Compute the linear trend.
+        """Compute the linear trend.
 
         Parameters
         ----------
@@ -44,7 +44,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         return self
 
     def transform(self, X):
-        """ Perform transformation by removing the trend.
+        """Perform transformation by removing the trend.
 
         Parameters
         ----------
@@ -57,7 +57,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         return X - self._trendline(X)
 
     def inverse_transform(self, X):
-        """ Add the trend back to the data.
+        """Add the trend back to the data.
 
         Parameters
         ----------
@@ -79,7 +79,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
 
 
 class QuantileMapper(BaseEstimator, TransformerMixin):
-    """ Transform features using quantile mapping.
+    """Transform features using quantile mapping.
 
     Parameters
     ----------
@@ -104,13 +104,14 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         self.qt_kwargs = qt_kwargs
 
     def fit(self, X, y=None):
-        """ Fit the quantile mapping model.
+        """Fit the quantile mapping model.
 
         Parameters
         ----------
         X : array-like, shape  [n_samples, n_features]
             Training data.
         """
+        # TO-DO: fix validate data fctn
         X = self._validate_data(X)
 
         qt_kws = self.qt_kwargs.copy()
@@ -134,7 +135,7 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X):
-        """ Perform the quantile mapping.
+        """Perform the quantile mapping.
 
         Parameters
         ----------
@@ -143,6 +144,7 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
         """
         # validate input data
         check_is_fitted(self)
+        # TO-DO: fix validate_data fctn
         X = self._validate_data(X)
 
         # maybe detrend the datasets
@@ -168,3 +170,19 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
 
     def _more_tags(self):
         return {'_xfail_checks': {'check_methods_subset_invariance': 'because'}}
+
+
+def ensure_samples_features(obj):
+    """helper function to ensure sammples conform to sklearn format
+    requirements
+    """
+    if isinstance(obj, pd.DataFrame):
+        return obj
+    if isinstance(obj, pd.Series):
+        return obj.to_frame()
+    if isinstance(obj, np.ndarray):
+        if obj.ndim == 2:
+            return obj
+        if obj.ndim == 1:
+            return obj.reshape(-1, 1)
+    return obj  # hope for the best, probably better to raise an error here
