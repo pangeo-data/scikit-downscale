@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 
-from skdownscale.pointwise_models import GroupedRegressor, PaddedDOYGrouper
+from skdownscale.pointwise_models.grouping import GroupedRegressor, PaddedDOYGrouper
 
 
 def test_groupers():
