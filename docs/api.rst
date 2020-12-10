@@ -48,3 +48,15 @@ Groupers
    DAY_GROUPER
    MONTH_GROUPER
    PaddedDOYGrouper
+
+Spatial Models
+=================
+
+Xarray Wrappers
+~~~~~~~~~~~~~~~
+
+.. autosummary::
+   :toctree: generated/
+
+   SpatialDisaggregator
+

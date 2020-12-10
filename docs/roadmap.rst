@@ -59,6 +59,8 @@ Components
 1. `pointwise_models`: a collection of linear models that are intended to be
    applied point-by-point. These may be sklearn Pipelines or custom sklearn-like
    models (e.g. BCSDTemperature).
+2. `spatial_models`: a collection of spatial models where the models have spatial 
+   dependence. 
 2. `global_models`: (not implemented) concept space for deep learning-based
    models.
 3. `metrics`: (not implemented) concept space for a benchmarking suite
@@ -81,6 +83,13 @@ Pointwise models
 6. ?
 
 Other methods, like LOCA, MACA, BCCA, etc, should also be possible.
+
+Spatial models 
+~~~~~~~~~~~~~~~~
+
+This category of methods includes models that have spatial dependence. 
+This far only the BCSD method (see Thrasher et al., 2012) for spatial disaggregation has 
+been implemented (for temperature and precipitation). 
 
 Global models
 ~~~~~~~~~~~~~
