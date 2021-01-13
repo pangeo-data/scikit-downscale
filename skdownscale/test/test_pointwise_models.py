@@ -10,6 +10,7 @@ from skdownscale.pointwise_models import (
     BcsdTemperature,
     PaddedDOYGrouper,
     PureAnalog,
+    QuantileMappingReressor,
     ZScoreRegressor,
 )
 from skdownscale.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
@@ -17,13 +18,14 @@ from skdownscale.pointwise_models.utils import LinearTrendTransformer, QuantileM
 
 @parametrize_with_checks(
     [
-        LinearTrendTransformer(),
-        QuantileMapper(),
+        # Regressors
         AnalogRegression(),
         BcsdPrecipitation(),
         BcsdTemperature(),
         PureAnalog(),
         ZScoreRegressor(),
+        # QuantileMappingReressor(n_endpoints=2),
+        # transformers
         LinearTrendTransformer(),
         QuantileMapper(),
     ]

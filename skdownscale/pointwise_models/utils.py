@@ -10,24 +10,62 @@ from sklearn.utils.validation import check_is_fitted
 Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
 
 
+def check_max_features(array, n=1):
+    if array.ndim == 1:
+        pass
+    elif array.ndim == 2:
+        n_features = array.shape[1]
+        if n_features > n:
+            raise ValueError(
+                'Found array with %d features (shape=%s) while '
+                'a maximum of %d is required' % (n_features, array.shape, n)
+            )
+
+    else:
+        raise ValueError(
+            'Found array with %d dimensions. Unclear which should '
+            'be the feature dim.' % array.ndim
+        )
+    return array
+
+
 def plotting_positions(n, alpha=0.4, beta=0.4):
     '''Returns a monotonic array of plotting positions.
+
     Parameters
     ----------
     n : int
         Length of plotting positions to return.
     alpha, beta : float
         Plotting positions parameter. Default is 0.4.
+
     Returns
     -------
     positions : ndarray
         Quantile mapped data with shape from `input_data` and probability
-            distribution from `data_to_match`.
+        distribution from `data_to_match`.
+
     See Also
     --------
     scipy.stats.mstats.plotting_positions
     '''
     return (np.arange(1, n + 1) - alpha) / (n + 1.0 - alpha - beta)
+
+
+def ensure_samples_features(obj):
+    """helper function to ensure sammples conform to sklearn format
+    requirements
+    """
+    if isinstance(obj, pd.DataFrame):
+        return obj
+    if isinstance(obj, pd.Series):
+        return obj.to_frame()
+    if isinstance(obj, np.ndarray):
+        if obj.ndim == 2:
+            return obj
+        if obj.ndim == 1:
+            return obj.reshape(-1, 1)
+    return obj  # hope for the best, probably better to raise an error here
 
 
 class LinearTrendTransformer(TransformerMixin, BaseEstimator):
@@ -98,7 +136,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         return {'_xfail_checks': {'check_methods_subset_invariance': 'because'}}
 
 
-class QuantileMapper(BaseEstimator, TransformerMixin):
+class QuantileMapper(TransformerMixin, BaseEstimator):
     """Transform features using quantile mapping.
 
     Parameters
@@ -190,19 +228,3 @@ class QuantileMapper(BaseEstimator, TransformerMixin):
 
     def _more_tags(self):
         return {'_xfail_checks': {'check_methods_subset_invariance': 'because'}}
-
-
-def ensure_samples_features(obj):
-    """helper function to ensure sammples conform to sklearn format
-    requirements
-    """
-    if isinstance(obj, pd.DataFrame):
-        return obj
-    if isinstance(obj, pd.Series):
-        return obj.to_frame()
-    if isinstance(obj, np.ndarray):
-        if obj.ndim == 2:
-            return obj
-        if obj.ndim == 1:
-            return obj.reshape(-1, 1)
-    return obj  # hope for the best, probably better to raise an error here

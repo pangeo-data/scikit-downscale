@@ -8,6 +8,14 @@ from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
 
+def select_analogs(analogs, inds):
+    # todo: this is possible with fancy indexing
+    out = np.empty(len(analogs))
+    for i, ind in enumerate(inds):
+        out[i] = analogs[i, ind]
+    return out
+
+
 class AnalogBase(RegressorMixin, BaseEstimator):
     _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_']
 
@@ -230,11 +238,3 @@ class PureAnalog(AnalogBase):
                 self.stats_['pop'] = np.where(analog_mask, 1, 0).mean(axis=1)
 
         return predicted
-
-
-def select_analogs(analogs, inds):
-    # todo: this is possible with fancy indexing
-    out = np.empty(len(analogs))
-    for i, ind in enumerate(inds):
-        out[i] = analogs[i, ind]
-    return out

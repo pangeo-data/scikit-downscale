@@ -1,13 +1,9 @@
 import warnings
 
 import pandas as pd
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils import check_array, check_X_y
 from sklearn.utils.validation import check_is_fitted
-
-
-class BaseDownscaler(BaseEstimator):
-    pass
 
 
 class TimeSynchronousDownscaler(BaseEstimator):
@@ -36,6 +32,7 @@ class TimeSynchronousDownscaler(BaseEstimator):
 
     def _validate_data(self, X, y=None, reset=True, validate_separately=False, **check_params):
         """Validate input data and set or check the `n_features_in_` attribute.
+
         Parameters
         ----------
         X : {array-like, sparse matrix, dataframe} of shape \
@@ -56,6 +53,7 @@ class TimeSynchronousDownscaler(BaseEstimator):
             Parameters passed to :func:`sklearn.utils.check_array` or
             :func:`sklearn.utils.check_X_y`. Ignored if validate_separately
             is not False.
+
         Returns
         -------
         out : {ndarray, sparse matrix} or tuple of these
