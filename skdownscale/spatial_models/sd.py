@@ -1,6 +1,7 @@
 import numpy as np
-import pandas as pd 
-import xarray as xr 
+import pandas as pd
+import xarray as xr
+
 
 class SpatialDisaggregator:
     """
@@ -16,7 +17,7 @@ class SpatialDisaggregator:
           temperature and other option is precipitation.
     """
 
-    def __init__(self, var='temperature'):
+    def __init__(self, var="temperature"):
         self._var = var
 
         if var == "temperature":
@@ -24,11 +25,12 @@ class SpatialDisaggregator:
         elif var == "precipitation":
             pass
         else:
-            raise NotImplementedError("functionality for spatial disaggregation"
-                    " of %s has not yet been added" %var)
+            raise NotImplementedError(
+                "functionality for spatial disaggregation"
+                " of %s has not yet been added" % var
+            )
 
-    def fit(self, ds_bc, climo_coarse, var_name,
-            lat_name='lat', lon_name='lon'):
+    def fit(self, ds_bc, climo_coarse, var_name, lat_name="lat", lon_name="lon"):
         """
         Fit the scaling factor used in spatial disaggregation
 
@@ -60,8 +62,7 @@ class SpatialDisaggregator:
 
         return scf
 
-    def predict(self, scf, climo_fine, var_name,
-                lat_name='lat', lon_name='lon'):
+    def predict(self, scf, climo_fine, var_name, lat_name="lat", lon_name="lon"):
         """
         Predict (apply) the scaling factor to the observed climatology.
 
@@ -94,9 +95,9 @@ class SpatialDisaggregator:
         return downscaled
 
     def _calculate_scaling_factor(self, ds_bc, climo, var_name, var):
-        '''
+        """
         compute scaling factor
-        '''
+        """
         # Necessary workaround to xarray's check with zero dimensions
         # https://github.com/pydata/xarray/issues/3575
         da = ds_bc[var_name]
@@ -105,20 +106,20 @@ class SpatialDisaggregator:
         groupby_type = ds_bc.time.dt.dayofyear
         gb = da.groupby(groupby_type)
 
-        if var == 'temperature':
+        if var == "temperature":
             return gb - climo
-        elif var == 'precipitation':
+        elif var == "precipitation":
             return gb / climo
 
     def _apply_scaling_factor(self, scf, climo, var_name, var):
-        '''
+        """
         apply scaling factor
-        '''
+        """
         groupby_type = scf.time.dt.dayofyear
         da = scf[var_name]
         sff_daily = da.groupby(groupby_type)
 
-        if var == 'temperature':
+        if var == "temperature":
             return sff_daily + climo
-        elif var == 'precipitation':
+        elif var == "precipitation":
             return sff_daily * climo
