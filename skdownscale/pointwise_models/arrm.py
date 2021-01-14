@@ -2,7 +2,8 @@ import numpy as np
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 
-from .utils import check_max_features, plotting_positions
+from .quantile import plotting_positions
+from .utils import check_max_features, default_none_kwargs
 
 try:
     import pwlf
@@ -133,11 +134,10 @@ class PiecewiseLinearRegression(RegressorMixin, BaseEstimator):
         X, y = check_X_y(X, y, y_numeric=True)
         X = check_max_features(X)
 
-        if self.pwlf_kwargs is None:
-            pwlf_kws = {}
-        else:
-            pwlf_kws = self.pwlf_kwargs
+        pwlf_kws = default_none_kwargs(self.pwlf_kwargs)
+
         self.model_ = pwlf.PiecewiseLinFit(X[:, 0], y, **pwlf_kws)
+
         if self.fit_option == 'auto':
             self.fit_breaks_ = self.model_.fit(self.n_segments, **kwargs)
         elif self.fit_option == 'arrm':

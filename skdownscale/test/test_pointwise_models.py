@@ -8,12 +8,13 @@ from skdownscale.pointwise_models import (
     AnalogRegression,
     BcsdPrecipitation,
     BcsdTemperature,
+    LinearTrendTransformer,
     PaddedDOYGrouper,
     PureAnalog,
+    QuantileMapper,
     QuantileMappingReressor,
     ZScoreRegressor,
 )
-from skdownscale.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
 
 
 @parametrize_with_checks(

@@ -1,23 +1,147 @@
+import collections
+
 import numpy as np
-from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.base import BaseEstimator, RegressorMixin, TransformerMixin
 from sklearn.linear_model import LinearRegression
-from sklearn.utils import check_array, check_X_y
+from sklearn.preprocessing import QuantileTransformer, quantile_transform
+from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
-from .utils import Cdf, LinearTrendTransformer, check_max_features, plotting_positions
+from .trend import LinearTrendTransformer
+from .utils import check_max_features, default_none_kwargs
 
 SYNTHETIC_MIN = -1e20
 SYNTHETIC_MAX = 1e20
+
+Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
+
+
+def plotting_positions(n, alpha=0.4, beta=0.4):
+    '''Returns a monotonic array of plotting positions.
+
+    Parameters
+    ----------
+    n : int
+        Length of plotting positions to return.
+    alpha, beta : float
+        Plotting positions parameter. Default is 0.4.
+
+    Returns
+    -------
+    positions : ndarray
+        Quantile mapped data with shape from `input_data` and probability
+        distribution from `data_to_match`.
+
+    See Also
+    --------
+    scipy.stats.mstats.plotting_positions
+    '''
+    return (np.arange(1, n + 1) - alpha) / (n + 1.0 - alpha - beta)
+
+
+class QuantileMapper(TransformerMixin, BaseEstimator):
+    """Transform features using quantile mapping.
+
+    Parameters
+    ----------
+    detrend : boolean, optional
+        If True, detrend the data before quantile mapping and add the trend
+        back after transforming. Default is False.
+    lt_kwargs : dict, optional
+        Dictionary of keyword arguments to pass to the LinearTrendTransformer
+    qm_kwargs : dict, optional
+        Dictionary of keyword arguments to pass to the QuantileMapper
+
+    Attributes
+    ----------
+    x_cdf_fit_ : QuantileTransformer
+        QuantileTranform for fit(X)
+    """
+
+    def __init__(self, detrend=False, lt_kwargs=None, qt_kwargs=None):
+
+        self.detrend = detrend
+        self.lt_kwargs = lt_kwargs
+        self.qt_kwargs = qt_kwargs
+
+    def fit(self, X, y=None):
+        """Fit the quantile mapping model.
+
+        Parameters
+        ----------
+        X : array-like, shape  [n_samples, n_features]
+            Training data.
+        """
+        # TO-DO: fix validate data fctn
+        X = self._validate_data(X)
+
+        qt_kws = default_none_kwargs(self.qt_kwargs, copy=True)
+
+        if 'n_quantiles' not in qt_kws:
+            qt_kws['n_quantiles'] = len(X)
+
+        # maybe detrend the input datasets
+        if self.detrend:
+            lt_kwargs = default_none_kwargs(self.lt_kwargs)
+            x_to_cdf = LinearTrendTransformer(**lt_kwargs).fit_transform(X)
+        else:
+            x_to_cdf = X
+
+        # calculate the cdfs for X
+        # TODO: replace this transformer with something that uses robust
+        # empirical cdf plotting positions
+        qt = QuantileTransformer(**qt_kws)
+
+        self.x_cdf_fit_ = qt.fit(x_to_cdf)
+
+        return self
+
+    def transform(self, X):
+        """Perform the quantile mapping.
+
+        Parameters
+        ----------
+        X : array_like, shape [n_samples, n_features]
+            Samples.
+        """
+        # validate input data
+        check_is_fitted(self)
+        # TO-DO: fix validate_data fctn
+        X = self._validate_data(X)
+
+        # maybe detrend the datasets
+        if self.detrend:
+            lt_kwargs = default_none_kwargs(self.lt_kwargs)
+            x_trend = LinearTrendTransformer(**lt_kwargs).fit(X)
+            x_to_cdf = x_trend.transform(X)
+        else:
+            x_to_cdf = X
+
+        # do the final mapping
+        qt_kws = default_none_kwargs(self.qt_kwargs, copy=True)
+        if 'n_quantiles' not in qt_kws:
+            qt_kws['n_quantiles'] = len(X)
+
+        x_quantiles = quantile_transform(x_to_cdf, copy=True, **qt_kws)
+        x_qmapped = self.x_cdf_fit_.inverse_transform(x_quantiles)
+
+        # add the trend back
+        if self.detrend:
+            x_qmapped = x_trend.inverse_transform(x_qmapped)
+
+        return x_qmapped
+
+    def _more_tags(self):
+        return {'_xfail_checks': {'check_methods_subset_invariance': 'because'}}
 
 
 class QuantileMappingReressor(RegressorMixin, BaseEstimator):
 
     _fit_attributes = ['_X_cdf', '_y_cdf']
 
-    def __init__(self, extrapolate=None, n_endpoints=10, cdf_kwargs={}):
+    def __init__(self, extrapolate=None, n_endpoints=10):
         self.extrapolate = extrapolate
         self.n_endpoints = n_endpoints
-        self.cdf_kwargs = cdf_kwargs
 
         if self.n_endpoints < 2:
             raise ValueError('Invalid number of n_endpoints, must be >= 2')
@@ -202,6 +326,7 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
                 'check_regressors_no_decision_function': 'QuantileMappingReressor only suppers 1 feature',
                 'check_supervised_y_2d': 'QuantileMappingReressor only suppers 1 feature',
                 'check_regressors_int': 'QuantileMappingReressor only suppers 1 feature',
+                'check_methods_sample_order_invariance': 'QuantileMappingReressor only suppers 1 feature',
             },
         }
 
