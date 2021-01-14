@@ -122,6 +122,7 @@ class PiecewiseLinearRegression(RegressorMixin, BaseEstimator):
 
         if pwlf is None:
             raise ImportError('pwlf is not installed')
+
         self.n_segments = n_segments
         self.fit_option = fit_option
         self.pwlf_kwargs = pwlf_kwargs
