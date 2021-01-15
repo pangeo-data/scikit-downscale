@@ -6,7 +6,8 @@ from sklearn.utils.validation import check_is_fitted
 
 from .base import TimeSynchronousDownscaler
 from .groupers import DAY_GROUPER, MONTH_GROUPER, PaddedDOYGrouper
-from .utils import QuantileMapper, ensure_samples_features
+from .quantile import QuantileMapper
+from .utils import default_none_kwargs, ensure_samples_features
 
 
 class BcsdBase(TimeSynchronousDownscaler):
@@ -21,7 +22,7 @@ class BcsdBase(TimeSynchronousDownscaler):
         climate_trend_grouper=DAY_GROUPER,
         climate_trend=MONTH_GROUPER,
         return_anoms=True,
-        qm_kwargs={},
+        qm_kwargs=None,
     ):
 
         self.time_grouper = time_grouper
@@ -61,8 +62,9 @@ class BcsdBase(TimeSynchronousDownscaler):
         Note that we store these mappers for later
         """
         self.quantile_mappers_ = {}
+        qm_kwargs = default_none_kwargs(self.qm_kwargs)
         for key, group in groups:
-            self.quantile_mappers_[key] = QuantileMapper(**self.qm_kwargs).fit(group)
+            self.quantile_mappers_[key] = QuantileMapper(**qm_kwargs).fit(group)
 
     def _qm_transform_by_group(self, groups):
         """helper function to apply quantile mapping by group
@@ -98,7 +100,7 @@ class BcsdPrecipitation(BcsdBase):
     time_grouper : str or pd.Grouper, optional
         Pandas time frequency str or Grouper object. Specifies how to group
         time periods. Default is 'M' (e.g. Monthly).
-    **qm_kwargs
+    qm_kwargs : dict
         Keyword arguments to pass to QuantileMapper.
 
     Attributes
@@ -202,6 +204,7 @@ class BcsdPrecipitation(BcsdBase):
                 'check_dont_overwrite_parameters': 'BCSD only suppers 1 feature',
                 'check_fit_idempotent': 'BCSD only suppers 1 feature',
                 'check_n_features_in': 'BCSD only suppers 1 feature',
+                'check_methods_sample_order_invariance': 'temporal order matters',
             },
         }
 
@@ -314,5 +317,6 @@ class BcsdTemperature(BcsdBase):
                 'check_dont_overwrite_parameters': 'BCSD only suppers 1 feature',
                 'check_fit_idempotent': 'BCSD only suppers 1 feature',
                 'check_n_features_in': 'BCSD only suppers 1 feature',
+                'check_methods_sample_order_invariance': 'temporal order matters',
             },
         }

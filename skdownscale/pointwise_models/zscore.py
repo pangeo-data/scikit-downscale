@@ -124,6 +124,7 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
                 'check_dont_overwrite_parameters': 'Zscore only suppers 1 feature',
                 'check_fit_idempotent': 'Zscore only suppers 1 feature',
                 'check_n_features_in': 'Zscore only suppers 1 feature',
+                'check_methods_sample_order_invariance': 'temporal order matters',
             },
         }
 

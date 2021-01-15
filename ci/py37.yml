@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python=3.7
   - dask
+  - pwlf
   - pytest
   - scikit-learn
   - xarray>=0.16

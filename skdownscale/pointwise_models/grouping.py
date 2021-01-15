@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from .utils import default_none_kwargs
+
 
 class GroupedRegressor:
     """ Grouped Regressor
@@ -28,9 +30,9 @@ class GroupedRegressor:
         estimator,
         fit_grouper,
         predict_grouper,
-        estimator_kwargs={},
-        fit_grouper_kwargs={},
-        predict_grouper_kwargs={},
+        estimator_kwargs=None,
+        fit_grouper_kwargs=None,
+        predict_grouper_kwargs=None,
     ):
 
         self.estimator = estimator
@@ -58,11 +60,13 @@ class GroupedRegressor:
         -------
         self : returns an instance of self.
         """
-        x_groups = self.fit_grouper(X.index, **self.fit_grouper_kwargs).groups
-        y_groups = self.fit_grouper(y.index, **self.fit_grouper_kwargs).groups
+        fit_grouper_kwargs = default_none_kwargs(self.fit_grouper_kwargs)
+        x_groups = self.fit_grouper(X.index, **fit_grouper_kwargs).groups
+        y_groups = self.fit_grouper(y.index, **fit_grouper_kwargs).groups
 
         self.targets_ = list(y.keys())
-        self.estimators_ = {key: self.estimator(**self.estimator_kwargs) for key in x_groups}
+        estimator_kwargs = default_none_kwargs(self.estimator_kwargs)
+        self.estimators_ = {key: self.estimator(**estimator_kwargs) for key in x_groups}
 
         for x_key, x_inds in x_groups.items():
             y_inds = y_groups[x_key]
@@ -85,7 +89,8 @@ class GroupedRegressor:
             The predicted values.
 
         """
-        grouper = X.groupby(self.predict_grouper, **self.predict_grouper_kwargs)
+        predict_grouper_kwargs = default_none_kwargs(self.predict_grouper_kwargs)
+        grouper = X.groupby(self.predict_grouper, **predict_grouper_kwargs)
 
         result = np.empty((len(X), len(self.targets_)))
         for key, inds in grouper.indices.items():
