@@ -58,6 +58,8 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
         QuantileTranform for fit(X)
     """
 
+    _fit_attributes = ['x_cdf_fit_']
+
     def __init__(self, detrend=False, lt_kwargs=None, qt_kwargs=None):
 
         self.detrend = detrend
@@ -103,6 +105,11 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
         ----------
         X : array_like, shape [n_samples, n_features]
             Samples.
+
+        Returns
+        -------
+        y : ndarray of shape (n_samples, )
+            Transformed data
         """
         # validate input data
         check_is_fitted(self)
@@ -136,6 +143,22 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
 
 
 class QuantileMappingReressor(RegressorMixin, BaseEstimator):
+    """Transform features using quantile mapping.
+
+    Parameters
+    ----------
+    extrapolate : str, optional
+        How to extend the cdfs at the tails. Valid options include {`'min'`, `'max'`, `'both'`, `'1to1'`, `None`}
+    n_endpoints : int
+        Number of endpoints to include when extrapolating the tails of the cdf
+
+    Attributes
+    ----------
+    _X_cdf : Cdf
+        NamedTuple representing the fit's X cdf
+    _y_cdf : Cdf
+        NamedTuple representing the fit's y cdf
+    """
 
     _fit_attributes = ['_X_cdf', '_y_cdf']
 
@@ -147,6 +170,17 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
             raise ValueError('Invalid number of n_endpoints, must be >= 2')
 
     def fit(self, X, y, **kwargs):
+        """Fit the quantile mapping regression model.
+
+        Parameters
+        ----------
+        X : array-like, shape  [n_samples, 1]
+            Training data.
+
+        Returns
+        -------
+        self : object
+        """
         X = check_array(
             X, dtype='numeric', ensure_min_samples=2 * self.n_endpoints + 1, ensure_2d=True
         )
@@ -162,7 +196,18 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
         return self
 
     def predict(self, X, **kwargs):
+        """Predict regression for target X.
 
+        Parameters
+        ----------
+        X : array_like, shape [n_samples, 1]
+            Samples.
+
+        Returns
+        -------
+        y : ndarray of shape (n_samples, )
+            Predicted data.
+        """
         check_is_fitted(self, self._fit_attributes)
         X = check_array(X, ensure_2d=True)
 
@@ -244,6 +289,26 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
     def _calc_extrapolated_cdf(
         self, data, sort=True, extrapolate=None, pp_min=SYNTHETIC_MIN, pp_max=SYNTHETIC_MAX
     ):
+        """ Calculate a new extrapolated cdf
+
+        The goal of this function is to create a CDF with bounds outside the [0, 1] range.
+        This allows for quantile mapping beyond observed data points.
+
+        Parameters
+        ----------
+        data : array_like, shape [n_samples, 1]
+            Input data (can be unsorted)
+        sort : bool
+            If true, sort the data before building the CDF
+        extrapolate : str or None
+            How to extend the cdfs at the tails. Valid options include {`'min'`, `'max'`, `'both'`, `'1to1'`, `None`}
+        pp_min, pp_max : float
+            Plotting position min/max values.
+
+        Returns
+        -------
+        cdf : Cdf (NamedTuple)
+        """
 
         n = len(data)
 
@@ -332,10 +397,29 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
 
 
 class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
+    """Experimental meta estimator for performing trend-aware quantile mapping
+
+    Parameters
+    ----------
+    qm_estimator : object, default=None
+        Regressor object such as ``QuantileMappingReressor``.
+    """
+
     def __init__(self, qm_estimator=None):
         self.qm_estimator = qm_estimator
 
     def fit(self, X, y):
+        """Fit the model.
+
+        Parameters
+        ----------
+        X : array-like, shape  [n_samples, n_features]
+            Training data.
+
+        Returns
+        -------
+        self : object
+        """
         self._X_mean_fit = X.mean()
         self._y_mean_fit = y.mean()
 
@@ -348,16 +432,36 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         self.qm_estimator.fit(x_detrend, y_detrend)
 
     def predict(self, X):
+        """Predict regression for target X.
 
+        Parameters
+        ----------
+        X : array_like, shape [n_samples, n_features]
+            Samples.
+
+        Returns
+        -------
+        y : ndarray of shape (n_samples, )
+            Predicted data.
+        """
         X_trend = LinearTrendTransformer()
         x_detrend = X_trend.fit_transform(X)
 
         y_hat = self.qm_estimator.predict(x_detrend).reshape(-1, 1)
 
-        # add the trend back
+        # add the mean and trend back
+
         # slope from X (predict)
+        slope = X_trend.lr_model_.coef_[:, 0]
+
         # delta: X (predict) - X (fit) + y
-        trendline = X_trend.lr_model_.coef_[0, 0] * np.arange(len(y_hat)).reshape(-1, 1)
-        y_hat += trendline - trendline.mean() + self._y_mean_fit + (X.mean() - self._X_mean_fit)
+        delta = (X.mean() - self._X_mean_fit) + self._y_mean_fit
+
+        # calculat the trendline
+        trendline = slope * np.arange(len(y_hat)).reshape(-1, 1)
+        trendline -= trendline.mean()  # center at 0
+
+        # apply the trend and delta
+        y_hat += trendline + delta
 
         return y_hat

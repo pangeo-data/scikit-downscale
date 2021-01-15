@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Scikit-downscale: toolkit for statistical downscaling
-===============================
+=====================================================
 
 Scikit-downscale is a toolkit for statistical downscaling using Scikit-Learn_.
 It is meant to support the development of new and existing downscaling
