@@ -8,22 +8,25 @@ from skdownscale.pointwise_models import (
     AnalogRegression,
     BcsdPrecipitation,
     BcsdTemperature,
+    LinearTrendTransformer,
     PaddedDOYGrouper,
     PureAnalog,
+    QuantileMapper,
+    QuantileMappingReressor,
     ZScoreRegressor,
 )
-from skdownscale.pointwise_models.utils import LinearTrendTransformer, QuantileMapper
 
 
 @parametrize_with_checks(
     [
-        LinearTrendTransformer(),
-        QuantileMapper(),
+        # Regressors
         AnalogRegression(),
         BcsdPrecipitation(),
         BcsdTemperature(),
         PureAnalog(),
         ZScoreRegressor(),
+        QuantileMappingReressor(n_endpoints=2),
+        # transformers
         LinearTrendTransformer(),
         QuantileMapper(),
     ]
@@ -88,7 +91,8 @@ def test_quantile_mapper_detrend():
 
 
 @pytest.mark.parametrize(
-    'model_cls', [BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor]
+    'model_cls',
+    [BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor, QuantileMappingReressor],
 )
 def test_linear_model(model_cls):
 

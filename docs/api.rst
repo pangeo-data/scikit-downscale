@@ -29,6 +29,9 @@ Linear Models
    BcsdTemperature
    PureAnalog
    AnalogRegression
+   PiecewiseLinearRegression
+   QuantileMappingReressor
+   TrendAwareQuantileMappingRegressor
 
 Transformers
 ~~~~~~~~~~~~
@@ -39,8 +42,16 @@ Transformers
    LinearTrendTransformer
    QuantileMapper
 
+Grouping
+~~~~~~~~
+.. autosummary::
+   :toctree: generated/
+
+   GroupedRegressor
+
+
 Groupers
-~~~~~~~~~~~~
+~~~~~~~~
 
 .. autosummary::
    :toctree: generated/

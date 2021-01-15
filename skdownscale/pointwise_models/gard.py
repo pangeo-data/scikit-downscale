@@ -7,6 +7,16 @@ from sklearn.neighbors import KDTree
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
+from .utils import default_none_kwargs
+
+
+def select_analogs(analogs, inds):
+    # todo: this is possible with fancy indexing
+    out = np.empty(len(analogs))
+    for i, ind in enumerate(inds):
+        out[i] = analogs[i, ind]
+    return out
+
 
 class AnalogBase(RegressorMixin, BaseEstimator):
     _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_']
@@ -34,7 +44,8 @@ class AnalogBase(RegressorMixin, BaseEstimator):
             warnings.warn('length of X is less than n_analogs, setting n_analogs = len(X)')
             self.k_ = len(X)
 
-        self.kdtree_ = KDTree(X, **self.kdtree_kwargs)
+        kdtree_kwargs = default_none_kwargs(self.kdtree_kwargs)
+        self.kdtree_ = KDTree(X, **kdtree_kwargs)
 
         self.X_ = X
         self.y_ = y
@@ -63,7 +74,7 @@ class AnalogRegression(AnalogBase):
         KDTree object
     """
 
-    def __init__(self, n_analogs=200, kdtree_kwargs={}, query_kwargs={}, lr_kwargs={}):
+    def __init__(self, n_analogs=200, kdtree_kwargs=None, query_kwargs=None, lr_kwargs=None):
 
         self.n_analogs = n_analogs
         self.kdtree_kwargs = kdtree_kwargs
@@ -89,7 +100,8 @@ class AnalogRegression(AnalogBase):
 
         predicted = np.empty(len(X))
 
-        lr_model = LinearRegression(**self.lr_kwargs)
+        lr_kwargs = default_none_kwargs(self.lr_kwargs)
+        lr_model = LinearRegression(**lr_kwargs)
 
         # TODO - extract from lr_model's below.
 
@@ -102,9 +114,8 @@ class AnalogRegression(AnalogBase):
     def _predict_one_step(self, lr_model, X):
 
         # get analogs
-        inds = self.kdtree_.query(
-            X, k=self.k_, return_distance=False, **self.query_kwargs
-        ).squeeze()
+        query_kwargs = default_none_kwargs(self.query_kwargs)
+        inds = self.kdtree_.query(X, k=self.k_, return_distance=False, **query_kwargs).squeeze()
 
         # extract data to train linear regression model
         x = np.asarray(self.kdtree_.data)[inds]
@@ -143,8 +154,8 @@ class PureAnalog(AnalogBase):
         kind='best_analog',
         thresh=None,
         stats=True,
-        kdtree_kwargs={},
-        query_kwargs={},
+        kdtree_kwargs=None,
+        query_kwargs=None,
     ):
         self.n_analogs = n_analogs
         self.kind = kind
@@ -176,7 +187,9 @@ class PureAnalog(AnalogBase):
         else:
             k = self.k_
             kind = self.kind
-        dist, inds = self.kdtree_.query(X, k=k, **self.query_kwargs)
+
+        query_kwargs = default_none_kwargs(self.query_kwargs)
+        dist, inds = self.kdtree_.query(X, k=k, **query_kwargs)
 
         analogs = np.take(self.y_, inds, axis=0)
 
@@ -230,11 +243,3 @@ class PureAnalog(AnalogBase):
                 self.stats_['pop'] = np.where(analog_mask, 1, 0).mean(axis=1)
 
         return predicted
-
-
-def select_analogs(analogs, inds):
-    # todo: this is possible with fancy indexing
-    out = np.empty(len(analogs))
-    for i, ind in enumerate(inds):
-        out[i] = analogs[i, ind]
-    return out
