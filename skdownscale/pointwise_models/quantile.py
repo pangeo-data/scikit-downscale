@@ -241,7 +241,7 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
         y_hat = np.full_like(X, np.nan)
         y_hat[sort_inds] = np.interp(X_cdf.pp, self._y_cdf.pp, self._y_cdf.vals)[1:-1]
 
-        # If extrapolate is 1to1, apply the offset between ref and like to the
+        # If extrapolate is 1to1, apply the offset between X and y to the
         # tails of y_hat
         if self.extrapolate == '1to1':
             X_fit_len = len(self._X_cdf.vals)
