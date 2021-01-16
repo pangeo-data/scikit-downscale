@@ -92,7 +92,7 @@ def test_quantile_mapper_detrend():
 
 @pytest.mark.parametrize(
     'model_cls',
-    [BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor, QuantileMappingReressor],
+    [BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor, QuantileMappingReressor,],
 )
 def test_linear_model(model_cls):
 

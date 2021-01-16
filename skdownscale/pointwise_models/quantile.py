@@ -17,7 +17,7 @@ Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
 
 
 def plotting_positions(n, alpha=0.4, beta=0.4):
-    '''Returns a monotonic array of plotting positions.
+    """Returns a monotonic array of plotting positions.
 
     Parameters
     ----------
@@ -35,7 +35,7 @@ def plotting_positions(n, alpha=0.4, beta=0.4):
     See Also
     --------
     scipy.stats.mstats.plotting_positions
-    '''
+    """
     return (np.arange(1, n + 1) - alpha) / (n + 1.0 - alpha - beta)
 
 
@@ -182,10 +182,10 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
         self : object
         """
         X = check_array(
-            X, dtype='numeric', ensure_min_samples=2 * self.n_endpoints + 1, ensure_2d=True
+            X, dtype='numeric', ensure_min_samples=2 * self.n_endpoints + 1, ensure_2d=True,
         )
         y = check_array(
-            y, dtype='numeric', ensure_min_samples=2 * self.n_endpoints + 1, ensure_2d=False
+            y, dtype='numeric', ensure_min_samples=2 * self.n_endpoints + 1, ensure_2d=False,
         )
 
         X = check_max_features(X, n=1)
@@ -287,9 +287,9 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
         return y_hat
 
     def _calc_extrapolated_cdf(
-        self, data, sort=True, extrapolate=None, pp_min=SYNTHETIC_MIN, pp_max=SYNTHETIC_MAX
+        self, data, sort=True, extrapolate=None, pp_min=SYNTHETIC_MIN, pp_max=SYNTHETIC_MAX,
     ):
-        """ Calculate a new extrapolated cdf
+        """Calculate a new extrapolated cdf
 
         The goal of this function is to create a CDF with bounds outside the [0, 1] range.
         This allows for quantile mapping beyond observed data points.
