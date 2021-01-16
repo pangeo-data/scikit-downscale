@@ -70,4 +70,3 @@ Xarray Wrappers
    :toctree: generated/
 
    SpatialDisaggregator
-

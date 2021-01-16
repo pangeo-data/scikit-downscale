@@ -17,20 +17,19 @@ class SpatialDisaggregator:
           temperature and other option is precipitation.
     """
 
-    def __init__(self, var="temperature"):
+    def __init__(self, var='temperature'):
         self._var = var
 
-        if var == "temperature":
+        if var == 'temperature':
             pass
-        elif var == "precipitation":
+        elif var == 'precipitation':
             pass
         else:
             raise NotImplementedError(
-                "functionality for spatial disaggregation"
-                " of %s has not yet been added" % var
+                'functionality for spatial disaggregation' ' of %s has not yet been added' % var
             )
 
-    def fit(self, ds_bc, climo_coarse, var_name, lat_name="lat", lon_name="lon"):
+    def fit(self, ds_bc, climo_coarse, var_name, lat_name='lat', lon_name='lon'):
         """
         Fit the scaling factor used in spatial disaggregation
 
@@ -54,15 +53,15 @@ class SpatialDisaggregator:
 
         # check that climo has been regridded to model res
         if not np.array_equal(ds_bc[lat_name], climo_coarse[lat_name]):
-            raise ValueError("climo latitude dimension does not match model res")
+            raise ValueError('climo latitude dimension does not match model res')
         if not np.array_equal(ds_bc[lon_name], climo_coarse[lon_name]):
-            raise ValueError("climo longitude dimension does not match model res")
+            raise ValueError('climo longitude dimension does not match model res')
 
         scf = self._calculate_scaling_factor(ds_bc, climo_coarse, var_name, self._var)
 
         return scf
 
-    def predict(self, scf, climo_fine, var_name, lat_name="lat", lon_name="lon"):
+    def predict(self, scf, climo_fine, var_name, lat_name='lat', lon_name='lon'):
         """
         Predict (apply) the scaling factor to the observed climatology.
 
@@ -86,9 +85,9 @@ class SpatialDisaggregator:
 
         # check that scale factor has been regridded to obs res
         if not np.array_equal(scf[lat_name], climo_fine[lat_name]):
-            raise ValueError("scale factor latitude dimension does not match obs res")
+            raise ValueError('scale factor latitude dimension does not match obs res')
         if not np.array_equal(scf[lon_name], climo_fine[lon_name]):
-            raise ValueError("scale factor longitude dimension does not match obs res")
+            raise ValueError('scale factor longitude dimension does not match obs res')
 
         downscaled = self._apply_scaling_factor(scf, climo_fine, var_name, self._var)
 
@@ -106,9 +105,9 @@ class SpatialDisaggregator:
         groupby_type = ds_bc.time.dt.dayofyear
         gb = da.groupby(groupby_type)
 
-        if var == "temperature":
+        if var == 'temperature':
             return gb - climo
-        elif var == "precipitation":
+        elif var == 'precipitation':
             return gb / climo
 
     def _apply_scaling_factor(self, scf, climo, var_name, var):
@@ -119,7 +118,7 @@ class SpatialDisaggregator:
         da = scf[var_name]
         sff_daily = da.groupby(groupby_type)
 
-        if var == "temperature":
+        if var == 'temperature':
             return sff_daily + climo
-        elif var == "precipitation":
+        elif var == 'precipitation':
             return sff_daily * climo
