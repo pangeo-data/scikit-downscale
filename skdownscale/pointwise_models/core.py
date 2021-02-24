@@ -29,7 +29,7 @@ def xenumerate(arr):
 
 
 def _make_mask(da, reduce_dims):
-    _reduce = {d: 0 for d in reduce_dims}
+    _reduce = {d: 0 for d in reduce_dims if d in da.dims}
     return da.isel(**_reduce, drop=True).notnull()
 
 
@@ -60,6 +60,10 @@ def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **
     reduce_dims = [along_dim, feature_dim]
     mask = _make_mask(X, reduce_dims)
 
+    # NEEDS UNIT TEST!
+    if y is not None:
+        mask *= _make_mask(y, reduce_dims)
+
     # create the empty output array
     models = xr.DataArray(np.empty(mask.shape, dtype=np.object), coords=mask.coords, dims=mask.dims)
 
@@ -88,12 +92,14 @@ def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM,
         ydims.pop(X.get_axis_num(feature_dim))
         yshape.pop(X.get_axis_num(feature_dim))
 
-    y = xr.DataArray(np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims)
+    y = xr.DataArray(np.full(yshape, np.nan, dtype=X.dtype), coords=ycoords, dims=ydims)
 
-    for index, model in xenumerate(models):
-        xdf = X[index].pipe(_da_to_df, feature_dim)
-        ydf = model.item().predict(xdf, **kwargs)
-        y[index] = ydf.squeeze()
+    for index, m in xenumerate(models):
+        model = m.item()
+        if model is not None:
+            xdf = X[index].pipe(_da_to_df, feature_dim)
+            ydf = model.predict(xdf, **kwargs)
+            y[index] = ydf.squeeze()
 
     return y
 

@@ -104,7 +104,8 @@ def test_linear_model(model_cls):
     y = X + 2
 
     model = model_cls()
-    model.fit(X, y)
+    fit_model = model.fit(X, y)
+    assert isinstance(fit_model, model_cls)
     y_hat = model.predict(X)
     assert len(y_hat) == len(X)
 

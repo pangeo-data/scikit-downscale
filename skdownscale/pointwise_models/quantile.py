@@ -126,7 +126,7 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
 
         # do the final mapping
         qt_kws = default_none_kwargs(self.qt_kwargs, copy=True)
-        if 'n_quantiles' not in qt_kws:
+        if 'n_quantiles' not in qt_zkws:
             qt_kws['n_quantiles'] = len(X)
 
         x_quantiles = quantile_transform(x_to_cdf, copy=True, **qt_kws)
@@ -430,6 +430,8 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         x_detrend = X_trend.fit_transform(X)
 
         self.qm_estimator.fit(x_detrend, y_detrend)
+        # NEEDS UNIT TEST! All fit methods should return self
+        return self
 
     def predict(self, X):
         """Predict regression for target X.
@@ -462,6 +464,7 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         trendline -= trendline.mean()  # center at 0
 
         # apply the trend and delta
-        y_hat += trendline + delta
+        # NEEDS UNIT TEST! (delta.item())
+        y_hat += trendline + delta.item()
 
         return y_hat
