@@ -12,7 +12,7 @@ except:
 
 
 def arrm_breakpoints(X, y, window_width, max_breakpoints):
-    '''Calculate breakpoints in x and y
+    """Calculate breakpoints in x and y
 
     Parameters
     ----------
@@ -26,7 +26,7 @@ def arrm_breakpoints(X, y, window_width, max_breakpoints):
     Returns
     -------
     breakpoints : ndarray
-    '''
+    """
     min_width = 10
 
     npoints = len(X)
@@ -97,7 +97,7 @@ def arrm_breakpoints(X, y, window_width, max_breakpoints):
 
 
 class PiecewiseLinearRegression(RegressorMixin, BaseEstimator):
-    """ Piecewise Linear Regression
+    """Piecewise Linear Regression
 
     Parameters
     ----------

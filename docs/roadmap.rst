@@ -59,6 +59,8 @@ Components
 1. `pointwise_models`: a collection of linear models that are intended to be
    applied point-by-point. These may be sklearn Pipelines or custom sklearn-like
    models (e.g. BCSDTemperature).
+2. `spatial_models`: a collection of spatial models where the models have spatial
+   dependence.
 2. `global_models`: (not implemented) concept space for deep learning-based
    models.
 3. `metrics`: (not implemented) concept space for a benchmarking suite
@@ -81,6 +83,50 @@ Pointwise models
 6. ?
 
 Other methods, like LOCA, MACA, BCCA, etc, should also be possible.
+
+Spatial models
+~~~~~~~~~~~~~~~~
+
+This category of methods includes models that have spatial dependence.
+Thus far only the BCSD method (see Thrasher et al., 2012) for spatial disaggregation has
+been implemented (for temperature and precipitation). Because the method involves regridding,
+which depends on the xESMF package, a recipe is provided herein versus a full implementation
+in scikit-downscale.
+
+.. code-block:: Python
+
+    from skdownscale.spatial_models import SpatialDisaggregator, apply_weights
+    import xesmf as xe
+    import xarray as xr
+
+    # da_climo_fine: xarray.DataArray (daily multi-decade climatology)
+    # da_obs : xarray.DataArray (daily obs data)
+    # da_model_train: xarray.DataArray (daily training data)
+    # ds_sd: xarray.Dataset (daily spatially disaggregated data)
+
+    # regrid climo to model resolution
+    obs_to_mod_weights = "filename"
+    regridder_obs_to_mod = xe.Regridder(da_obs.isel(time=0), da_model_train.isel(time=0),
+                                        'bilinear', filename=obs_to_mod_weights, reuse_weights=True)
+    climo_regrid = xr.map_blocks(apply_weights, regridder_obs_to_mod,
+                                          args=[da_climo_fine])
+    climo_coarse = climo_regrid.compute()
+
+    # fit the scaling factor model
+    sfc = SpatialDisaggregator.fit(da_model_train, climo_coarse, var_name='tasmax')
+
+    # regrid scale factor
+    mod_to_obs_weights = "filename"
+    regridder_mod_to_obs = xe.Regridder(da_model_train.isel(time=0),
+                                        da_obs.isel(time=0), 'bilinear',
+                                        filename=mod_to_obs_weights, reuse_weights=True)
+    sff_regrid = xr.map_blocks(apply_weights, regridder_mod_to_obs, args=[sfc])
+    sff = sff_regrid.compute()
+
+    # predict using scale factor
+    ds_varname = 'scale_factor_fine'
+    sff_ds = sff.to_dataset(name=ds_varname)
+    ds_sd = SpatialDisaggregator.predict(sff_ds, da_climo_fine, var_name=ds_varname)
 
 Global models
 ~~~~~~~~~~~~~
@@ -110,7 +156,7 @@ Dependencies
 ------------
 
 - Core: Xarray, Pandas, Dask, Scikit-learn, Numpy, Scipy
-- Optional: Statsmodels, Keras, PyTorch, Tensorflow, etc.
+- Optional: Statsmodels, Keras, PyTorch, Tensorflow, xESMF, etc.
 
 Related projects
 ----------------

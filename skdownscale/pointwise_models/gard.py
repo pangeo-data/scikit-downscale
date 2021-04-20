@@ -22,7 +22,7 @@ class AnalogBase(RegressorMixin, BaseEstimator):
     _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_']
 
     def fit(self, X, y):
-        """ Fit Analog model using a KDTree
+        """Fit Analog model using a KDTree
 
         Parameters
         ----------
@@ -54,7 +54,7 @@ class AnalogBase(RegressorMixin, BaseEstimator):
 
 
 class AnalogRegression(AnalogBase):
-    """ AnalogRegression
+    """AnalogRegression
 
     Parameters
     ----------
@@ -82,7 +82,7 @@ class AnalogRegression(AnalogBase):
         self.lr_kwargs = lr_kwargs
 
     def predict(self, X):
-        """ Predict using the AnalogRegression model
+        """Predict using the AnalogRegression model
 
         Parameters
         ----------
@@ -130,7 +130,7 @@ class AnalogRegression(AnalogBase):
 
 
 class PureAnalog(AnalogBase):
-    """ PureAnalog
+    """PureAnalog
 
     Attributes
     ----------

@@ -7,7 +7,7 @@ from .base import TimeSynchronousDownscaler
 
 
 class ZScoreRegressor(TimeSynchronousDownscaler):
-    """ Z Score Regressor bias correction model wrapper
+    """Z Score Regressor bias correction model wrapper
 
     Apply a scikit-learn model (e.g. Pipeline) point-by-point. The pipeline
     must implement the fit and predict methods.
@@ -28,7 +28,7 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
         self.window_width = window_width
 
     def fit(self, X, y):
-        """ Fit Z-Score Model finds the shift and scale parameters
+        """Fit Z-Score Model finds the shift and scale parameters
         to inform bias correction.
 
         Parameters
@@ -65,7 +65,7 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
         return self
 
     def predict(self, X):
-        """ Predict performs the z-score bias correction
+        """Predict performs the z-score bias correction
         on the future model dataset, X.
 
         Parameters
