@@ -429,7 +429,7 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         X_trend = LinearTrendTransformer()
         x_detrend = X_trend.fit_transform(X)
 
-        self.qm_estimator.fit(x_detrend, y_detrend)
+        return self.qm_estimator.fit(x_detrend, y_detrend)
 
     def predict(self, X):
         """Predict regression for target X.
