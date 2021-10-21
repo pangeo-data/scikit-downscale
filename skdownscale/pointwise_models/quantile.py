@@ -431,6 +431,8 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
 
         return self.qm_estimator.fit(x_detrend, y_detrend)
 
+        return self
+
     def predict(self, X):
         """Predict regression for target X.
 
@@ -455,7 +457,7 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         slope = X_trend.lr_model_.coef_[:, 0]
 
         # delta: X (predict) - X (fit) + y
-        delta = (X.mean() - self._X_mean_fit) + self._y_mean_fit
+        delta = (X.mean().values - self._X_mean_fit.values) + self._y_mean_fit.values
 
         # calculat the trendline
         trendline = slope * np.arange(len(y_hat)).reshape(-1, 1)
@@ -465,3 +467,6 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         y_hat += trendline + delta
 
         return y_hat
+
+    def transform(self, X):
+        return self.predict(X)
