@@ -1,5 +1,5 @@
 from .arrm import PiecewiseLinearRegression
-from .bcsd import BcsdPrecipitation, BcsdTemperature
+from .bcsd import BcRelative, BcAbsolute
 from .core import PointWiseDownscaler
 from .gard import AnalogRegression, PureAnalog, PureRegression
 from .groupers import DAY_GROUPER, MONTH_GROUPER, PaddedDOYGrouper
