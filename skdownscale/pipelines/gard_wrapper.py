@@ -1,41 +1,42 @@
 from sklearn.pipeline import Pipeline
-from skdownscale.pointwise_models import AnalogBase, PointWiseDownscaler, TrendAwareQuantileMappingRegressor, QuantileMappingReressor
+from sklearn.linear_model import LinearRegression
+from skdownscale.pointwise_models import AnalogBase, PureRegression, PointWiseDownscaler, TrendAwareQuantileMappingRegressor, QuantileMappingReressor
+from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from skdownscale.pointwise_models.utils import default_none_kwargs
 
 
 class GardWrapper:
-    def __init__(self, model, feature_list=None, dim='time', bias_correction_model=None):
+    def __init__(
+        self, 
+        model, 
+        feature_list=None, 
+        dim='time', 
+        bias_correction_method='quantile_transform', 
+        bc_kwargs=None,
+        spatial_features=(1, 1)
+        ):
         """
         Parameters
         ----------
         model: a GARD model instance to be fitted pointwise 
         feature_list: a list of feature names to be used in predicting 
         dim: dimension to apply the model along. Default is ``time``. 
+        bias_correction_method: string of the name of bias correction model 
+        bc_kwargs: kwargs directly passed to the bias correction model
+        spatial 
         """
         self._dim = dim
-        if not isinstance(model, AnalogBase):
+        if not isinstance(model, (AnalogBase, PureRegression)):
             raise TypeError('model must be part of the GARD family of pointwise models ')
-        self._features = feature_list
+        self.features = feature_list
+        self._model = model 
 
-        # construct the pipeline to be used point wise 
-        if not bias_correction_model:
-            bias_correction_model = TrendAwareQuantileMappingRegressor(QuantileMappingReressor())
-
-        # NOTE: 
-        # alternatively we can also write a "gard_preprocess" class to do the spatial matching required for GARD, which outputs X and y that are matched in resolution 
-        # then initialize the entire model as: 
-        # gard_pipeline = Pipeline(
-        #   [gard_preprocess, 
-        #    PointwiseDownscaler(Pipeline([pointwise_bias_correct, gard]))
-        #   ])
-        # in this word, bcsd_pipeline = Pipeline([bcsd_preprocess, PointwiseDownscaler(bcsd), bcsd_postprocess])
-        # the benefit in this is that it allows us to re-use certain elements more easily: new_pipeline = Pipeline([bcsd_preprocess, bias_correct, bcsd, bcsd_postprocess])
-        # the downside is that the code in a notebook would be messier (or we put it into a prefect workflow??)
-        self._pipeline = Pipeline(
-            [
-                ('bias_correct', bias_correction_model),
-                ('gard', model)
-            ]
-        )
+        # TODO: allow different methods for each feature 
+        availalbe_methods = ['quantile_transform', 'z_score', 'quantile_map', 'detrended_quantile_map', 'none']
+        if bias_correction_method not in availalbe_methods:
+            raise NotImplementedError(f'bias correction method must be one of {availalbe_methods}')
+        self.bias_correction_method = bias_correction_method
+        self.bc_kwargs = bc_kwargs
 
 
     def fit(self, X, y, **kwargs):
@@ -62,30 +63,83 @@ class GardWrapper:
         self._validate_data(X=X, y=y)
 
         # perform preprocess that is done for the entire domain 
-        # for gard: simply match the spatial domain & limit to selected features 
-        # TODO: extend this to include using spatial features and/or transform the feature space into PCA, etc 
         self._lats = y.lat 
         self._lons = y.lon
-        resampled_X = X.sel(lat=self._lats, lon=self._lons, method='nearest')[self._features]
+        X = X.sel(lat=self._lats, lon=self._lons, method='nearest')[self.features]
+        X = X.assign_coords({'lat': self._lats, 'lon': self._lons})
 
-        # fit point wise models 
-        self._pointwise_models = PointWiseDownscaler(model=self._pipeline, dim=self._dim)
-        self._pointwise_models.fit(resampled_X, y, **kwargs)
+        #TODO: spatial features 
+        #TODO: extend this to include transforming the feature space into PCA, etc 
+
+        # point wise transformation on X based on what bias correction method is chosen 
+        bc_kws = default_none_kwargs(self.bc_kwargs, copy=True)
+
+        if self.bias_correction_method in ['quantile_map', 'detrended_quantile_map']:
+            self.X_train = X 
+        else:
+            for v in self.features:
+                if self.bias_correction_method == 'quantile_transform':
+                    # no need to remember the transformer since the quantile transformation itself serves as bias correction 
+                    if 'n_quantiles' not in bc_kws:
+                        bc_kws['n_quantiles'] = len(X[v])
+                    qm = PointWiseDownscaler(model=QuantileTransformer(**bc_kws))
+                    qm.fit(X[v])
+                    X = qm.transform(X[v])
+                elif self.bias_correction_method == 'z_score':
+                    # no need to remember the transformer since the zscoring itself serves as bias correction 
+                    sc = PointWiseDownscaler(model=StandardScaler(**bc_kws))
+                    sc.fit(X[v])
+                    X = sc.transform(X[v])
+
+        # point wise downscaling 
+        self._pointwise_models = PointWiseDownscaler(model=self._model, dim=self._dim)
+        self._pointwise_models.fit(X, y, **kwargs)
 
         return self
 
 
-    def predict(self, X):
+    def predict(self, X, **kwargs):
         self._validate_data(X=X)
 
-        resampled_X = X.sel(lat=self._lats, lon=self._lons, method='nearest')[self._features]
-        downscaled = self._pointwise_models.predict(resampled_X) 
+        # spatial process 
+        X = X.sel(lat=self._lats, lon=self._lons, method='nearest')[self.features]
+        X = X.assign_coords({'lat': self._lats, 'lon': self._lons})
+
+        # point wise transformation 
+        ref_start = kwargs.get('ref_start', X.time[0])
+        ref_stop = kwargs.get('ref_stop', X.time[-1])
+        reference_X = X.sel(time=slice(ref_start, ref_stop))
+        bc_kws = default_none_kwargs(self.bc_kwargs, copy=True)
+        for v in self.features:
+            if self.bias_correction_method == 'quantile_transform':
+                # no need to remember the CDF since the quantile transformation itself serves as bias correction 
+                if 'n_quantiles' not in bc_kws:
+                    bc_kws['n_quantiles'] = len(X[v])
+                qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kws))
+                qt.fit(reference_X[v])
+                # TODO: extrapolate at the extremes 
+                X = qt.transform(X[v])
+            elif self.bias_correction_method == 'z_score':
+                scaler = PointWiseDownscaler(model=StandardScaler(**bc_kws))
+                scaler.fit(reference_X[v])
+                X[v] = scaler.transform(X[v])
+            elif self.bias_correction_method == 'quantile_map':
+                qm = PointWiseDownscaler(model=QuantileMappingReressor(**bc_kws), dim=self._dim)
+                qm.fit(self.X_train[v], reference_X[v])
+                X[v] = qm.predict(X[v])
+            elif self.bias_correction_method == 'detrended_quantile_map':
+                qm = PointWiseDownscaler(TrendAwareQuantileMappingRegressor(QuantileMappingReressor(**bc_kws)))
+                qm.fit(self.X_train[v], reference_X[v])
+                X[v] = qm.predict(X[v])
+
+        # point wise downscaling
+        downscaled = self._pointwise_models.predict(X) 
 
         return self._postprocess(downscaled)
 
 
     def _validate_data(self, X, y=None):
-        for f in self._features:
+        for f in self.features:
             assert f in X 
 
         # TODO: 

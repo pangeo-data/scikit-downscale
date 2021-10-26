@@ -6,7 +6,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KDTree
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
-
+from sklearn.metrics import mean_squared_error
 from .utils import default_none_kwargs
 
 
@@ -74,9 +74,10 @@ class AnalogRegression(AnalogBase):
         KDTree object
     """
 
-    def __init__(self, n_analogs=200, kdtree_kwargs=None, query_kwargs=None, lr_kwargs=None):
+    def __init__(self, n_analogs=200, stats=True, kdtree_kwargs=None, query_kwargs=None, lr_kwargs=None):
 
         self.n_analogs = n_analogs
+        self.stats = stats
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
         self.lr_kwargs = lr_kwargs
@@ -99,6 +100,8 @@ class AnalogRegression(AnalogBase):
         X = check_array(X)
 
         predicted = np.empty(len(X))
+        if self.stats:
+            self.stats_['error'] = np.empty(len(X))
 
         lr_kwargs = default_none_kwargs(self.lr_kwargs)
         lr_model = LinearRegression(**lr_kwargs)
@@ -107,11 +110,11 @@ class AnalogRegression(AnalogBase):
 
         for i in range(len(X)):
             # predict for this time step
-            predicted[i] = self._predict_one_step(lr_model, X[None, i])
+            predicted[i] = self._predict_one_step(lr_model, X[None, i], i)
 
         return predicted
 
-    def _predict_one_step(self, lr_model, X):
+    def _predict_one_step(self, lr_model, X, i):
 
         # get analogs
         query_kwargs = default_none_kwargs(self.query_kwargs)
@@ -123,9 +126,14 @@ class AnalogRegression(AnalogBase):
 
         # train linear regression model
         lr_model.fit(x, y)
+        y_hat = lr_model.predict(x)
 
         # predict for this time step
         predicted = lr_model.predict(X)
+
+        if self.stats:
+            # calculate the rmse of prediction 
+            self.stats_['error'][i] = mean_squared_error(y, y_hat, squared=False)
         return predicted
 
 
@@ -243,3 +251,26 @@ class PureAnalog(AnalogBase):
                 self.stats_['pop'] = np.where(analog_mask, 1, 0).mean(axis=1)
 
         return predicted
+
+
+class PureRegression(RegressorMixin, BaseEstimator):
+    def __init__(
+        self,
+        stats=True,
+        lr_kwargs=None,
+    ):
+        self.stats = stats
+        self.lr_kwargs = lr_kwargs
+
+    def fit(self, X, y):
+        lr_kwargs = default_none_kwargs(self.lr_kwargs)
+        self.model = LinearRegression(**lr_kwargs).fit(X, y)
+        y_hat = self.model.predict(X)
+        if self.stats:
+            self.stats_ = {}
+            error = mean_squared_error(y, y_hat, squared=False)
+            self.stats_['error'] = np.full_like(y, error)
+        return self 
+
+    def predict(self, X):
+        return self.model.predict(X)
