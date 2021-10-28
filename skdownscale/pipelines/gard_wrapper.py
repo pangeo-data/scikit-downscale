@@ -1,11 +1,12 @@
-from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LinearRegression
-from skdownscale.pointwise_models import AnalogBase, PureRegression, PointWiseDownscaler, TrendAwareQuantileMappingRegressor, QuantileMappingReressor
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import QuantileTransformer, StandardScaler
+from skdownscale.pointwise_models import AnalogBase, PureRegression, PointWiseDownscaler, TrendAwareQuantileMappingRegressor, QuantileMappingReressor
 from skdownscale.pointwise_models.utils import default_none_kwargs
+from skdownscale.pointwise_models.core import xenumerate
 
 
-
+import gstools as gs
 
 
 class GardWrapper:
@@ -46,7 +47,8 @@ class GardWrapper:
             raise NotImplementedError(f'bias correction method must be one of {availalbe_methods}')
         self.bias_correction_method = bias_correction_method
         self.bc_kwargs = bc_kwargs
-        self.generate_scrf = generate_scrf
+        self.generate_scrf_ = generate_scrf
+        self.scrf_temporal_scaler = 1000.
 
     def fit(self, X, y, **kwargs):
         """
@@ -81,8 +83,8 @@ class GardWrapper:
         #TODO: extend this to include transforming the feature space into PCA, etc 
 
         # generate correlation lengths for spatio-temporal correlated random field (scrf) if needed 
-        if self.generate_scrf:
-            self.len_scales = find_correlation_length_scale(data=y) 
+        if self.generate_scrf_:
+            self.find_correlation_length_scale(data=y)
 
         # point wise transformation on X based on what bias correction method is chosen 
         bc_kws = default_none_kwargs(self.bc_kwargs, copy=True)
@@ -119,7 +121,7 @@ class GardWrapper:
         X = X.assign_coords({'lat': self._lats, 'lon': self._lons})
 
         # point wise transformation 
-        ref_start = kwargs.get('ref_start', X.time[0])
+        ref_start = kwargs.get('ref_start', X.time[0])  # double check the 
         ref_stop = kwargs.get('ref_stop', X.time[-1])
         reference_X = X.sel(time=slice(ref_start, ref_stop))
         bc_kws = default_none_kwargs(self.bc_kwargs, copy=True)
@@ -145,30 +147,38 @@ class GardWrapper:
                 qm.fit(self.X_train[v], reference_X[v])
                 X[v] = qm.predict(X[v])
 
+        # generate random fields 
+        if not self.generate_scrf_:
+            scrf = kwargs['scrf']
+        else:
+            seed = kwargs.get('scrf_seed', 0)
+            scrf = self.generate_scrf(template=X, seed=seed)
+
         # point wise downscaling
         downscaled = self._pointwise_models.predict(X) 
 
-        return self._postprocess(downscaled)
+        # add random permutation to better simulate the extremes  
+        errors = xr.DataArray(0, dims=downscaled.dims, coords=downscaled.coords)
+        for index, model in xenumerate(self._pointwise_models._models):
+            errors[index] = model.item().stats_['error']
+
+        return downscaled + scrf * errors 
 
 
     def _validate_data(self, X, y=None):
         for f in self.features:
             assert f in X 
+        
+        for d in ['time', 'lat', 'lon']:
+            assert d in X 
+            if y:
+                assert d in y 
 
         # TODO: 
         # check that X is coarser than y and roughly in the same domain to avoid extrapolating 
-        # check that spatial dimensions are named lat/lon or x/y 
-
-
-    def _postprocess(self, y_hat):
-        # TODO: any postprocessing needed for gard? 
-        return y_hat
 
 
     def find_correlation_length_scale(self, data, seasonality_period=31):
-        for d in ['time', 'lat', 'lon']:
-            assert d in data
-
         # remove seasonality before finding correlation length, otherwise the seasonality correlation dominates 
         seasonality = data.rolling({'time': seasonality_period}, center=True, min_periods=1).mean().groupby('time.dayofyear').mean()
         detrended = data.groupby("time.dayofyear") - seasonality
@@ -186,10 +196,34 @@ class GardWrapper:
         for yr, group in detrended[self.label_name].groupby('time.year'):
             v = group.isel(time=slice(0, day_in_year)).stack(point=['lat', 'lon']).transpose('point', 'time').values
             fields.extend(list(v))
-        t = np.arange(day_in_year) / 1000.
+        t = np.arange(day_in_year) / self.scrf_temporal_scaler
         bin_center, gamma = gs.vario_estimate(pos=t, field=fields, mesh_type='structured')
         temporal = gs.Gaussian(dim=1)
         temporal.fit_variogram(bin_center, gamma, sill=np.mean(np.var(fields, axis=1)))
         temporal_len_scale = temporal.len_scale
 
-        return {'temporal': temporal_len_scale, 'spatial': spatial_len_scale}
+        self.len_scales = {'temporal': temporal_len_scale, 'spatial': spatial_len_scale}
+
+    
+    def generate_scrf(self, template, seed, crs='ESRI:54008'):
+        # reproject template into Sinusoidal projection 
+        # TODO: any better ones for preserving distance between two arbitrary points on the map 
+        projected = template.isel(time=0).rio.write_crs('EPSG:4326').rio.reproject(crs)
+        x = projected.x
+        y = projected.y 
+        t = np.arange(len(template.time)) / self.scrf_temporal_scaler
+
+        ss = self.len_scales['spatial']
+        ts = self.len_scales['temporal']
+
+        # model is specified as spatial_dim1, spatial_dim2, temporal_scale 
+        model = gs.Gaussian(dim=3, var=1.0, len_scale=[ss, ss, ts])
+        srf = gs.SRF(model, seed=seed)
+        field = xr.DataArray(
+            srf.structured((x, y, t)), 
+            dims=['lon', 'lat', 'time'],
+            coords=[x, y, template.time]
+        ).rio.write_crs(crs)
+
+        field = field.rio.reproject('EPSG:4326')
+        return field
