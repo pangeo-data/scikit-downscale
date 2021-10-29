@@ -49,7 +49,6 @@ def _da_to_df(da, feature_dim=DEFAULT_FEATURE_DIM):
 
 
 def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
-
     if len(args) == 2:
         y, model = args
     else:
@@ -100,10 +99,21 @@ def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM,
 
 def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
 
-    xtrans = xr.full_like(X, np.nan)
+    dims = list(X.dims)
+    shape = list(X.shape)
+    coords = dict(X.coords)
+    coords.pop(feature_dim)
+    if feature_dim in dims:
+        dims.pop(X.get_axis_num(feature_dim))
+        shape.pop(X.get_axis_num(feature_dim))
+
+    xtrans = xr.DataArray(np.empty(shape, dtype=X.dtype), coords=coords, dims=dims)
 
     for index, model in xenumerate(models):
-        xdf = X[index].pipe(_da_to_df, feature_dim).drop(models.coords.keys())
+        xdf = X[index].pipe(_da_to_df, feature_dim)
+        for key in models.coords.keys():
+            if key in xdf:
+                xdf.drop(key)
         xtrans_df = model.item().transform(xdf, **kwargs)
         xtrans[index] = xtrans_df.squeeze()
     return xtrans
