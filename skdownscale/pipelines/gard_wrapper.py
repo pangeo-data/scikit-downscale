@@ -5,7 +5,7 @@ from skdownscale.pointwise_models import AnalogBase, PureRegression, PointWiseDo
 from skdownscale.pointwise_models.utils import default_none_kwargs
 from skdownscale.pointwise_models.core import xenumerate
 
-
+from scipy.stats import norm as norm
 import gstools as gs
 
 
@@ -32,7 +32,8 @@ class GardWrapper:
         generate_scrf         : boolean. indicates whether a spatio-temporal correlated random field (scrf) will be 
                                 generated based on the fine resolution data provided in .fit as y. if false, it is 
                                 assumed that a pre-generated scrf will be passed into .predict as an argument that 
-                                matches the prediction result dimensions.  
+                                matches the prediction result dimensions. 
+        spatial_feature       : (3, 3) 
         """
         self._dim = dim
         if not isinstance(model, (AnalogBase, PureRegression)):
@@ -40,6 +41,7 @@ class GardWrapper:
         self.features = feature_list
         self.label_name = label_name
         self._model = model 
+        self.thresh = model.thresh
 
         # TODO: allow different methods for each feature 
         availalbe_methods = ['quantile_transform', 'z_score', 'quantile_map', 'detrended_quantile_map', 'none']
@@ -74,14 +76,18 @@ class GardWrapper:
         self._validate_data(X=X, y=y)
 
         # perform preprocess that is done for the entire domain 
+        # shared between multiple method types (spatial)
         self._lats = y.lat 
         self._lons = y.lon
         X = X.sel(lat=self._lats, lon=self._lons, method='nearest')[self.features]
         X = X.assign_coords({'lat': self._lats, 'lon': self._lons})
 
+        # shared between multiple method types but point wise 
         #TODO: spatial features 
-        #TODO: extend this to include transforming the feature space into PCA, etc 
+        #TODO: extend this to include transforming the feature space into PCA, etc
+        # map + 1d component (pca) of ocean surface temperature for precip prediction 
 
+        # spatial 
         # generate correlation lengths for spatio-temporal correlated random field (scrf) if needed 
         if self.generate_scrf_:
             self.find_correlation_length_scale(data=y)
@@ -108,6 +114,7 @@ class GardWrapper:
 
         # point wise downscaling 
         self._pointwise_models = PointWiseDownscaler(model=self._model, dim=self._dim)
+        # may be able to write out _pointwise_models as a zarr dataset (an array of pickled object)
         self._pointwise_models.fit(X, y, **kwargs)
 
         return self
@@ -125,6 +132,9 @@ class GardWrapper:
         ref_stop = kwargs.get('ref_stop', X.time[-1])
         reference_X = X.sel(time=slice(ref_start, ref_stop))
         bc_kws = default_none_kwargs(self.bc_kwargs, copy=True)
+
+        # create a bias correction class that gets passed into the init (write a bias correction mixin)
+        # OR, task bias_correct return bc_X 
         for v in self.features:
             if self.bias_correction_method == 'quantile_transform':
                 # no need to remember the CDF since the quantile transformation itself serves as bias correction 
@@ -133,7 +143,7 @@ class GardWrapper:
                 qt = PointWiseDownscaler(model=QuantileTransformer(**bc_kws))
                 qt.fit(reference_X[v])
                 # TODO: extrapolate at the extremes 
-                X = qt.transform(X[v])
+                X[v] = qt.transform(X[v])
             elif self.bias_correction_method == 'z_score':
                 scaler = PointWiseDownscaler(model=StandardScaler(**bc_kws))
                 scaler.fit(reference_X[v])
@@ -147,6 +157,10 @@ class GardWrapper:
                 qm.fit(self.X_train[v], reference_X[v])
                 X[v] = qm.predict(X[v])
 
+        # point wise downscaling
+        predicted_values = self._pointwise_models.predict(X) 
+
+        # move into a different task 
         # generate random fields 
         if not self.generate_scrf_:
             scrf = kwargs['scrf']
@@ -154,15 +168,31 @@ class GardWrapper:
             seed = kwargs.get('scrf_seed', 0)
             scrf = self.generate_scrf(template=X, seed=seed)
 
-        # point wise downscaling
-        downscaled = self._pointwise_models.predict(X) 
-
         # add random permutation to better simulate the extremes  
-        errors = xr.DataArray(0, dims=downscaled.dims, coords=downscaled.coords)
-        for index, model in xenumerate(self._pointwise_models._models):
-            errors[index] = model.item().stats_['error']
+        errors = self._pointwise_models.predict(X, return_errors=True)
+        if self.thresh is not None:
+            exceedance_prob = self._pointwise_models.predict(X, return_exceedance_prob=True)
+            # convert scrf from a normal distribution to a uniform distribution 
+            scrf_uniform = xr.apply_ufunc(norm.cdf, scrf, dask='parallelized', output_dtypes=[scrf.dtype])
 
-        return downscaled + scrf * errors 
+            # find where exceedance prob is exceeded 
+            mask = scrf_uniform > (1 - exceedance_prob)
+
+            # Rescale the uniform distribution
+            new_uniform = (scrf_uniform - (1 - exceedance_prob)) / exceedance_prob
+
+            # Get the normal distribution equivalent of new_uniform
+            r_normal = xr.apply_ufunc(norm.ppf, new_uniform, dask='parallelized', output_dtypes=[new_uniform.dtype])
+
+            downscaled = predicted_values + r_normal * errors 
+
+            # what do we do for thresholds like heat wave? 
+            valids = xr.ufuncs.logical_or(mask, downscaled >= 0)
+            downscaled = downscaled.where(valids, 0)
+        else:
+            downscaled = predicted_values + scrf * errors 
+
+        return downscaled
 
 
     def _validate_data(self, X, y=None):
@@ -174,8 +204,7 @@ class GardWrapper:
             if y:
                 assert d in y 
 
-        # TODO: 
-        # check that X is coarser than y and roughly in the same domain to avoid extrapolating 
+        # TODO: check that X is coarser than y and roughly in the same domain to avoid extrapolating 
 
 
     def find_correlation_length_scale(self, data, seasonality_period=31):

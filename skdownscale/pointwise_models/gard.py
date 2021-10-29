@@ -36,7 +36,6 @@ class AnalogBase(RegressorMixin, BaseEstimator):
         self : returns an instance of self.
         """
         X, y = self._validate_data(X, y=y, y_numeric=True)
-        self.stats_ = {}  # populated in predict methods
 
         if len(X) >= self.n_analogs:
             self.k_ = self.n_analogs
@@ -87,11 +86,12 @@ class AnalogRegression(AnalogBase):
         self.n_analogs = n_analogs
         self.thresh = thresh
         self.stats = stats
+        self.stats_ = {}  # populated in predict methods
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
         self.lr_kwargs = lr_kwargs
 
-    def predict(self, X):
+    def predict(self, X, return_errors=False, return_exceedance_prob=False):
         """ Predict using the AnalogRegression model
 
         Parameters
@@ -108,12 +108,12 @@ class AnalogRegression(AnalogBase):
         check_is_fitted(self)
         X = check_array(X)
 
-        predicted = np.empty(len(X))
-        errors = np.empty(len(X))
+        out = np.empty(len(X))
+        if self.stats and len(self.stats_) == 0:
+            self.stats_['error'] = np.empty(len(X))
+            self.stats_['prob'] = np.empty(len(X))
 
-        # the next three variables are not used if self.thresh = None
-        # instantiating to keep the code clean 
-        exceedance_prob = np.empty(len(X))
+        # not used if self.thresh = None, instantiating to keep the code clean 
         logistic_kwargs = default_none_kwargs(self.logistic_kwargs)
         logistic_model = LogisticRegression(**logistic_kwargs)
         
@@ -123,23 +123,18 @@ class AnalogRegression(AnalogBase):
         # TODO - extract from lr_model's below.
         for i in range(len(X)):
             # predict for this time step
-            predicted[i], errors[i], exceedance_prob[i] = self._predict_one_step(
+            out[i] = self._predict_one_step(
                 logistic_model,
                 lr_model, 
                 X[None, i], 
-                i
+                i,
+                return_errors=return_errors,
+                return_exceedance_prob=return_exceedance_prob
             )
-
-        out = pd.DataFrame()
-        if self.thresh is not None:
-            out['exceedance_prob'] = exceedance_prob
-        if self.stats:
-            out['error'] = errors
-        out['value'] = predicted
 
         return out
 
-    def _predict_one_step(self, logistic_model, lr_model, X, i, logistic_model):
+    def _predict_one_step(self, logistic_model, lr_model, X, i, return_errors=False, return_exceedance_prob=False):
 
         # get analogs
         query_kwargs = default_none_kwargs(self.query_kwargs)
@@ -149,30 +144,40 @@ class AnalogRegression(AnalogBase):
         x = np.asarray(self.kdtree_.data)[inds]
         y = self.y_[inds]
 
-        # train logistic regression model 
+        # figure out if there's a threshold of interest 
         if self.thresh is not None:
             exceed_ind = (y > self.thresh)
+        else:
+            exceed_ind = [True] * len(y)
+
+        # if simply returning exceedance prob, train logistic model and don't train linear model 
+        if return_exceedance_prob:
+            if self.thresh is None:
+                return None 
+            if self.stats and self.stats_['prob'][i] is not None:
+                return self.stats_['prob'][i]
             binary_y = exceed_ind.astype(int)
             logistic_model.fit(x, binary_y)
             exceedance_prob = logistic_model.predict_proba(X)
-        else:
-            exceed_ind = [True] * len(y)
-            exceedance_prob = None
+            if self.stats:
+                self.stats_['prob'][i] = exceedance_prob
+            return exceedance_prob
 
-        # train linear regression model
+        # train linear regression model otherwise 
         lr_model.fit(x[exceed_ind], y[exceed_ind])
-        
-        if self.stats:
-            y_hat = lr_model.predict(x[exceed_ind])
-            # calculate the rmse of prediction 
-            error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
-        else:
-            error = None
 
-        # predict for this time step
+        if return_errors:
+            if self.stats and self.stats_['error'][i] is not None:
+                return self.stats_['error'][i]
+            # calculate the rmse of prediction 
+            y_hat = lr_model.predict(x[exceed_ind])
+            error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
+            if self.stats:
+                self.stats_['error'][i] = error 
+            return error 
+
         predicted = lr_model.predict(X)
-        
-        return predicted, error, exceedance_prob
+        return predicted
 
 
 class PureAnalog(AnalogBase):
@@ -210,7 +215,7 @@ class PureAnalog(AnalogBase):
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
 
-    def predict(self, X):
+    def predict(self, X, return_errors=False, return_exceedance_prob=False):
         """Predict using the PureAnalog model
 
         Parameters
@@ -287,16 +292,17 @@ class PureAnalog(AnalogBase):
             else:
                 self.stats_['error'] = analogs.where(analog_mask).std(axis=1)
                 # calculate the probability of precip
-                self.stats_['pop'] = exceedance_prob
+                self.stats_['prob'] = exceedance_prob
 
-        out = pd.DataFrame()
-        if self.thresh is not None:
-            out['exceedance_prob'] = exceedance_prob
-        if self.stats:
-            out['error'] = self._stats['error']
-        out['value'] = predicted
+        if return_errors or return_exceedance_prob:
+            assert not (return_errors == return_exceedance_prob)
 
-        return out
+        if self.thresh is not None and return_exceedance_prob:
+            return self.logistic_model.predict_proba(X)
+        if self.stats and return_errors:
+            return self._stats['error']
+        
+        return predicted
 
 
 class PureRegression(RegressorMixin, BaseEstimator):
@@ -326,17 +332,24 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
         y_hat = self.model.predict(X[exceed_ind])
         if self.stats:
-            self.stats_ = {}
             error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
             self.stats_['error'] = error 
         return self 
 
-    def predict(self, X):
-        out = pd.DataFrame()
-        if self.thresh is not None:
-            out['exceedance_prob'] = self.logistic_model.predict_proba(X)
-        if self.stats:
-            out['error'] = self._stats['error']
-        out['value'] = self.linear_model.predict(X)
+    def predict(self, X, return_errors=False, return_exceedance_prob=False):
+        if return_errors or return_exceedance_prob:
+            assert not (return_errors == return_exceedance_prob)
+
+        if return_exceedance_prob:
+            if self.thresh is not None:
+                return self.logistic_model.predict_proba(X)
+            else:
+                return None 
+
+        if return_errors:
+            if self.stats:
+                return self._stats['error']
+            else:
+                raise ValueError('self.stats must be set to True in order to return errors in prediction')
         
-        return out 
+        return self.linear_model.predict(X)
