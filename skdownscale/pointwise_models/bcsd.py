@@ -92,7 +92,7 @@ class BcsdBase(TimeSynchronousDownscaler):
         return result
 
 
-class BcsdPrecipitation(BcsdBase):
+class BcRelative(BcsdBase):
     """Classic BCSD model for Precipitation
 
     Parameters
@@ -209,7 +209,8 @@ class BcsdPrecipitation(BcsdBase):
         }
 
 
-class BcsdTemperature(BcsdBase):
+class BcAbsolute(BcsdBase):
+    # currently: x and y are in same grid
     def fit(self, X, y):
         """Fit BcsdTemperature model
 
@@ -229,16 +230,16 @@ class BcsdTemperature(BcsdBase):
         X, y = self._validate_data(X, y, y_numeric=True)
         # TO-DO: set n_features_in attribute
         if self.n_features_in_ != 1:
-            raise ValueError(f'BCSD only supports up to 4 features, found {self.n_features_in_}')
+            raise ValueError(f'BCSD only supports 1 feature, found {self.n_features_in_}')
 
-        # make groups for day or month
+        # make groups for day or month, default is month
         y_groups = self._create_groups(y)
 
-        # calculate the climatologies
+        # calculate the climatologies (monthly mean of historical gcm and historical obs)
         self._x_climo = self._create_groups(X).mean()
         self.y_climo_ = y_groups.mean()
 
-        # fit the quantile mappers
+        # fit the quantile mappers - grab cdf of historical observations (not gcms)
         self._qm_fit_by_group(y_groups)
 
         return self
@@ -257,9 +258,11 @@ class BcsdTemperature(BcsdBase):
             Returns predicted values.
         """
         check_is_fitted(self)
+        # whatever gcm you want to use (historical or future)
         X = self._check_array(X)
 
         # Calculate the 9-year running mean for each month
+        # centered rolling mean 
         def rolling_func(x):
             return x.rolling(9, center=True, min_periods=1).mean()
 
@@ -320,3 +323,19 @@ class BcsdTemperature(BcsdBase):
                 'check_methods_sample_order_invariance': 'temporal order matters',
             },
         }
+
+# class bcsd(BcsdBase):
+#     def prep(obs, gcm):
+#         # coarsen
+#     def postprocess():
+#         # take it back to finescale
+#     def fit(self, obs, gcm):
+#         x, y = self.prep(obs, gcm)
+#         if self.flavor == 'absolute':
+#             model = PointWiseDownscaler(BcAbsolute)
+#         return model
+#     def predict(self, )
+#         out_y = self.model.predict()
+#         # take it back to finescale
+#         out_y = self.postprocess(out_y)
+#     def __init__:

@@ -74,7 +74,7 @@ def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **
             scalar_obj[:] = [mod.fit(xdf, ydf, **kwargs)]
         else:
             scalar_obj[:] = [mod.fit(xdf, **kwargs)]
-        models[index] = scalar_obj.squeeze()
+        models[index] = scalar_obj.squeeze() # try passing mod.fit() instead of passing to scalar_obj
     return models
 
 
