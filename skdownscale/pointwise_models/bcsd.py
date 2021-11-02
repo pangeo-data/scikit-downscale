@@ -204,6 +204,7 @@ class BcsdPrecipitation(BcsdBase):
                 'check_dont_overwrite_parameters': 'BCSD only suppers 1 feature',
                 'check_fit_idempotent': 'BCSD only suppers 1 feature',
                 'check_n_features_in': 'BCSD only suppers 1 feature',
+                'check_fit_check_is_fitted': 'BCSD only suppers 1 feature',
                 'check_methods_sample_order_invariance': 'temporal order matters',
             },
         }
@@ -317,6 +318,7 @@ class BcsdTemperature(BcsdBase):
                 'check_dont_overwrite_parameters': 'BCSD only suppers 1 feature',
                 'check_fit_idempotent': 'BCSD only suppers 1 feature',
                 'check_n_features_in': 'BCSD only suppers 1 feature',
+                'check_fit_check_is_fitted': 'BCSD only suppers 1 feature',
                 'check_methods_sample_order_invariance': 'temporal order matters',
             },
         }
