@@ -1,4 +1,5 @@
 import collections
+import copy
 
 import numpy as np
 from sklearn.base import BaseEstimator, RegressorMixin, TransformerMixin
@@ -217,13 +218,16 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
 
         X_cdf = self._calc_extrapolated_cdf(X[sort_inds], sort=False, extrapolate=self.extrapolate)
 
+        # Fill value for when x < xp[0] or x > xp[-1] (i.e. when X_cdf vals are out of range for self._X_cdf vals)
         left = -np.inf if self.extrapolate in ['min', 'both'] else None
         right = np.inf if self.extrapolate in ['max', 'both'] else None
+        # For all values in future X, find the corresponding percentile in historical X 
         X_cdf.pp[:] = np.interp(
             X_cdf.vals, self._X_cdf.vals, self._X_cdf.pp, left=left, right=right
         )
 
-        # Extrapolate the tails beyond 1.0 to handle "new extremes"
+        # Extrapolate the tails beyond 1.0 to handle "new extremes", only triggered when the new extremes are even more drastic then 
+        # the linear extrapolation result from historical X at SYNTHETIC_MIN and SYNTHETIC_MAX 
         if np.isinf(X_cdf.pp).any():
             lower_inds = np.nonzero(-np.inf == X_cdf.pp)[0]
             upper_inds = np.nonzero(np.inf == X_cdf.pp)[0]
@@ -396,6 +400,121 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
         }
 
 
+class EquidistantCdfMatcher(QuantileMappingReressor):
+    """Transform features using equidistant CDF matching, a version of quantile mapping that preserves the difference or ratio between X_test and X_train.
+
+    Parameters
+    ----------
+    extrapolate : str, optional
+        How to extend the cdfs at the tails. Valid options include {`'min'`, `'max'`, `'both'`, `'1to1'`, `None`}
+    n_endpoints : int
+        Number of endpoints to include when extrapolating the tails of the cdf
+
+    Attributes
+    ----------
+    _X_cdf : Cdf
+        NamedTuple representing the fit's X cdf
+    _y_cdf : Cdf
+        NamedTuple representing the fit's y cdf
+    """
+
+    _fit_attributes = ['_X_cdf', '_y_cdf']
+
+    def __init__(self, kind='difference', extrapolate=None, n_endpoints=10, max_ratio=None):
+        if kind not in ['difference', 'ratio']:
+            raise NotImplementedError('kind must be either difference or ratio')
+        self.kind = kind
+        self.extrapolate = extrapolate
+        self.n_endpoints = n_endpoints
+        # John Abatzoglou's code seems to have a max ratio for precip at 5.0 https://github.com/jhamman/MACA/blob/master/MACAv2jointtas/METHOD/BIASCORRECT/get_bias_correction.m#L27
+        self.max_ratio = max_ratio
+
+        if self.n_endpoints < 2:
+            raise ValueError('Invalid number of n_endpoints, must be >= 2')
+
+    def predict(self, X, **kwargs):
+        """Predict regression for target X.
+
+        Parameters
+        ----------
+        X : array_like, shape [n_samples, 1]
+            Samples.
+
+        Returns
+        -------
+        y : ndarray of shape (n_samples, )
+            Predicted data.
+        """
+        check_is_fitted(self, self._fit_attributes)
+        X = check_array(X, ensure_2d=True)
+
+        X = X[:, 0]
+
+        sort_inds = np.argsort(X)
+
+        X_cdf = self._calc_extrapolated_cdf(X[sort_inds], sort=False, extrapolate=self.extrapolate)
+        X_train_vals = np.interp(x=X_cdf.pp, xp=self._X_cdf.pp, fp=self._X_cdf.vals)
+
+        # generate y value as historical y plus/multiply by quantile difference 
+        if self.kind == 'difference':
+            diff = X_cdf.vals - X_train_vals 
+            sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) + diff 
+        elif self.kind == 'raio': 
+            ratio = X_cdf.vals / X_train_vals 
+            if self.max_ratio is not None:
+                ratio = np.min(ratio, self.max_ratio)
+            sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) * ratio 
+
+        # put things into the right order 
+        y_hat = np.full_like(X, np.nan)
+        y_hat[sort_inds] = sorted_y_hat
+
+        # If extrapolate is 1to1, apply the offset between X and y to the
+        # tails of y_hat
+        if self.extrapolate == '1to1':
+            X_fit_len = len(self._X_cdf.vals)
+            X_fit_min = self._X_cdf.vals[0]
+            X_fit_max = self._X_cdf.vals[-1]
+
+            y_fit_len = len(self._y_cdf.vals)
+            y_fit_min = self._y_cdf.vals[0]
+            y_fit_max = self._y_cdf.vals[-1]
+
+            # adjust values over fit max
+            inds = X > X_fit_max
+            if inds.any():
+                if X_fit_len == y_fit_len:
+                    y_hat[inds] = y_fit_max + (X[inds] - X_fit_max)
+                elif X_fit_len > y_fit_len:
+                    X_fit_at_y_fit_max = np.interp(
+                        self._y_cdf.pp[-1], self._X_cdf.pp, self._X_cdf.vals
+                    )
+                    y_hat[inds] = y_fit_max + (X[inds] - X_fit_at_y_fit_max)
+                elif X_fit_len < y_fit_len:
+                    y_fit_at_X_fit_max = np.interp(
+                        self._X_cdf.pp[-1], self._y_cdf.pp, self._y_cdf.vals
+                    )
+                    y_hat[inds] = y_fit_at_X_fit_max + (X[inds] - X_fit_max)
+
+            # adjust values under fit min
+            inds = X < X_fit_min
+            if inds.any():
+                if X_fit_len == y_fit_len:
+                    y_hat[inds] = y_fit_min + (X[inds] - X_fit_min)
+                elif X_fit_len > y_fit_len:
+                    X_fit_at_y_fit_min = np.interp(
+                        self._y_cdf.pp[0], self._X_cdf.pp, self._X_cdf.vals
+                    )
+                    y_hat[inds] = X_fit_min + (X[inds] - X_fit_at_y_fit_min)
+                elif X_fit_len < y_fit_len:
+                    y_fit_at_X_fit_min = np.interp(
+                        self._X_cdf.pp[0], self._y_cdf.pp, self._y_cdf.vals
+                    )
+                    y_hat[inds] = y_fit_at_X_fit_min + (X[inds] - X_fit_min)
+
+        return y_hat 
+
+
 class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
     """Experimental meta estimator for performing trend-aware quantile mapping
 
@@ -405,8 +524,11 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         Regressor object such as ``QuantileMappingReressor``.
     """
 
-    def __init__(self, qm_estimator=None):
+    def __init__(self, qm_estimator=None, trend_transformer=None):
         self.qm_estimator = qm_estimator
+        if trend_transformer is None:
+            self.trend_transformer = LinearTrendTransformer()
+
 
     def fit(self, X, y):
         """Fit the model.
@@ -423,10 +545,10 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         self._X_mean_fit = X.mean()
         self._y_mean_fit = y.mean()
 
-        y_trend = LinearTrendTransformer()
+        y_trend = copy.deepcopy(self.trend_transformer)
         y_detrend = y_trend.fit_transform(y)
 
-        X_trend = LinearTrendTransformer()
+        X_trend = copy.deepcopy(self.trend_transformer)
         x_detrend = X_trend.fit_transform(X)
 
         self.qm_estimator.fit(x_detrend, y_detrend)
@@ -444,21 +566,18 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         y : ndarray of shape (n_samples, )
             Predicted data.
         """
-        X_trend = LinearTrendTransformer()
+        X_trend = copy.deepcopy(self.trend_transformer)
         x_detrend = X_trend.fit_transform(X)
 
         y_hat = self.qm_estimator.predict(x_detrend).reshape(-1, 1)
 
         # add the mean and trend back
-
-        # slope from X (predict)
-        slope = X_trend.lr_model_.coef_[:, 0]
-
-        # delta: X (predict) - X (fit) + y
+        # delta: X (predict) - X (fit) + y --> projected change + historical obs mean 
         delta = (X.mean() - self._X_mean_fit) + self._y_mean_fit
 
-        # calculat the trendline
-        trendline = slope * np.arange(len(y_hat)).reshape(-1, 1)
+        # calculate the trendline
+        # TODO: think about how this would need to change if we're using a rolling average trend 
+        trendline = X_trend.trendline(X)
         trendline -= trendline.mean()  # center at 0
 
         # apply the trend and delta
