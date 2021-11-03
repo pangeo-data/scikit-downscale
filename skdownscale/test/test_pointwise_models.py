@@ -220,16 +220,16 @@ def test_EquidistantCdfMatcher():
     projected_change = 2
     bias = 3
 
-    X_train = xr.DataArray(x, coords=[("time", x)])
-    y_train = xr.DataArray(x + bias, coords=[("time", x)])
+    X_train = pd.DataFrame(x)
+    y_train = pd.DataFrame(x + bias)
 
     for kind in ['difference', 'ratio']:
         if kind == 'difference':
-            X_test = xr.DataArray(x + projected_change, coords=[("time", x)])
+            X_test = pd.DataFrame(x + projected_change)
         elif kind == 'ratio':
-            X_test = xr.DataArray(x * projected_change, coords=[("time", x)])
+            X_test = pd.DataFrame(x * projected_change)
 
-        bias_correction_model = EquidistantCdfMatcher(kind='difference')
+        bias_correction_model = EquidistantCdfMatcher(kind=kind)
         bias_correction_model.fit(
             X=X_train,
             y=y_train
@@ -237,6 +237,6 @@ def test_EquidistantCdfMatcher():
         y_test = bias_correction_model.predict(X_test)
 
         if kind == 'difference':
-            assert (y_test.reshape(-1, 1) == (y_train + projected_change)).all()
+            assert (y_test.reshape(-1, 1) == (y_train.values + projected_change)).all()
         elif kind == 'ratio':
-            assert (y_test.reshape(-1, 1) == (y_train * projected_change)).all()
+            assert (y_test.reshape(-1, 1) == (y_train.values * projected_change)).all()
