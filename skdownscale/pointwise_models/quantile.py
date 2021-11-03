@@ -554,6 +554,8 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
 
         self.qm_estimator.fit(x_detrend, y_detrend)
 
+        return self
+
     def predict(self, X):
         """Predict regression for target X.
 
@@ -574,7 +576,7 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
 
         # add the mean and trend back
         # delta: X (predict) - X (fit) + y --> projected change + historical obs mean 
-        delta = (X.mean() - self._X_mean_fit) + self._y_mean_fit
+        delta = (X.mean().values - self._X_mean_fit.values) + self._y_mean_fit.values
 
         # calculate the trendline
         # TODO: think about how this would need to change if we're using a rolling average trend 
