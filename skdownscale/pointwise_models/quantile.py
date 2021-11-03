@@ -459,15 +459,16 @@ class EquidistantCdfMatcher(QuantileMappingReressor):
         if self.kind == 'difference':
             diff = X_cdf.vals - X_train_vals 
             sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) + diff 
-        elif self.kind == 'raio': 
+        elif self.kind == 'ratio': 
             ratio = X_cdf.vals / X_train_vals 
+            print(ratio)
             if self.max_ratio is not None:
                 ratio = np.min(ratio, self.max_ratio)
             sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) * ratio 
 
         # put things into the right order 
         y_hat = np.full_like(X, np.nan)
-        y_hat[sort_inds] = sorted_y_hat
+        y_hat[sort_inds] = sorted_y_hat[1:-1]
 
         # If extrapolate is 1to1, apply the offset between X and y to the
         # tails of y_hat

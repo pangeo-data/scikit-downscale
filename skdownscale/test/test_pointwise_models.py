@@ -13,6 +13,7 @@ from skdownscale.pointwise_models import (
     PureAnalog,
     QuantileMapper,
     QuantileMappingReressor,
+    EquidistantCdfMatcher,
     ZScoreRegressor,
 )
 
@@ -26,6 +27,8 @@ from skdownscale.pointwise_models import (
         PureAnalog(),
         ZScoreRegressor(),
         QuantileMappingReressor(n_endpoints=2),
+        EquidistantCdfMatcher(kind='difference', n_endpoints=2),
+        EquidistantCdfMatcher(kind='ratio', n_endpoints=2),
         # transformers
         LinearTrendTransformer(),
         QuantileMapper(),
@@ -92,7 +95,7 @@ def test_quantile_mapper_detrend():
 
 @pytest.mark.parametrize(
     'model_cls',
-    [BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor, QuantileMappingReressor],
+    [BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor, QuantileMappingReressor, EquidistantCdfMatcher],
 )
 def test_linear_model(model_cls):
 
@@ -210,3 +213,30 @@ def test_BcsdTemperature_nasanex():
     y = pd.DataFrame({'foo': np.random.random(len(index))}, index=index)
     model_nasanex = BcsdTemperature(time_grouper='daily_nasa-nex', return_anoms=False).fit(X, y)
     assert issubclass(model_nasanex.time_grouper, PaddedDOYGrouper)
+
+
+def test_EquidistantCdfMatcher():
+    x = np.arange(1, 22)
+    projected_change = 2
+    bias = 3
+
+    X_train = xr.DataArray(x, coords=[("time", x)])
+    y_train = xr.DataArray(x + bias, coords=[("time", x)])
+
+    for kind in ['difference', 'ratio']:
+        if kind == 'difference':
+            X_test = xr.DataArray(x + projected_change, coords=[("time", x)])
+        elif kind == 'ratio':
+            X_test = xr.DataArray(x * projected_change, coords=[("time", x)])
+
+        bias_correction_model = EquidistantCdfMatcher(kind='difference')
+        bias_correction_model.fit(
+            X=X_train,
+            y=y_train
+        )
+        y_test = bias_correction_model.predict(X_test)
+
+        if kind == 'difference':
+            assert (y_test.reshape(-1, 1) == (y_train + projected_change)).all()
+        elif kind == 'ratio':
+            assert (y_test.reshape(-1, 1) == (y_train * projected_change)).all()
