@@ -73,7 +73,7 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
         Parameters
         ----------
         X : array-like, shape  [n_samples, n_features]
-            Training data.
+            Training data
         """
         # TO-DO: fix validate data fctn
         X = self._validate_data(X)
