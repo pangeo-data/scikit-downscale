@@ -221,13 +221,13 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
         # Fill value for when x < xp[0] or x > xp[-1] (i.e. when X_cdf vals are out of range for self._X_cdf vals)
         left = -np.inf if self.extrapolate in ['min', 'both'] else None
         right = np.inf if self.extrapolate in ['max', 'both'] else None
-        # For all values in future X, find the corresponding percentile in historical X 
+        # For all values in future X, find the corresponding percentile in historical X
         X_cdf.pp[:] = np.interp(
             X_cdf.vals, self._X_cdf.vals, self._X_cdf.pp, left=left, right=right
         )
 
-        # Extrapolate the tails beyond 1.0 to handle "new extremes", only triggered when the new extremes are even more drastic then 
-        # the linear extrapolation result from historical X at SYNTHETIC_MIN and SYNTHETIC_MAX 
+        # Extrapolate the tails beyond 1.0 to handle "new extremes", only triggered when the new extremes are even more drastic then
+        # the linear extrapolation result from historical X at SYNTHETIC_MIN and SYNTHETIC_MAX
         if np.isinf(X_cdf.pp).any():
             lower_inds = np.nonzero(-np.inf == X_cdf.pp)[0]
             upper_inds = np.nonzero(np.inf == X_cdf.pp)[0]
@@ -455,18 +455,18 @@ class EquidistantCdfMatcher(QuantileMappingReressor):
         X_cdf = self._calc_extrapolated_cdf(X[sort_inds], sort=False, extrapolate=self.extrapolate)
         X_train_vals = np.interp(x=X_cdf.pp, xp=self._X_cdf.pp, fp=self._X_cdf.vals)
 
-        # generate y value as historical y plus/multiply by quantile difference 
+        # generate y value as historical y plus/multiply by quantile difference
         if self.kind == 'difference':
-            diff = X_cdf.vals - X_train_vals 
-            sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) + diff 
-        elif self.kind == 'ratio': 
-            ratio = X_cdf.vals / X_train_vals 
+            diff = X_cdf.vals - X_train_vals
+            sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) + diff
+        elif self.kind == 'ratio':
+            ratio = X_cdf.vals / X_train_vals
             print(ratio)
             if self.max_ratio is not None:
                 ratio = np.min(ratio, self.max_ratio)
-            sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) * ratio 
+            sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) * ratio
 
-        # put things into the right order 
+        # put things into the right order
         y_hat = np.full_like(X, np.nan)
         y_hat[sort_inds] = sorted_y_hat[1:-1]
 
@@ -513,7 +513,7 @@ class EquidistantCdfMatcher(QuantileMappingReressor):
                     )
                     y_hat[inds] = y_fit_at_X_fit_min + (X[inds] - X_fit_min)
 
-        return y_hat 
+        return y_hat
 
 
 class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
@@ -529,7 +529,6 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         self.qm_estimator = qm_estimator
         if trend_transformer is None:
             self.trend_transformer = LinearTrendTransformer()
-
 
     def fit(self, X, y):
         """Fit the model.
@@ -575,11 +574,11 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         y_hat = self.qm_estimator.predict(x_detrend).reshape(-1, 1)
 
         # add the mean and trend back
-        # delta: X (predict) - X (fit) + y --> projected change + historical obs mean 
+        # delta: X (predict) - X (fit) + y --> projected change + historical obs mean
         delta = (X.mean().values - self._X_mean_fit.values) + self._y_mean_fit.values
 
         # calculate the trendline
-        # TODO: think about how this would need to change if we're using a rolling average trend 
+        # TODO: think about how this would need to change if we're using a rolling average trend
         trendline = X_trend.trendline(X)
         trendline -= trendline.mean()  # center at 0
 

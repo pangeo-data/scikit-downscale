@@ -8,12 +8,12 @@ from skdownscale.pointwise_models import (
     AnalogRegression,
     BcsdPrecipitation,
     BcsdTemperature,
+    EquidistantCdfMatcher,
     LinearTrendTransformer,
     PaddedDOYGrouper,
     PureAnalog,
     QuantileMapper,
     QuantileMappingReressor,
-    EquidistantCdfMatcher,
     ZScoreRegressor,
 )
 
@@ -95,7 +95,14 @@ def test_quantile_mapper_detrend():
 
 @pytest.mark.parametrize(
     'model_cls',
-    [BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor, QuantileMappingReressor, EquidistantCdfMatcher],
+    [
+        BcsdTemperature,
+        PureAnalog,
+        AnalogRegression,
+        ZScoreRegressor,
+        QuantileMappingReressor,
+        EquidistantCdfMatcher,
+    ],
 )
 def test_linear_model(model_cls):
 
@@ -230,10 +237,7 @@ def test_EquidistantCdfMatcher():
             X_test = pd.DataFrame(x * projected_change)
 
         bias_correction_model = EquidistantCdfMatcher(kind=kind)
-        bias_correction_model.fit(
-            X=X_train,
-            y=y_train
-        )
+        bias_correction_model.fit(X=X_train, y=y_train)
         y_test = bias_correction_model.predict(X_test)
 
         if kind == 'difference':
