@@ -516,6 +516,13 @@ class EquidistantCdfMatcher(QuantileMappingReressor):
 
         return y_hat
 
+    def _more_tags(self):
+        return {
+            '_xfail_checks': {
+                'check_fit_check_is_fitted': 'QuantileMappingReressor only suppers 1 feature',
+            },
+        }
+
 
 class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
     """Experimental meta estimator for performing trend-aware quantile mapping
