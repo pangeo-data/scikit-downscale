@@ -102,10 +102,6 @@ def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
     dims = list(X.dims)
     shape = list(X.shape)
     coords = dict(X.coords)
-    coords.pop(feature_dim)
-    if feature_dim in dims:
-        dims.pop(X.get_axis_num(feature_dim))
-        shape.pop(X.get_axis_num(feature_dim))
 
     xtrans = xr.DataArray(np.empty(shape, dtype=X.dtype), coords=coords, dims=dims)
 

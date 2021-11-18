@@ -10,9 +10,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2.3.4
-      - uses: actions/setup-python@v2.2.1
-      - uses: pre-commit/action@v2.0.2
+      - uses: actions/checkout@v2.4.0
+      - uses: actions/setup-python@v2.2.2
+      - uses: pre-commit/action@v2.0.3
   test:
     name: ${{ matrix.python-version }}-build
     runs-on: ubuntu-latest
@@ -20,13 +20,13 @@ jobs:
       matrix:
         python-version: [3.7, 3.8]
     steps:
-      - uses: actions/checkout@v2.3.4
+      - uses: actions/checkout@v2.4.0
       - name: Setup Python
-        uses: actions/setup-python@v2.2.1
+        uses: actions/setup-python@v2.2.2
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.6
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/dev-requirements.txt') }}
@@ -40,6 +40,6 @@ jobs:
         run: |
           python -m pytest --junitxml=test-reports/junit.xml --cov=./ --verbose
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v2.1.0
         with:
           file: test-reports/junit.xml
