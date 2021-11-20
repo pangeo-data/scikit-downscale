@@ -103,8 +103,8 @@ class AnalogRegression(AnalogBase):
         ----------
         X : DataFrame, shape (n_samples, 1)
             Samples.
-        return_errors: boolean
-        return_exceedance_prob: boolean
+        return_errors : bool
+        return_exceedance_prob : bool
 
         Returns
         -------
