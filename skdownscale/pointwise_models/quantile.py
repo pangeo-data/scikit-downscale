@@ -462,7 +462,6 @@ class EquidistantCdfMatcher(QuantileMappingReressor):
             sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) + diff
         elif self.kind == 'ratio':
             ratio = X_cdf.vals / X_train_vals
-            print(ratio)
             if self.max_ratio is not None:
                 ratio = np.min(ratio, self.max_ratio)
             sorted_y_hat = np.interp(x=X_cdf.pp, xp=self._y_cdf.pp, fp=self._y_cdf.vals) * ratio
