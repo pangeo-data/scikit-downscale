@@ -427,7 +427,7 @@ class EquidistantCdfMatcher(QuantileMappingReressor):
         self.kind = kind
         self.extrapolate = extrapolate
         self.n_endpoints = n_endpoints
-        # John Abatzoglou's code seems to have a max ratio for precip at 5.0 https://github.com/jhamman/MACA/blob/master/MACAv2jointtas/METHOD/BIASCORRECT/get_bias_correction.m#L27
+        # MACA seems to have a max ratio for precip at 5.0
         self.max_ratio = max_ratio
 
         if self.n_endpoints < 2:
