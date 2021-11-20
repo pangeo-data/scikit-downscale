@@ -11,10 +11,22 @@ from skdownscale.pointwise_models import (
     LinearTrendTransformer,
     PaddedDOYGrouper,
     PureAnalog,
+    PureRegression,
     QuantileMapper,
     QuantileMappingReressor,
     ZScoreRegressor,
 )
+
+
+@pytest.fixture(scope='module')
+def sample_X_y(n=365):
+    index = pd.date_range('2019-01-01', periods=n)
+    X = pd.DataFrame(
+        {'foo': np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10, 'bar': np.random.rand((n))},
+        index=index,
+    )
+    y = X + 2
+    return X, y
 
 
 @parametrize_with_checks(
@@ -24,6 +36,7 @@ from skdownscale.pointwise_models import (
         BcsdPrecipitation(),
         BcsdTemperature(),
         PureAnalog(),
+        PureRegression(),
         ZScoreRegressor(),
         QuantileMappingReressor(n_endpoints=2),
         # transformers
@@ -92,7 +105,14 @@ def test_quantile_mapper_detrend():
 
 @pytest.mark.parametrize(
     'model_cls',
-    [BcsdTemperature, PureAnalog, AnalogRegression, ZScoreRegressor, QuantileMappingReressor],
+    [
+        BcsdTemperature,
+        PureAnalog,
+        AnalogRegression,
+        ZScoreRegressor,
+        QuantileMappingReressor,
+        PureRegression,
+    ],
 )
 def test_linear_model(model_cls):
 
@@ -107,6 +127,78 @@ def test_linear_model(model_cls):
     model.fit(X, y)
     y_hat = model.predict(X)
     assert len(y_hat) == len(X)
+
+
+@pytest.mark.parametrize(
+    'model_cls', [PureAnalog, AnalogRegression, PureRegression],
+)
+def test_models_with_multiple_features(model_cls):
+    X, y = sample_X_y
+    model = model_cls()
+    model.fit(X, y)
+    y_hat = model.predict(X)
+    assert len(y_hat) == len(X)
+
+
+@pytest.mark.parametrize(
+    'kind', ['best_analog', 'sample_analogs', 'weight_analogs', 'mean_analogs'],
+)
+def test_gard_analog_models(kind):
+    X, y = sample_X_y
+
+    # test non threshold modeling
+    model = PureAnalog(kind=kind, k=3)
+    model.fit(X, y)
+    y_hat = model.predict(X)
+    error = model.predict(return_errors=True)
+    prob = model.predict(return_exceedance_prob=True)
+    assert len(y_hat) == len(X)
+    assert error
+    assert prob is None
+
+    # test threshold modeling
+    model = PureAnalog(kind=kind, k=3, thresh=0)
+    model.fit(X, y)
+    y_hat = model.predict(X)
+    error = model.predict(return_errors=True)
+    prob = model.predict(return_exceedance_prob=True)
+    assert len(y_hat) == len(X)
+    assert error
+    assert prob
+
+
+@pytest.mark.parametrize('thresh', [None, 0])
+def test_gard_analog_regression_models(thresh):
+    X, y = sample_X_y
+
+    model = AnalogRegression(thresh=thresh)
+    model.fit(X, y)
+    y_hat = model.predict(X)
+    error = model.predict(return_errors=True)
+    prob = model.predict(return_exceedance_prob=True)
+    assert len(prob) == len(error) == len(y_hat) == len(X)
+
+    if model.thresh:
+        assert prob[0]
+    else:
+        assert prob[0] is None
+
+
+@pytest.mark.parametrize('thresh', [None, 0])
+def test_gard_pure_regression_models(thresh):
+    X, y = sample_X_y
+
+    model = PureRegression(thresh=thresh)
+    model.fit(X, y)
+    y_hat = model.predict(X)
+    error = model.predict(return_errors=True)
+    prob = model.predict(return_exceedance_prob=True)
+    assert len(y_hat) == len(X)
+    assert error
+    if model.thresh:
+        assert prob
+    else:
+        assert prob is None
 
 
 @pytest.mark.parametrize('model_cls', [BcsdPrecipitation])
