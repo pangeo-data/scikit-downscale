@@ -25,7 +25,7 @@ def sample_X_y(n=365):
         {'foo': np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10, 'bar': np.random.rand((n))},
         index=index,
     )
-    y = X + 2
+    y = X['foo'] + 2
     return X, y
 
 
@@ -132,7 +132,7 @@ def test_linear_model(model_cls):
 @pytest.mark.parametrize(
     'model_cls', [PureAnalog, AnalogRegression, PureRegression],
 )
-def test_models_with_multiple_features(model_cls):
+def test_models_with_multiple_features(sample_X_y, model_cls):
     X, y = sample_X_y
     model = model_cls()
     model.fit(X, y)
@@ -143,62 +143,60 @@ def test_models_with_multiple_features(model_cls):
 @pytest.mark.parametrize(
     'kind', ['best_analog', 'sample_analogs', 'weight_analogs', 'mean_analogs'],
 )
-def test_gard_analog_models(kind):
+def test_gard_analog_models(sample_X_y, kind):
     X, y = sample_X_y
 
     # test non threshold modeling
-    model = PureAnalog(kind=kind, k=3)
+    model = PureAnalog(kind=kind, n_analogs=3)
     model.fit(X, y)
     y_hat = model.predict(X)
-    error = model.predict(return_errors=True)
-    prob = model.predict(return_exceedance_prob=True)
+    error = model.predict(X, return_errors=True)
+    prob = model.predict(X, return_exceedance_prob=True)
     assert len(y_hat) == len(X)
-    assert error
-    assert prob is None
+    assert len(error) == len(X)
+    assert np.isnan(prob)
 
     # test threshold modeling
-    model = PureAnalog(kind=kind, k=3, thresh=0)
+    model = PureAnalog(kind=kind, n_analogs=3, thresh=0)
     model.fit(X, y)
     y_hat = model.predict(X)
-    error = model.predict(return_errors=True)
-    prob = model.predict(return_exceedance_prob=True)
-    assert len(y_hat) == len(X)
-    assert error
-    assert prob
+    error = model.predict(X, return_errors=True)
+    prob = model.predict(X, return_exceedance_prob=True)
+    assert len(prob) == len(error) == len(y_hat) == len(X)
 
 
 @pytest.mark.parametrize('thresh', [None, 0])
-def test_gard_analog_regression_models(thresh):
+def test_gard_analog_regression_models(sample_X_y, thresh):
     X, y = sample_X_y
 
     model = AnalogRegression(thresh=thresh)
     model.fit(X, y)
     y_hat = model.predict(X)
-    error = model.predict(return_errors=True)
-    prob = model.predict(return_exceedance_prob=True)
+    error = model.predict(X, return_errors=True)
+    prob = model.predict(X, return_exceedance_prob=True)
     assert len(prob) == len(error) == len(y_hat) == len(X)
 
     if model.thresh:
         assert prob[0]
     else:
-        assert prob[0] is None
+        assert np.isnan(prob[0])
 
 
 @pytest.mark.parametrize('thresh', [None, 0])
-def test_gard_pure_regression_models(thresh):
+def test_gard_pure_regression_models(sample_X_y, thresh):
     X, y = sample_X_y
 
     model = PureRegression(thresh=thresh)
     model.fit(X, y)
     y_hat = model.predict(X)
-    error = model.predict(return_errors=True)
-    prob = model.predict(return_exceedance_prob=True)
+    error = model.predict(X, return_errors=True)
+    prob = model.predict(X, return_exceedance_prob=True)
     assert len(y_hat) == len(X)
     assert error
     if model.thresh:
         assert prob
     else:
-        assert prob is None
+        assert np.isnan(prob)
 
 
 @pytest.mark.parametrize('model_cls', [BcsdPrecipitation])

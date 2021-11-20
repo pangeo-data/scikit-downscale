@@ -37,6 +37,7 @@ class AnalogBase(RegressorMixin, BaseEstimator):
         self : returns an instance of self.
         """
         X, y = self._validate_data(X, y=y, y_numeric=True)
+        self.stats_ = {}  # populated in predict methods
 
         if len(X) >= self.n_analogs:
             self.k_ = self.n_analogs
@@ -90,7 +91,6 @@ class AnalogRegression(AnalogBase):
 
         self.n_analogs = n_analogs
         self.thresh = thresh
-        self.stats_ = {}  # to be populated in predict
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
         self.logistic_kwargs = logistic_kwargs
@@ -128,6 +128,9 @@ class AnalogRegression(AnalogBase):
         lr_model = LinearRegression(**lr_kwargs)
 
         # TODO - extract from lr_model's below.
+        self.stats_['error'] = np.empty(len(X))
+        self.stats_['prob'] = np.empty(len(X))
+
         for i in range(len(X)):
             # predict for this time step
             out[i] = self._predict_one_step(
@@ -146,7 +149,7 @@ class AnalogRegression(AnalogBase):
     ):
         if return_exceedance_prob:
             if self.thresh is None:
-                return None
+                return np.nan
             if self.stats_.get('prob', None) is not None:
                 return self.stats_['prob'][i]
 
@@ -166,27 +169,30 @@ class AnalogRegression(AnalogBase):
         if self.thresh is not None:
             exceed_ind = y > self.thresh
         else:
-            exceed_ind = [True] * len(y)
+            exceed_ind = np.array([True] * len(y))
 
-        # if simply returning exceedance prob, train logistic model and don't train linear model
-        if return_exceedance_prob:
+        # train logistic regression model
+        if self.thresh is not None:
             binary_y = exceed_ind.astype(int)
             logistic_model.fit(x, binary_y)
-            exceedance_prob = logistic_model.predict_proba(X)
-            self.stats_['prob'][i] = exceedance_prob
-            return exceedance_prob
+            exceedance_prob = logistic_model.predict_proba(X)[:, 0]
+            self.stats_['prob'][i] = exceedance_prob[0]
 
         # train linear regression model otherwise
         lr_model.fit(x[exceed_ind], y[exceed_ind])
 
-        if return_errors:
-            # calculate the rmse of prediction
-            y_hat = lr_model.predict(x[exceed_ind])
-            error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
-            self.stats_['error'][i] = error
-            return error
+        # calculate the rmse of prediction
+        y_hat = lr_model.predict(x[exceed_ind])
+        error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
+        self.stats_['error'][i] = error
 
         predicted = lr_model.predict(X)
+
+        if return_exceedance_prob:
+            return exceedance_prob
+        if return_errors:
+            return error
+
         return predicted
 
 
@@ -215,7 +221,6 @@ class PureAnalog(AnalogBase):
         self.n_analogs = n_analogs
         self.kind = kind
         self.thresh = thresh
-        self.stats_ = {}  # to be populated in predict
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
 
@@ -237,8 +242,8 @@ class PureAnalog(AnalogBase):
 
         if return_exceedance_prob:
             if self.thresh is None:
-                return None
-            if self.stats_.get('prob', None) is not None:
+                return np.nan
+            elif self.stats_.get('prob', None) is not None:
                 return self.stats_['prob']
 
         elif return_errors:
@@ -266,7 +271,7 @@ class PureAnalog(AnalogBase):
             # There are certainly edge cases not dealt with properly here
             # particularly in the weight analogs case
             analog_mask = analogs > self.thresh
-            masked_analogs = analogs[analog_mask]
+            masked_analogs = np.where(analog_mask, analogs, np.nan)
 
         if kind == 'best_analog':
             predicted = analogs[:, 0]
@@ -282,25 +287,25 @@ class PureAnalog(AnalogBase):
             # work around for zero distances (perfect matches)
             tiny = 1e-20
             weights = 1.0 / np.where(dist == 0, tiny, dist)
-            if self.thresh:
+            if self.thresh is not None:
                 predicted = np.average(masked_analogs, weights=weights, axis=1)
             else:
                 predicted = np.average(analogs.squeeze(), weights=weights, axis=1)
 
         elif kind == 'mean_analogs':
-            if self.thresh:
-                predicted = analogs.mean(axis=1)
-            else:
+            if self.thresh is not None:
                 predicted = masked_analogs.mean(axis=1)
+            else:
+                predicted = analogs.mean(axis=1)
 
         else:
             raise ValueError('got unexpected kind %s' % kind)
 
-        if self.thresh:
+        if self.thresh is not None:
             # for mean/weight cases, this fills nans when all analogs
             # were below thresh
             predicted = np.nan_to_num(predicted, nan=0.0)
-            self.stats_['error'] = analogs.where(analog_mask).std(axis=1)
+            self.stats_['error'] = masked_analogs.std(axis=1)
             # calculate the probability of precip
             self.stats_['prob'] = np.where(analog_mask, 1, 0).mean(axis=1)
         else:
@@ -315,42 +320,48 @@ class PureAnalog(AnalogBase):
 
 
 class PureRegression(RegressorMixin, BaseEstimator):
+    _fit_attributes = ['stats_', 'logistic_model_', 'linear_model_']
+
     def __init__(
         self, thresh=None, logistic_kwargs=None, linear_kwargs=None,
     ):
         self.thresh = thresh
-        self.stats_ = {}  # to be populated in fit
         self.logistic_kwargs = logistic_kwargs
         self.linear_kwargs = linear_kwargs
 
     def fit(self, X, y):
+        X, y = self._validate_data(X, y=y, y_numeric=True)
+        self.stats_ = {}
+
         if self.thresh is not None:
             exceed_ind = y > self.thresh
             binary_y = exceed_ind.astype(int)
             logistic_kwargs = default_none_kwargs(self.logistic_kwargs)
-            self.logistic_model = LogisticRegression(**logistic_kwargs).fit(X, binary_y)
+            self.logistic_model_ = LogisticRegression(**logistic_kwargs).fit(X, binary_y)
         else:
             exceed_ind = [True] * len(y)
 
         linear_kwargs = default_none_kwargs(self.linear_kwargs)
-        self.linear_model = LinearRegression(**linear_kwargs).fit(X[exceed_ind], y[exceed_ind])
+        self.linear_model_ = LinearRegression(**linear_kwargs).fit(X[exceed_ind], y[exceed_ind])
 
-        y_hat = self.model.predict(X[exceed_ind])
+        y_hat = self.linear_model_.predict(X[exceed_ind])
         self.stats_['error'] = mean_squared_error(y[exceed_ind], y_hat, squared=False)
 
         return self
 
     def predict(self, X, return_errors=False, return_exceedance_prob=False):
+        check_is_fitted(self)
+
         # cannot return error and exceedance prob at the same time
         assert not (return_errors is True and return_exceedance_prob is True)
 
         if return_exceedance_prob:
             if self.thresh is not None:
-                return self.logistic_model.predict_proba(X)
+                return self.logistic_model_.predict_proba(X)[:, 0]
             else:
-                return None
+                return np.nan
 
         if return_errors:
-            return self._stats['error']
+            return self.stats_['error']
 
-        return self.linear_model.predict(X)
+        return self.linear_model_.predict(X)
