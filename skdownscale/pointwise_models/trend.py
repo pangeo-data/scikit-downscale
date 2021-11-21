@@ -51,7 +51,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         # validate input data
         check_is_fitted(self)
         X = self._validate_data(X)
-        return X - self._trendline(X)
+        return X - self.trendline(X)
 
     def inverse_transform(self, X):
         """Add the trend back to the data.
@@ -64,9 +64,9 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         # validate input data
         check_is_fitted(self)
         X = self._validate_data(X)
-        return X + self._trendline(X)
+        return X + self.trendline(X)
 
-    def _trendline(self, X):
+    def trendline(self, X):
         """ helper function to calculate a linear trendline """
         X = self._validate_data(X)
         return self.lr_model_.predict(np.arange(len(X)).reshape(-1, 1))
