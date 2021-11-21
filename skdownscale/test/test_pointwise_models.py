@@ -8,6 +8,7 @@ from skdownscale.pointwise_models import (
     AnalogRegression,
     BcsdPrecipitation,
     BcsdTemperature,
+    EquidistantCdfMatcher,
     LinearTrendTransformer,
     PaddedDOYGrouper,
     PureAnalog,
@@ -39,6 +40,8 @@ def sample_X_y(n=365):
         PureRegression(),
         ZScoreRegressor(),
         QuantileMappingReressor(n_endpoints=2),
+        EquidistantCdfMatcher(kind='difference', n_endpoints=2),
+        EquidistantCdfMatcher(kind='ratio', n_endpoints=2),
         # transformers
         LinearTrendTransformer(),
         QuantileMapper(),
@@ -104,17 +107,26 @@ def test_quantile_mapper_detrend():
 
 
 @pytest.mark.parametrize(
-    'model_cls',
+    'model',
     [
-        BcsdTemperature,
-        PureAnalog,
-        AnalogRegression,
-        ZScoreRegressor,
-        QuantileMappingReressor,
-        PureRegression,
+        BcsdTemperature(),
+        PureAnalog(),
+        AnalogRegression(),
+        PureRegression(),
+        ZScoreRegressor(),
+        QuantileMappingReressor(),
+        QuantileMappingReressor(extrapolate='min'),
+        QuantileMappingReressor(extrapolate='max'),
+        QuantileMappingReressor(extrapolate='both'),
+        QuantileMappingReressor(extrapolate='1to1'),
+        EquidistantCdfMatcher(),
+        EquidistantCdfMatcher(extrapolate='min'),
+        EquidistantCdfMatcher(extrapolate='max'),
+        EquidistantCdfMatcher(extrapolate='both'),
+        EquidistantCdfMatcher(extrapolate='1to1'),
     ],
 )
-def test_linear_model(model_cls):
+def test_linear_model(model):
 
     n = 365
     # TODO: add test for time other time ranges (e.g. < 365 days)
@@ -123,7 +135,6 @@ def test_linear_model(model_cls):
     X = pd.DataFrame({'foo': np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10}, index=index)
     y = X + 2
 
-    model = model_cls()
     model.fit(X, y)
     y_hat = model.predict(X)
     assert len(y_hat) == len(X)
@@ -301,3 +312,27 @@ def test_BcsdTemperature_nasanex():
     y = pd.DataFrame({'foo': np.random.random(len(index))}, index=index)
     model_nasanex = BcsdTemperature(time_grouper='daily_nasa-nex', return_anoms=False).fit(X, y)
     assert issubclass(model_nasanex.time_grouper, PaddedDOYGrouper)
+
+
+def test_EquidistantCdfMatcher():
+    x = np.arange(1, 22)
+    projected_change = 2
+    bias = 3
+
+    X_train = pd.DataFrame(x)
+    y_train = pd.DataFrame(x + bias)
+
+    for kind in ['difference', 'ratio']:
+        if kind == 'difference':
+            X_test = pd.DataFrame(x + projected_change)
+        elif kind == 'ratio':
+            X_test = pd.DataFrame(x * projected_change)
+
+        bias_correction_model = EquidistantCdfMatcher(kind=kind)
+        bias_correction_model.fit(X=X_train, y=y_train)
+        y_test = bias_correction_model.predict(X_test)
+
+        if kind == 'difference':
+            assert (y_test.reshape(-1, 1) == (y_train.values + projected_change)).all()
+        elif kind == 'ratio':
+            assert (y_test.reshape(-1, 1) == (y_train.values * projected_change)).all()
