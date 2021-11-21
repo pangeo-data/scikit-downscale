@@ -128,8 +128,8 @@ class AnalogRegression(AnalogBase):
         lr_model = LinearRegression(**lr_kwargs)
 
         # TODO - extract from lr_model's below.
-        self.stats_['error'] = np.empty(len(X))
-        self.stats_['prob'] = np.empty(len(X))
+        self.stats_['error'] = np.zeros(len(X))
+        self.stats_['prob'] = np.ones(len(X))
 
         for i in range(len(X)):
             # predict for this time step
@@ -149,7 +149,7 @@ class AnalogRegression(AnalogBase):
     ):
         if return_exceedance_prob:
             if self.thresh is None:
-                return np.nan
+                return 1.0
             if self.stats_.get('prob', None) is not None:
                 return self.stats_['prob'][i]
 
@@ -172,11 +172,14 @@ class AnalogRegression(AnalogBase):
             exceed_ind = np.array([True] * len(y))
 
         # train logistic regression model
-        if self.thresh is not None:
-            binary_y = exceed_ind.astype(int)
+        binary_y = exceed_ind.astype(int)
+        if not binary_y.mean() == 1:
             logistic_model.fit(x, binary_y)
-            exceedance_prob = logistic_model.predict_proba(X)[:, 0]
-            self.stats_['prob'][i] = exceedance_prob[0]
+            exceedance_prob = logistic_model.predict_proba(X)[:, 0][0]
+        else:
+            exceedance_prob = 1.0
+
+        self.stats_['prob'][i] = exceedance_prob
 
         # train linear regression model otherwise
         lr_model.fit(x[exceed_ind], y[exceed_ind])
@@ -242,7 +245,7 @@ class PureAnalog(AnalogBase):
 
         if return_exceedance_prob:
             if self.thresh is None:
-                return np.nan
+                return np.ones(len(X))
             elif self.stats_.get('prob', None) is not None:
                 return self.stats_['prob']
 
@@ -310,6 +313,7 @@ class PureAnalog(AnalogBase):
             self.stats_['prob'] = np.where(analog_mask, 1, 0).mean(axis=1)
         else:
             self.stats_['error'] = analogs.std(axis=1)
+            self.stats_['prob'] = np.ones(len(X))
 
         if return_exceedance_prob:
             return self.stats_['prob']
@@ -345,7 +349,8 @@ class PureRegression(RegressorMixin, BaseEstimator):
         self.linear_model_ = LinearRegression(**linear_kwargs).fit(X[exceed_ind], y[exceed_ind])
 
         y_hat = self.linear_model_.predict(X[exceed_ind])
-        self.stats_['error'] = mean_squared_error(y[exceed_ind], y_hat, squared=False)
+        error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
+        self.stats_['error'] = np.full(shape=len(X), fill_value=error)
 
         return self
 
@@ -359,7 +364,7 @@ class PureRegression(RegressorMixin, BaseEstimator):
             if self.thresh is not None:
                 return self.logistic_model_.predict_proba(X)[:, 0]
             else:
-                return np.nan
+                return np.ones(len(X))
 
         if return_errors:
             return self.stats_['error']

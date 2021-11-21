@@ -152,9 +152,8 @@ def test_gard_analog_models(sample_X_y, kind):
     y_hat = model.predict(X)
     error = model.predict(X, return_errors=True)
     prob = model.predict(X, return_exceedance_prob=True)
-    assert len(y_hat) == len(X)
-    assert len(error) == len(X)
-    assert np.isnan(prob)
+    assert len(prob) == len(error) == len(y_hat) == len(X)
+    assert (prob == 1).all()
 
     # test threshold modeling
     model = PureAnalog(kind=kind, n_analogs=3, thresh=0)
@@ -163,9 +162,11 @@ def test_gard_analog_models(sample_X_y, kind):
     error = model.predict(X, return_errors=True)
     prob = model.predict(X, return_exceedance_prob=True)
     assert len(prob) == len(error) == len(y_hat) == len(X)
+    assert (prob <= 1).all()
+    assert (prob >= 0).all()
 
 
-@pytest.mark.parametrize('thresh', [None, 0])
+@pytest.mark.parametrize('thresh', [None, 3])
 def test_gard_analog_regression_models(sample_X_y, thresh):
     X, y = sample_X_y
 
@@ -175,14 +176,14 @@ def test_gard_analog_regression_models(sample_X_y, thresh):
     error = model.predict(X, return_errors=True)
     prob = model.predict(X, return_exceedance_prob=True)
     assert len(prob) == len(error) == len(y_hat) == len(X)
-
     if model.thresh:
-        assert prob[0]
+        assert (prob <= 1).all()
+        assert (prob >= 0).all()
     else:
-        assert np.isnan(prob[0])
+        assert (prob == 1).all()
 
 
-@pytest.mark.parametrize('thresh', [None, 0])
+@pytest.mark.parametrize('thresh', [None, 3])
 def test_gard_pure_regression_models(sample_X_y, thresh):
     X, y = sample_X_y
 
@@ -191,12 +192,12 @@ def test_gard_pure_regression_models(sample_X_y, thresh):
     y_hat = model.predict(X)
     error = model.predict(X, return_errors=True)
     prob = model.predict(X, return_exceedance_prob=True)
-    assert len(y_hat) == len(X)
-    assert error
+    assert len(prob) == len(error) == len(y_hat) == len(X)
     if model.thresh:
-        assert prob
+        assert (prob <= 1).all()
+        assert (prob >= 0).all()
     else:
-        assert np.isnan(prob)
+        assert (prob == 1).all()
 
 
 @pytest.mark.parametrize('model_cls', [BcsdPrecipitation])
