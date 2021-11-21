@@ -248,45 +248,42 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
         # If extrapolate is 1to1, apply the offset between X and y to the
         # tails of y_hat
         if self.extrapolate == '1to1':
-            X_fit_len = len(self._X_cdf.vals)
-            X_fit_min = self._X_cdf.vals[0]
-            X_fit_max = self._X_cdf.vals[-1]
+            y_hat = self._extrapolate_1to1(X, y_hat)
 
-            y_fit_len = len(self._y_cdf.vals)
-            y_fit_min = self._y_cdf.vals[0]
-            y_fit_max = self._y_cdf.vals[-1]
+        return y_hat
 
-            # adjust values over fit max
-            inds = X > X_fit_max
-            if inds.any():
-                if X_fit_len == y_fit_len:
-                    y_hat[inds] = y_fit_max + (X[inds] - X_fit_max)
-                elif X_fit_len > y_fit_len:
-                    X_fit_at_y_fit_max = np.interp(
-                        self._y_cdf.pp[-1], self._X_cdf.pp, self._X_cdf.vals
-                    )
-                    y_hat[inds] = y_fit_max + (X[inds] - X_fit_at_y_fit_max)
-                elif X_fit_len < y_fit_len:
-                    y_fit_at_X_fit_max = np.interp(
-                        self._X_cdf.pp[-1], self._y_cdf.pp, self._y_cdf.vals
-                    )
-                    y_hat[inds] = y_fit_at_X_fit_max + (X[inds] - X_fit_max)
+    def _extrapolate_1to1(self, X, y_hat):
+        X_fit_len = len(self._X_cdf.vals)
+        X_fit_min = self._X_cdf.vals[0]
+        X_fit_max = self._X_cdf.vals[-1]
 
-            # adjust values under fit min
-            inds = X < X_fit_min
-            if inds.any():
-                if X_fit_len == y_fit_len:
-                    y_hat[inds] = y_fit_min + (X[inds] - X_fit_min)
-                elif X_fit_len > y_fit_len:
-                    X_fit_at_y_fit_min = np.interp(
-                        self._y_cdf.pp[0], self._X_cdf.pp, self._X_cdf.vals
-                    )
-                    y_hat[inds] = X_fit_min + (X[inds] - X_fit_at_y_fit_min)
-                elif X_fit_len < y_fit_len:
-                    y_fit_at_X_fit_min = np.interp(
-                        self._X_cdf.pp[0], self._y_cdf.pp, self._y_cdf.vals
-                    )
-                    y_hat[inds] = y_fit_at_X_fit_min + (X[inds] - X_fit_min)
+        y_fit_len = len(self._y_cdf.vals)
+        y_fit_min = self._y_cdf.vals[0]
+        y_fit_max = self._y_cdf.vals[-1]
+
+        # adjust values over fit max
+        inds = X > X_fit_max
+        if inds.any():
+            if X_fit_len == y_fit_len:
+                y_hat[inds] = y_fit_max + (X[inds] - X_fit_max)
+            elif X_fit_len > y_fit_len:
+                X_fit_at_y_fit_max = np.interp(self._y_cdf.pp[-1], self._X_cdf.pp, self._X_cdf.vals)
+                y_hat[inds] = y_fit_max + (X[inds] - X_fit_at_y_fit_max)
+            elif X_fit_len < y_fit_len:
+                y_fit_at_X_fit_max = np.interp(self._X_cdf.pp[-1], self._y_cdf.pp, self._y_cdf.vals)
+                y_hat[inds] = y_fit_at_X_fit_max + (X[inds] - X_fit_max)
+
+        # adjust values under fit min
+        inds = X < X_fit_min
+        if inds.any():
+            if X_fit_len == y_fit_len:
+                y_hat[inds] = y_fit_min + (X[inds] - X_fit_min)
+            elif X_fit_len > y_fit_len:
+                X_fit_at_y_fit_min = np.interp(self._y_cdf.pp[0], self._X_cdf.pp, self._X_cdf.vals)
+                y_hat[inds] = X_fit_min + (X[inds] - X_fit_at_y_fit_min)
+            elif X_fit_len < y_fit_len:
+                y_fit_at_X_fit_min = np.interp(self._X_cdf.pp[0], self._y_cdf.pp, self._y_cdf.vals)
+                y_hat[inds] = y_fit_at_X_fit_min + (X[inds] - X_fit_min)
 
         return y_hat
 
@@ -473,45 +470,7 @@ class EquidistantCdfMatcher(QuantileMappingReressor):
         # If extrapolate is 1to1, apply the offset between X and y to the
         # tails of y_hat
         if self.extrapolate == '1to1':
-            X_fit_len = len(self._X_cdf.vals)
-            X_fit_min = self._X_cdf.vals[0]
-            X_fit_max = self._X_cdf.vals[-1]
-
-            y_fit_len = len(self._y_cdf.vals)
-            y_fit_min = self._y_cdf.vals[0]
-            y_fit_max = self._y_cdf.vals[-1]
-
-            # adjust values over fit max
-            inds = X > X_fit_max
-            if inds.any():
-                if X_fit_len == y_fit_len:
-                    y_hat[inds] = y_fit_max + (X[inds] - X_fit_max)
-                elif X_fit_len > y_fit_len:
-                    X_fit_at_y_fit_max = np.interp(
-                        self._y_cdf.pp[-1], self._X_cdf.pp, self._X_cdf.vals
-                    )
-                    y_hat[inds] = y_fit_max + (X[inds] - X_fit_at_y_fit_max)
-                elif X_fit_len < y_fit_len:
-                    y_fit_at_X_fit_max = np.interp(
-                        self._X_cdf.pp[-1], self._y_cdf.pp, self._y_cdf.vals
-                    )
-                    y_hat[inds] = y_fit_at_X_fit_max + (X[inds] - X_fit_max)
-
-            # adjust values under fit min
-            inds = X < X_fit_min
-            if inds.any():
-                if X_fit_len == y_fit_len:
-                    y_hat[inds] = y_fit_min + (X[inds] - X_fit_min)
-                elif X_fit_len > y_fit_len:
-                    X_fit_at_y_fit_min = np.interp(
-                        self._y_cdf.pp[0], self._X_cdf.pp, self._X_cdf.vals
-                    )
-                    y_hat[inds] = X_fit_min + (X[inds] - X_fit_at_y_fit_min)
-                elif X_fit_len < y_fit_len:
-                    y_fit_at_X_fit_min = np.interp(
-                        self._X_cdf.pp[0], self._y_cdf.pp, self._y_cdf.vals
-                    )
-                    y_hat[inds] = y_fit_at_X_fit_min + (X[inds] - X_fit_min)
+            y_hat = self._extrapolate_1to1(X, y_hat)
 
         return y_hat
 

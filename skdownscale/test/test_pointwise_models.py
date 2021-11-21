@@ -94,17 +94,25 @@ def test_quantile_mapper_detrend():
 
 
 @pytest.mark.parametrize(
-    'model_cls',
+    'model',
     [
-        BcsdTemperature,
-        PureAnalog,
-        AnalogRegression,
-        ZScoreRegressor,
-        QuantileMappingReressor,
-        EquidistantCdfMatcher,
+        BcsdTemperature(),
+        PureAnalog(),
+        AnalogRegression(),
+        ZScoreRegressor(),
+        QuantileMappingReressor(),
+        QuantileMappingReressor(extrapolate='min'),
+        QuantileMappingReressor(extrapolate='max'),
+        QuantileMappingReressor(extrapolate='both'),
+        QuantileMappingReressor(extrapolate='1to1'),
+        EquidistantCdfMatcher(),
+        EquidistantCdfMatcher(extrapolate='min'),
+        EquidistantCdfMatcher(extrapolate='max'),
+        EquidistantCdfMatcher(extrapolate='both'),
+        EquidistantCdfMatcher(extrapolate='1to1'),
     ],
 )
-def test_linear_model(model_cls):
+def test_linear_model(model):
 
     n = 365
     # TODO: add test for time other time ranges (e.g. < 365 days)
@@ -113,7 +121,6 @@ def test_linear_model(model_cls):
     X = pd.DataFrame({'foo': np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10}, index=index)
     y = X + 2
 
-    model = model_cls()
     model.fit(X, y)
     y_hat = model.predict(X)
     assert len(y_hat) == len(X)
