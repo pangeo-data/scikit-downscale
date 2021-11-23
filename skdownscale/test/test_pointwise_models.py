@@ -161,8 +161,8 @@ def test_gard_analog_models(sample_X_y, kind):
     model = PureAnalog(kind=kind, n_analogs=3)
     model.fit(X, y)
     y_hat = model.predict(X)
-    error = model.predict(X, return_errors=True)
-    prob = model.predict(X, return_exceedance_prob=True)
+    error = model.prediction_error_
+    prob = model.exceedance_prob_
     assert len(prob) == len(error) == len(y_hat) == len(X)
     assert (prob == 1).all()
 
@@ -170,8 +170,8 @@ def test_gard_analog_models(sample_X_y, kind):
     model = PureAnalog(kind=kind, n_analogs=3, thresh=0)
     model.fit(X, y)
     y_hat = model.predict(X)
-    error = model.predict(X, return_errors=True)
-    prob = model.predict(X, return_exceedance_prob=True)
+    error = model.prediction_error_
+    prob = model.exceedance_prob_
     assert len(prob) == len(error) == len(y_hat) == len(X)
     assert (prob <= 1).all()
     assert (prob >= 0).all()
@@ -184,8 +184,8 @@ def test_gard_analog_regression_models(sample_X_y, thresh):
     model = AnalogRegression(thresh=thresh)
     model.fit(X, y)
     y_hat = model.predict(X)
-    error = model.predict(X, return_errors=True)
-    prob = model.predict(X, return_exceedance_prob=True)
+    error = model.prediction_error_
+    prob = model.exceedance_prob_
     assert len(prob) == len(error) == len(y_hat) == len(X)
     if model.thresh:
         assert (prob <= 1).all()
@@ -201,8 +201,8 @@ def test_gard_pure_regression_models(sample_X_y, thresh):
     model = PureRegression(thresh=thresh)
     model.fit(X, y)
     y_hat = model.predict(X)
-    error = model.predict(X, return_errors=True)
-    prob = model.predict(X, return_exceedance_prob=True)
+    error = model.prediction_error_
+    prob = model.exceedance_prob_
     assert len(prob) == len(error) == len(y_hat) == len(X)
     if model.thresh:
         assert (prob <= 1).all()

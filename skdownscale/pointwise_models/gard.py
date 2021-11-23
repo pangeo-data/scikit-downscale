@@ -37,7 +37,8 @@ class AnalogBase(RegressorMixin, BaseEstimator):
         self : returns an instance of self.
         """
         X, y = self._validate_data(X, y=y, y_numeric=True)
-        self.stats_ = {}  # populated in predict methods
+        self.prediction_error_ = []  # populated in predict methods
+        self.exceedance_prob_ = []  # populated in predict methods
 
         if len(X) >= self.n_analogs:
             self.k_ = self.n_analogs
@@ -52,6 +53,13 @@ class AnalogBase(RegressorMixin, BaseEstimator):
         self.y_ = y
 
         return self
+
+    def _more_tags(self):
+        return {
+            '_xfail_checks': {
+                'check_dict_unchanged': 'GARD models store prediction error and exceedance probabilities during predict',
+            },
+        }
 
 
 class AnalogRegression(AnalogBase):
@@ -96,24 +104,19 @@ class AnalogRegression(AnalogBase):
         self.logistic_kwargs = logistic_kwargs
         self.lr_kwargs = lr_kwargs
 
-    def predict(self, X, return_errors=False, return_exceedance_prob=False):
+    def predict(self, X):
         """ Predict using the AnalogRegression model
 
         Parameters
         ----------
         X : DataFrame, shape (n_samples, 1)
             Samples.
-        return_errors : bool
-        return_exceedance_prob : bool
 
         Returns
         -------
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
         """
-        # cannot return error and exceedance prob at the same time
-        assert not (return_errors is True and return_exceedance_prob is True)
-
         # validate input data
         check_is_fitted(self)
         X = check_array(X)
@@ -122,41 +125,22 @@ class AnalogRegression(AnalogBase):
 
         # not used if self.thresh = None, instantiating to keep the code clean
         logistic_kwargs = default_none_kwargs(self.logistic_kwargs)
-        logistic_model = LogisticRegression(**logistic_kwargs)
+        logistic_model = LogisticRegression(**logistic_kwargs) if self.thresh is not None else None
 
         lr_kwargs = default_none_kwargs(self.lr_kwargs)
         lr_model = LinearRegression(**lr_kwargs)
 
         # TODO - extract from lr_model's below.
-        self.stats_['error'] = np.zeros(len(X))
-        self.stats_['prob'] = np.ones(len(X))
+        self.prediction_error_ = np.zeros(len(X))
+        self.exceedance_prob_ = np.ones(len(X))
 
         for i in range(len(X)):
             # predict for this time step
-            out[i] = self._predict_one_step(
-                logistic_model,
-                lr_model,
-                X[None, i],
-                i,
-                return_errors=return_errors,
-                return_exceedance_prob=return_exceedance_prob,
-            )
+            out[i] = self._predict_one_step(logistic_model, lr_model, X[None, i], i,)
 
         return out
 
-    def _predict_one_step(
-        self, logistic_model, lr_model, X, i, return_errors=False, return_exceedance_prob=False
-    ):
-        if return_exceedance_prob:
-            if self.thresh is None:
-                return 1.0
-            if self.stats_.get('prob', None) is not None:
-                return self.stats_['prob'][i]
-
-        if return_errors:
-            if self.stats_.get('error', None) is not None:
-                return self.stats_['error'][i]
-
+    def _predict_one_step(self, logistic_model, lr_model, X, i):
         # get analogs
         query_kwargs = default_none_kwargs(self.query_kwargs)
         inds = self.kdtree_.query(X, k=self.k_, return_distance=False, **query_kwargs).squeeze()
@@ -179,22 +163,17 @@ class AnalogRegression(AnalogBase):
         else:
             exceedance_prob = 1.0
 
-        self.stats_['prob'][i] = exceedance_prob
+        self.exceedance_prob_[i] = exceedance_prob
 
-        # train linear regression model otherwise
+        # train linear regression model on data above threshold of interest
         lr_model.fit(x[exceed_ind], y[exceed_ind])
 
         # calculate the rmse of prediction
         y_hat = lr_model.predict(x[exceed_ind])
         error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
-        self.stats_['error'][i] = error
+        self.prediction_error_[i] = error
 
         predicted = lr_model.predict(X)
-
-        if return_exceedance_prob:
-            return exceedance_prob
-        if return_errors:
-            return error
 
         return predicted
 
@@ -227,7 +206,7 @@ class PureAnalog(AnalogBase):
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
 
-    def predict(self, X, return_errors=False, return_exceedance_prob=False):
+    def predict(self, X):
         """Predict using the PureAnalog model
 
         Parameters
@@ -240,19 +219,6 @@ class PureAnalog(AnalogBase):
         C : pd.DataFrame, shape (n_samples, 1)
             Returns predicted values.
         """
-        # cannot return error and exceedance prob at the same time
-        assert not (return_errors is True and return_exceedance_prob is True)
-
-        if return_exceedance_prob:
-            if self.thresh is None:
-                return np.ones(len(X))
-            elif self.stats_.get('prob', None) is not None:
-                return self.stats_['prob']
-
-        elif return_errors:
-            if self.stats_.get('error', None) is not None:
-                return self.stats_['error']
-
         # validate input data
         check_is_fitted(self)
         X = check_array(X)
@@ -308,17 +274,11 @@ class PureAnalog(AnalogBase):
             # for mean/weight cases, this fills nans when all analogs
             # were below thresh
             predicted = np.nan_to_num(predicted, nan=0.0)
-            self.stats_['error'] = masked_analogs.std(axis=1)
-            # calculate the probability of precip
-            self.stats_['prob'] = np.where(analog_mask, 1, 0).mean(axis=1)
+            self.prediction_error_ = masked_analogs.std(axis=1)
+            self.exceedance_prob_ = np.where(analog_mask, 1, 0).mean(axis=1)
         else:
-            self.stats_['error'] = analogs.std(axis=1)
-            self.stats_['prob'] = np.ones(len(X))
-
-        if return_exceedance_prob:
-            return self.stats_['prob']
-        elif return_errors:
-            return self.stats_['error']
+            self.prediction_error_ = analogs.std(axis=1)
+            self.exceedance_prob_ = np.ones(len(X))
 
         return predicted
 
@@ -350,23 +310,24 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
         y_hat = self.linear_model_.predict(X[exceed_ind])
         error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
-        self.stats_['error'] = np.full(shape=len(X), fill_value=error)
+        self.prediction_error_ = np.full(shape=len(X), fill_value=error)
+        self.exceedance_prob_ = []  # populated in predict
 
         return self
 
-    def predict(self, X, return_errors=False, return_exceedance_prob=False):
+    def predict(self, X):
         check_is_fitted(self)
 
-        # cannot return error and exceedance prob at the same time
-        assert not (return_errors is True and return_exceedance_prob is True)
-
-        if return_exceedance_prob:
-            if self.thresh is not None:
-                return self.logistic_model_.predict_proba(X)[:, 0]
-            else:
-                return np.ones(len(X))
-
-        if return_errors:
-            return self.stats_['error']
+        if self.thresh is not None:
+            self.exceedance_prob_ = self.logistic_model_.predict_proba(X)[:, 0]
+        else:
+            self.exceedance_prob_ = np.ones(len(np.asarray(X)))
 
         return self.linear_model_.predict(X)
+
+    def _more_tags(self):
+        return {
+            '_xfail_checks': {
+                'check_dict_unchanged': 'GARD models store prediction error and exceedance probabilities during predict',
+            },
+        }
