@@ -1,4 +1,5 @@
 import copy
+from typing import List, Union
 
 import numpy as np
 import pandas as pd
@@ -113,6 +114,22 @@ def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
         xtrans_df = model.item().transform(xdf, **kwargs)
         xtrans[index] = xtrans_df.squeeze()
     return xtrans
+
+
+def _getattr_wrapper(models, keys):
+    dims = list(models.dims)
+    shape = list(models.shape)
+    coords = dict(models.coords)
+
+    out = xr.Dataset()
+    for key in keys:
+        out[key] = xr.DataArray(np.empty(shape), coords=coords, dims=dims)
+
+    for index, model in xenumerate(models):
+        for key in keys:
+            out[key][index] = getattr(model.item(), key)
+
+    return out
 
 
 class PointWiseDownscaler:
@@ -242,6 +259,22 @@ class PointWiseDownscaler:
             return xr.map_blocks(_transform_wrapper, X, args=[self._models], kwargs=kws)
         else:
             return _transform_wrapper(X, self._models, **kws)
+
+    def get_attr(self, keys: Union[str, List[str]]) -> xr.Dataset:
+        """
+        Get attribute values specified in keys from each of the pointwise models
+
+        Parameters
+        ----------
+        keys: str or List[str]
+        """
+        if isinstance(keys, str):
+            keys = [keys]
+
+        if self._models.chunks:
+            return xr.map_blocks(_getattr_wrapper, self._models, args=[keys])
+        else:
+            return _getattr_wrapper(self._models, keys)
 
     def _to_feature_x(self, X, feature_dim=DEFAULT_FEATURE_DIM):
         # xarray.Dataset --> xarray.DataArray
