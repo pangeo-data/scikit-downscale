@@ -153,7 +153,7 @@ class AnalogRegression(AnalogBase):
         if self.thresh is not None:
             exceed_ind = y > self.thresh
         else:
-            exceed_ind = np.array([True] * len(y))
+            exceed_ind = np.ones(len(y), dtype=bool)
 
         # train logistic regression model
         binary_y = exceed_ind.astype(int)
