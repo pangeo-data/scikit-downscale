@@ -20,7 +20,7 @@ def select_analogs(analogs, inds):
 
 
 class AnalogBase(RegressorMixin, BaseEstimator):
-    _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_']
+    _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_', 'prediction_error_', 'exceedance_prob_']
 
     def fit(self, X, y):
         """ Fit Analog model using a KDTree
@@ -85,6 +85,11 @@ class AnalogRegression(AnalogBase):
     ----------
     kdtree_ : sklearn.neighbors.KDTree
         KDTree object
+
+    Notes
+    -----
+    GARD models store prediction error  (`model.prediction_error_`) and
+    exceedance probabilities (`model.exceedance_prob_`) for the last prediction.
     """
 
     def __init__(
@@ -131,8 +136,8 @@ class AnalogRegression(AnalogBase):
         lr_model = LinearRegression(**lr_kwargs)
 
         # TODO - extract from lr_model's below.
-        self.prediction_error_ = np.zeros(len(X))
-        self.exceedance_prob_ = np.ones(len(X))
+        self.prediction_error_ = np.zeros(len(X), dtype=np.float64)
+        self.exceedance_prob_ = np.ones(len(X), dtype=np.float64)
 
         for i in range(len(X)):
             # predict for this time step
@@ -153,17 +158,15 @@ class AnalogRegression(AnalogBase):
         if self.thresh is not None:
             exceed_ind = y > self.thresh
         else:
-            exceed_ind = np.array([True] * len(y))
+            exceed_ind = np.ones(len(y), dtype=bool)
 
         # train logistic regression model
-        binary_y = exceed_ind.astype(int)
-        if not binary_y.mean() == 1:
+        binary_y = exceed_ind.astype(np.int8)
+        if not np.all(binary_y == 1):
             logistic_model.fit(x, binary_y)
-            exceedance_prob = logistic_model.predict_proba(X)[:, 0][0]
+            self.exceedance_prob_[i] = logistic_model.predict_proba(X)[0, 0]
         else:
-            exceedance_prob = 1.0
-
-        self.exceedance_prob_[i] = exceedance_prob
+            self.exceedance_prob_[i] = 1.0
 
         # train linear regression model on data above threshold of interest
         lr_model.fit(x[exceed_ind], y[exceed_ind])
@@ -180,11 +183,8 @@ class AnalogRegression(AnalogBase):
 
 class PureAnalog(AnalogBase):
     """ PureAnalog
-
-    Attributes
+    Parameters
     ----------
-    kdtree_ : sklearn.neighbors.KDTree
-        KDTree object
     n_analogs : int
         Number of analogs to use
     thresh : float
@@ -195,6 +195,16 @@ class PureAnalog(AnalogBase):
         Dictionary of keyword arguments to pass to cKDTree constructor
     query_kwargs : dict
         Dictionary of keyword arguments to pass to `cKDTree.query`
+
+    Attributes
+    ----------
+    kdtree_ : sklearn.neighbors.KDTree
+        KDTree object
+
+    Notes
+    -----
+    GARD models store prediction error  (`model.prediction_error_`) and
+    exceedance probabilities (`model.exceedance_prob_`) for the last prediction.
     """
 
     def __init__(
@@ -278,13 +288,40 @@ class PureAnalog(AnalogBase):
             self.exceedance_prob_ = np.where(analog_mask, 1, 0).mean(axis=1)
         else:
             self.prediction_error_ = analogs.std(axis=1)
-            self.exceedance_prob_ = np.ones(len(X))
+            self.exceedance_prob_ = np.ones(len(X), dtype=np.float64)
 
         return predicted
 
 
 class PureRegression(RegressorMixin, BaseEstimator):
-    _fit_attributes = ['stats_', 'logistic_model_', 'linear_model_']
+    """ PureRegression
+    Parameters
+    ----------
+    thresh : float
+        Subset analogs based on threshold
+    logistic_kwargs : dict
+        Dictionary of keyword arguments to pass to logistic regression model
+    linear_kwargs : dict
+        Dictionary of keyword arguments to pass to linear regression model
+
+    Attributes
+    ----------
+    kdtree_ : sklearn.neighbors.KDTree
+        KDTree object
+
+    Notes
+    -----
+    GARD pure regression models store prediction error  (`model.prediction_error_`) for the last fit and
+    exceedance probabilities (`model.exceedance_prob_`) for the last prediction.
+    """
+
+    _fit_attributes = [
+        'stats_',
+        'logistic_model_',
+        'linear_model_',
+        'prediction_error_',
+        'exceedance_prob_',
+    ]
 
     def __init__(
         self, thresh=None, logistic_kwargs=None, linear_kwargs=None,
@@ -299,11 +336,11 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
         if self.thresh is not None:
             exceed_ind = y > self.thresh
-            binary_y = exceed_ind.astype(int)
+            binary_y = exceed_ind.astype(np.int8)
             logistic_kwargs = default_none_kwargs(self.logistic_kwargs)
             self.logistic_model_ = LogisticRegression(**logistic_kwargs).fit(X, binary_y)
         else:
-            exceed_ind = [True] * len(y)
+            exceed_ind = np.ones(len(y), dtype=bool)
 
         linear_kwargs = default_none_kwargs(self.linear_kwargs)
         self.linear_model_ = LinearRegression(**linear_kwargs).fit(X[exceed_ind], y[exceed_ind])
@@ -321,7 +358,7 @@ class PureRegression(RegressorMixin, BaseEstimator):
         if self.thresh is not None:
             self.exceedance_prob_ = self.logistic_model_.predict_proba(X)[:, 0]
         else:
-            self.exceedance_prob_ = np.ones(len(np.asarray(X)))
+            self.exceedance_prob_ = np.ones(len(np.asarray(X)), dtype=np.float64)
 
         return self.linear_model_.predict(X)
 
