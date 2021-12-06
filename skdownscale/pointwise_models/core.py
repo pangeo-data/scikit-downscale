@@ -1,5 +1,5 @@
 import copy
-from typing import List, Union
+from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -116,18 +116,26 @@ def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
     return xtrans
 
 
-def _getattr_wrapper(models, keys):
-    dims = list(models.dims)
-    shape = list(models.shape)
-    coords = dict(models.coords)
+def _getattr_wrapper(models, key, template_output=None):
+    if template_output is None:
+        dims = list(models.dims)
+        shape = list(models.shape)
+        coords = dict(models.coords)
+    else:
+        dims = list(template_output.dims)
+        shape = list(template_output.shape)
+        coords = dict(template_output.coords)
 
-    out = xr.Dataset()
-    for key in keys:
-        out[key] = xr.DataArray(np.empty(shape), coords=coords, dims=dims)
-
+    # construct output dataset
+    # use the first model in the numerator to define dtype of output
     for index, model in xenumerate(models):
-        for key in keys:
-            out[key][index] = getattr(model.item(), key)
+        dtype = type(getattr(model.item(), key))
+        out = xr.DataArray(np.empty(shape, dtype), coords=coords, dims=dims)
+        break
+
+    # iterate through models to get attribute values
+    for index, model in xenumerate(models):
+        out[index] = getattr(model.item(), key)
 
     return out
 
@@ -260,21 +268,27 @@ class PointWiseDownscaler:
         else:
             return _transform_wrapper(X, self._models, **kws)
 
-    def get_attr(self, keys: Union[str, List[str]]) -> xr.Dataset:
+    def get_attr(self, key: str, template_output: Optional[xr.DataArray] = None) -> xr.Dataset:
         """
-        Get attribute values specified in keys from each of the pointwise models
+        Get attribute values specified in key from each of the pointwise models
 
         Parameters
         ----------
-        keys: str or List[str]
+        key: str
+        template_output: template data array or dataset of the output dimensions
         """
-        if isinstance(keys, str):
-            keys = [keys]
+        kws = {'template_output': template_output}
 
         if self._models.chunks:
-            return xr.map_blocks(_getattr_wrapper, self._models, args=[keys])
+            if template_output is not None:
+                template = xr.full_like(template_output, None, dtype=np.object)
+            else:
+                template = xr.full_like(self._models, None, dtype=np.object)
+            return xr.map_blocks(
+                _getattr_wrapper, self._models, args=[key], kwargs=kws, template=template
+            )
         else:
-            return _getattr_wrapper(self._models, keys)
+            return _getattr_wrapper(self._models, key, **kws)
 
     def _to_feature_x(self, X, feature_dim=DEFAULT_FEATURE_DIM):
         # xarray.Dataset --> xarray.DataArray
