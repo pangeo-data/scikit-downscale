@@ -316,10 +316,10 @@ class PureRegression(RegressorMixin, BaseEstimator):
     """
 
     _fit_attributes = [
-        'stats_',
         'logistic_model_',
         'linear_model_',
         'prediction_error_',
+        'fit_error_',
         'exceedance_prob_',
     ]
 
@@ -332,7 +332,6 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
     def fit(self, X, y):
         X, y = self._validate_data(X, y=y, y_numeric=True)
-        self.stats_ = {}
 
         if self.thresh is not None:
             exceed_ind = y > self.thresh
@@ -347,7 +346,8 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
         y_hat = self.linear_model_.predict(X[exceed_ind])
         error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
-        self.prediction_error_ = np.full(shape=len(X), fill_value=error)
+        self.fit_error_ = error
+        self.prediction_error_ = []  # populated in predict
         self.exceedance_prob_ = []  # populated in predict
 
         return self
@@ -359,6 +359,10 @@ class PureRegression(RegressorMixin, BaseEstimator):
             self.exceedance_prob_ = self.logistic_model_.predict_proba(X)[:, 0]
         else:
             self.exceedance_prob_ = np.ones(len(np.asarray(X)), dtype=np.float64)
+
+        self.prediction_error_ = np.full(
+            shape=len(np.asarray(X)), dtype=np.float64, fill_value=self.fit_error_
+        )
 
         return self.linear_model_.predict(X)
 
