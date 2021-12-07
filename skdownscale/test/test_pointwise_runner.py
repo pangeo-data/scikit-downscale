@@ -47,6 +47,13 @@ def test_pointwise_model(X, y):
     assert y_pred.sizes == y.sizes
     assert y.chunks == y_pred.chunks
 
+    keys = ['memory', 'verbose']
+    attrs = model.get_attr(keys)
+    assert isinstance(attrs, xr.Dataset)
+    for key in keys:
+        assert isinstance(attrs[key], xr.DataArray)
+        assert attrs[key].sizes == model._models.sizes
+
 
 @pytest.mark.parametrize(
     'X',
