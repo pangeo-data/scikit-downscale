@@ -116,7 +116,7 @@ def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
     return xtrans
 
 
-def _getattr_wrapper(models, key, template_output=None):
+def _getattr_wrapper(models, key, dtype, template_output=None):
     if template_output is None:
         dims = list(models.dims)
         shape = list(models.shape)
@@ -127,11 +127,7 @@ def _getattr_wrapper(models, key, template_output=None):
         coords = dict(template_output.coords)
 
     # construct output dataset
-    # use the first model in the numerator to define dtype of output
-    for index, model in xenumerate(models):
-        dtype = type(getattr(model.item(), key))
-        out = xr.DataArray(np.empty(shape, dtype), coords=coords, dims=dims)
-        break
+    out = xr.DataArray(np.empty(shape, dtype), coords=coords, dims=dims)
 
     # iterate through models to get attribute values
     for index, model in xenumerate(models):
@@ -201,7 +197,7 @@ class PointWiseDownscaler:
         if X.chunks:
             reduce_dims = [self._dim, kws['feature_dim']]
             mask = _make_mask(X, reduce_dims)
-            template = xr.full_like(mask, None, dtype=np.object)
+            template = xr.full_like(mask, None, dtype=object)
             self._models = xr.map_blocks(_fit_wrapper, X, args=args, kwargs=kws, template=template)
         else:
             self._models = _fit_wrapper(X, *args, **kws)
@@ -268,27 +264,40 @@ class PointWiseDownscaler:
         else:
             return _transform_wrapper(X, self._models, **kws)
 
-    def get_attr(self, key: str, template_output: Optional[xr.DataArray] = None) -> xr.Dataset:
+    def get_attr(
+        self, key: str, dtype: str, template_output: Optional[Union[xr.DataArray]] = None
+    ) -> xr.Dataset:
         """
         Get attribute values specified in key from each of the pointwise models
 
         Parameters
         ----------
         key: str
+        dtype: expected dtype of the values
         template_output: template data array or dataset of the output dimensions
         """
-        kws = {'template_output': template_output}
-
         if self._models.chunks:
             if template_output is not None:
-                template = xr.full_like(template_output, None, dtype=np.object)
+                template = xr.full_like(template_output, None, dtype=dtype)
+                # there is currently a bug in xarray map block such that the template output has to be a dataset instead of a dataarray
+                return xr.map_blocks(
+                    _getattr_wrapper,
+                    self._models,
+                    args=[key, dtype, template_output.to_dataset()],
+                    template=template,
+                )
+
             else:
-                template = xr.full_like(self._models, None, dtype=np.object)
-            return xr.map_blocks(
-                _getattr_wrapper, self._models, args=[key], kwargs=kws, template=template
-            )
+                template = xr.full_like(self._models, None, dtype=dtype)
+                return xr.map_blocks(
+                    _getattr_wrapper, self._models, args=[key, dtype], template=template
+                )
+
         else:
-            return _getattr_wrapper(self._models, key, **kws)
+            if template_output is not None:
+                return _getattr_wrapper(self._models, key, dtype, template_output)
+            else:
+                return _getattr_wrapper(self._models, key, dtype)
 
     def _to_feature_x(self, X, feature_dim=DEFAULT_FEATURE_DIM):
         # xarray.Dataset --> xarray.DataArray
