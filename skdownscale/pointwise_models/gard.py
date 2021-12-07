@@ -2,7 +2,8 @@ import warnings
 
 import numpy as np
 from sklearn.base import BaseEstimator, RegressorMixin
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import mean_squared_error
 from sklearn.neighbors import KDTree
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
@@ -19,14 +20,14 @@ def select_analogs(analogs, inds):
 
 
 class AnalogBase(RegressorMixin, BaseEstimator):
-    _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_']
+    _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_', 'prediction_error_', 'exceedance_prob_']
 
     def fit(self, X, y):
         """ Fit Analog model using a KDTree
 
         Parameters
         ----------
-        X : pd.Series or pd.DataFrame, shape (n_samples, 1)
+        X : pd.Series or pd.DataFrame, shape (n_samples, n_features)
             Training data
         y : pd.Series or pd.DataFrame, shape (n_samples, 1)
             Target values.
@@ -36,7 +37,8 @@ class AnalogBase(RegressorMixin, BaseEstimator):
         self : returns an instance of self.
         """
         X, y = self._validate_data(X, y=y, y_numeric=True)
-        self.stats_ = {}  # populated in predict methods
+        self.prediction_error_ = []  # populated in predict methods
+        self.exceedance_prob_ = []  # populated in predict methods
 
         if len(X) >= self.n_analogs:
             self.k_ = self.n_analogs
@@ -52,6 +54,13 @@ class AnalogBase(RegressorMixin, BaseEstimator):
 
         return self
 
+    def _more_tags(self):
+        return {
+            '_xfail_checks': {
+                'check_dict_unchanged': 'GARD models store prediction error and exceedance probabilities during predict',
+            },
+        }
+
 
 class AnalogRegression(AnalogBase):
     """ AnalogRegression
@@ -60,6 +69,10 @@ class AnalogRegression(AnalogBase):
     ----------
     n_analogs: int
         Number of analogs to use when building linear regression
+    thresh: float or int
+        Threshold value. If provided, the model will predict:
+        1) the probability of this threshold being exceeded, and
+        2) the value given the threshold is exceeded
     kdtree_kwargs : dict
         Keyword arguments to pass to the sklearn.neighbors.KDTree constructor
     query_kwargs : dict
@@ -72,13 +85,28 @@ class AnalogRegression(AnalogBase):
     ----------
     kdtree_ : sklearn.neighbors.KDTree
         KDTree object
+
+    Notes
+    -----
+    GARD models store prediction error  (`model.prediction_error_`) and
+    exceedance probabilities (`model.exceedance_prob_`) for the last prediction.
     """
 
-    def __init__(self, n_analogs=200, kdtree_kwargs=None, query_kwargs=None, lr_kwargs=None):
+    def __init__(
+        self,
+        n_analogs=200,
+        thresh=None,
+        kdtree_kwargs=None,
+        query_kwargs=None,
+        logistic_kwargs=None,
+        lr_kwargs=None,
+    ):
 
         self.n_analogs = n_analogs
+        self.thresh = thresh
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
+        self.logistic_kwargs = logistic_kwargs
         self.lr_kwargs = lr_kwargs
 
     def predict(self, X):
@@ -98,21 +126,26 @@ class AnalogRegression(AnalogBase):
         check_is_fitted(self)
         X = check_array(X)
 
-        predicted = np.empty(len(X))
+        out = np.empty(len(X))
+
+        # not used if self.thresh = None, instantiating to keep the code clean
+        logistic_kwargs = default_none_kwargs(self.logistic_kwargs)
+        logistic_model = LogisticRegression(**logistic_kwargs) if self.thresh is not None else None
 
         lr_kwargs = default_none_kwargs(self.lr_kwargs)
         lr_model = LinearRegression(**lr_kwargs)
 
         # TODO - extract from lr_model's below.
+        self.prediction_error_ = np.zeros(len(X), dtype=np.float64)
+        self.exceedance_prob_ = np.ones(len(X), dtype=np.float64)
 
         for i in range(len(X)):
             # predict for this time step
-            predicted[i] = self._predict_one_step(lr_model, X[None, i])
+            out[i] = self._predict_one_step(logistic_model, lr_model, X[None, i], i,)
 
-        return predicted
+        return out
 
-    def _predict_one_step(self, lr_model, X):
-
+    def _predict_one_step(self, logistic_model, lr_model, X, i):
         # get analogs
         query_kwargs = default_none_kwargs(self.query_kwargs)
         inds = self.kdtree_.query(X, k=self.k_, return_distance=False, **query_kwargs).squeeze()
@@ -121,21 +154,37 @@ class AnalogRegression(AnalogBase):
         x = np.asarray(self.kdtree_.data)[inds]
         y = self.y_[inds]
 
-        # train linear regression model
-        lr_model.fit(x, y)
+        # figure out if there's a threshold of interest
+        if self.thresh is not None:
+            exceed_ind = y > self.thresh
+        else:
+            exceed_ind = np.ones(len(y), dtype=bool)
 
-        # predict for this time step
+        # train logistic regression model
+        binary_y = exceed_ind.astype(np.int8)
+        if not np.all(binary_y == 1):
+            logistic_model.fit(x, binary_y)
+            self.exceedance_prob_[i] = logistic_model.predict_proba(X)[0, 0]
+        else:
+            self.exceedance_prob_[i] = 1.0
+
+        # train linear regression model on data above threshold of interest
+        lr_model.fit(x[exceed_ind], y[exceed_ind])
+
+        # calculate the rmse of prediction
+        y_hat = lr_model.predict(x[exceed_ind])
+        error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
+        self.prediction_error_[i] = error
+
         predicted = lr_model.predict(X)
+
         return predicted
 
 
 class PureAnalog(AnalogBase):
     """ PureAnalog
-
-    Attributes
+    Parameters
     ----------
-    kdtree_ : sklearn.neighbors.KDTree
-        KDTree object
     n_analogs : int
         Number of analogs to use
     thresh : float
@@ -146,21 +195,24 @@ class PureAnalog(AnalogBase):
         Dictionary of keyword arguments to pass to cKDTree constructor
     query_kwargs : dict
         Dictionary of keyword arguments to pass to `cKDTree.query`
+
+    Attributes
+    ----------
+    kdtree_ : sklearn.neighbors.KDTree
+        KDTree object
+
+    Notes
+    -----
+    GARD models store prediction error  (`model.prediction_error_`) and
+    exceedance probabilities (`model.exceedance_prob_`) for the last prediction.
     """
 
     def __init__(
-        self,
-        n_analogs=200,
-        kind='best_analog',
-        thresh=None,
-        stats=True,
-        kdtree_kwargs=None,
-        query_kwargs=None,
+        self, n_analogs=200, kind='best_analog', thresh=None, kdtree_kwargs=None, query_kwargs=None,
     ):
         self.n_analogs = n_analogs
         self.kind = kind
         self.thresh = thresh
-        self.stats = stats
         self.kdtree_kwargs = kdtree_kwargs
         self.query_kwargs = query_kwargs
 
@@ -198,7 +250,7 @@ class PureAnalog(AnalogBase):
             # There are certainly edge cases not dealt with properly here
             # particularly in the weight analogs case
             analog_mask = analogs > self.thresh
-            masked_analogs = analogs[analog_mask]
+            masked_analogs = np.where(analog_mask, analogs, np.nan)
 
         if kind == 'best_analog':
             predicted = analogs[:, 0]
@@ -214,7 +266,7 @@ class PureAnalog(AnalogBase):
             # work around for zero distances (perfect matches)
             tiny = 1e-20
             weights = 1.0 / np.where(dist == 0, tiny, dist)
-            if self.thresh:
+            if self.thresh is not None:
                 predicted = np.average(masked_analogs, weights=weights, axis=1)
             else:
                 predicted = np.average(analogs.squeeze(), weights=weights, axis=1)
@@ -232,14 +284,91 @@ class PureAnalog(AnalogBase):
             # for mean/weight cases, this fills nans when all analogs
             # were below thresh
             predicted = np.nan_to_num(predicted, nan=0.0)
-
-        if self.stats:
-            # calculate the standard deviation of the anlogs
-            if self.thresh is None:
-                self.stats_['error'] = analogs.std(axis=1)
-            else:
-                self.stats_['error'] = analogs.where(analog_mask).std(axis=1)
-                # calculate the probability of precip
-                self.stats_['pop'] = np.where(analog_mask, 1, 0).mean(axis=1)
+            self.prediction_error_ = masked_analogs.std(axis=1)
+            self.exceedance_prob_ = np.where(analog_mask, 1, 0).mean(axis=1)
+        else:
+            self.prediction_error_ = analogs.std(axis=1)
+            self.exceedance_prob_ = np.ones(len(X), dtype=np.float64)
 
         return predicted
+
+
+class PureRegression(RegressorMixin, BaseEstimator):
+    """ PureRegression
+    Parameters
+    ----------
+    thresh : float
+        Subset analogs based on threshold
+    logistic_kwargs : dict
+        Dictionary of keyword arguments to pass to logistic regression model
+    linear_kwargs : dict
+        Dictionary of keyword arguments to pass to linear regression model
+
+    Attributes
+    ----------
+    kdtree_ : sklearn.neighbors.KDTree
+        KDTree object
+
+    Notes
+    -----
+    GARD pure regression models store prediction error  (`model.prediction_error_`) for the last fit and
+    exceedance probabilities (`model.exceedance_prob_`) for the last prediction.
+    """
+
+    _fit_attributes = [
+        'logistic_model_',
+        'linear_model_',
+        'prediction_error_',
+        'fit_error_',
+        'exceedance_prob_',
+    ]
+
+    def __init__(
+        self, thresh=None, logistic_kwargs=None, linear_kwargs=None,
+    ):
+        self.thresh = thresh
+        self.logistic_kwargs = logistic_kwargs
+        self.linear_kwargs = linear_kwargs
+
+    def fit(self, X, y):
+        X, y = self._validate_data(X, y=y, y_numeric=True)
+
+        if self.thresh is not None:
+            exceed_ind = y > self.thresh
+            binary_y = exceed_ind.astype(np.int8)
+            logistic_kwargs = default_none_kwargs(self.logistic_kwargs)
+            self.logistic_model_ = LogisticRegression(**logistic_kwargs).fit(X, binary_y)
+        else:
+            exceed_ind = np.ones(len(y), dtype=bool)
+
+        linear_kwargs = default_none_kwargs(self.linear_kwargs)
+        self.linear_model_ = LinearRegression(**linear_kwargs).fit(X[exceed_ind], y[exceed_ind])
+
+        y_hat = self.linear_model_.predict(X[exceed_ind])
+        error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
+        self.fit_error_ = error
+        self.prediction_error_ = []  # populated in predict
+        self.exceedance_prob_ = []  # populated in predict
+
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self)
+
+        if self.thresh is not None:
+            self.exceedance_prob_ = self.logistic_model_.predict_proba(X)[:, 0]
+        else:
+            self.exceedance_prob_ = np.ones(len(np.asarray(X)), dtype=np.float64)
+
+        self.prediction_error_ = np.full(
+            shape=len(np.asarray(X)), dtype=np.float64, fill_value=self.fit_error_
+        )
+
+        return self.linear_model_.predict(X)
+
+    def _more_tags(self):
+        return {
+            '_xfail_checks': {
+                'check_dict_unchanged': 'GARD models store prediction error and exceedance probabilities during predict',
+            },
+        }

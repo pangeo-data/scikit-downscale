@@ -1,5 +1,5 @@
 import copy
-from typing import List, Union
+from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -116,18 +116,22 @@ def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
     return xtrans
 
 
-def _getattr_wrapper(models, keys):
-    dims = list(models.dims)
-    shape = list(models.shape)
-    coords = dict(models.coords)
+def _getattr_wrapper(models, key, dtype, template_output=None):
+    if template_output is None:
+        dims = list(models.dims)
+        shape = list(models.shape)
+        coords = dict(models.coords)
+    else:
+        dims = list(template_output.dims)
+        shape = list(template_output.shape)
+        coords = dict(template_output.coords)
 
-    out = xr.Dataset()
-    for key in keys:
-        out[key] = xr.DataArray(np.empty(shape), coords=coords, dims=dims)
+    # construct output dataset
+    out = xr.DataArray(np.empty(shape, dtype), coords=coords, dims=dims)
 
+    # iterate through models to get attribute values
     for index, model in xenumerate(models):
-        for key in keys:
-            out[key][index] = getattr(model.item(), key)
+        out[index] = getattr(model.item(), key)
 
     return out
 
@@ -193,7 +197,7 @@ class PointWiseDownscaler:
         if X.chunks:
             reduce_dims = [self._dim, kws['feature_dim']]
             mask = _make_mask(X, reduce_dims)
-            template = xr.full_like(mask, None, dtype=np.object)
+            template = xr.full_like(mask, None, dtype=object)
             self._models = xr.map_blocks(_fit_wrapper, X, args=args, kwargs=kws, template=template)
         else:
             self._models = _fit_wrapper(X, *args, **kws)
@@ -260,21 +264,40 @@ class PointWiseDownscaler:
         else:
             return _transform_wrapper(X, self._models, **kws)
 
-    def get_attr(self, keys: Union[str, List[str]]) -> xr.Dataset:
+    def get_attr(
+        self, key: str, dtype: str, template_output: Optional[Union[xr.DataArray]] = None
+    ) -> xr.Dataset:
         """
-        Get attribute values specified in keys from each of the pointwise models
+        Get attribute values specified in key from each of the pointwise models
 
         Parameters
         ----------
-        keys: str or List[str]
+        key: str
+        dtype: expected dtype of the values
+        template_output: template data array or dataset of the output dimensions
         """
-        if isinstance(keys, str):
-            keys = [keys]
-
         if self._models.chunks:
-            return xr.map_blocks(_getattr_wrapper, self._models, args=[keys])
+            if template_output is not None:
+                template = xr.full_like(template_output, None, dtype=dtype)
+                # there is currently a bug in xarray map block such that the template output has to be a dataset instead of a dataarray
+                return xr.map_blocks(
+                    _getattr_wrapper,
+                    self._models,
+                    args=[key, dtype, template_output.to_dataset()],
+                    template=template,
+                )
+
+            else:
+                template = xr.full_like(self._models, None, dtype=dtype)
+                return xr.map_blocks(
+                    _getattr_wrapper, self._models, args=[key, dtype], template=template
+                )
+
         else:
-            return _getattr_wrapper(self._models, keys)
+            if template_output is not None:
+                return _getattr_wrapper(self._models, key, dtype, template_output)
+            else:
+                return _getattr_wrapper(self._models, key, dtype)
 
     def _to_feature_x(self, X, feature_dim=DEFAULT_FEATURE_DIM):
         # xarray.Dataset --> xarray.DataArray
