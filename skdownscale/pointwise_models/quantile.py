@@ -510,9 +510,7 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         X_trend = copy.deepcopy(self.trend_transformer)
         x_detrend = X_trend.fit_transform(X)
 
-        return self.qm_estimator.fit(x_detrend, y_detrend)
-
-        return self
+        self.qm_estimator.fit(x_detrend, y_detrend)
 
         return self
 
@@ -547,6 +545,3 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         y_hat += trendline + delta
 
         return y_hat
-
-    def transform(self, X):
-        return self.predict(X)

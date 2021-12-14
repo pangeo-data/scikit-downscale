@@ -325,19 +325,3 @@ class BcAbsolute(BcsdBase):
                 'check_methods_sample_order_invariance': 'temporal order matters',
             },
         }
-
-# class bcsd(BcsdBase):
-#     def prep(obs, gcm):
-#         # coarsen
-#     def postprocess():
-#         # take it back to finescale
-#     def fit(self, obs, gcm):
-#         x, y = self.prep(obs, gcm)
-#         if self.flavor == 'absolute':
-#             model = PointWiseDownscaler(BcAbsolute)
-#         return model
-#     def predict(self, )
-#         out_y = self.model.predict()
-#         # take it back to finescale
-#         out_y = self.postprocess(out_y)
-#     def __init__:
