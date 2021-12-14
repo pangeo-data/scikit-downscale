@@ -514,6 +514,8 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
 
         return self
 
+        return self
+
     def predict(self, X):
         """Predict regression for target X.
 
@@ -545,3 +547,6 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         y_hat += trendline + delta
 
         return y_hat
+
+    def transform(self, X):
+        return self.predict(X)
