@@ -47,23 +47,18 @@ def test_pointwise_model(X, y):
     assert y_pred.sizes == y.sizes
     assert y.chunks == y_pred.chunks
 
-    keys = ['memory', 'verbose']
-    attrs = model.get_attr(keys)
-    assert isinstance(attrs, xr.Dataset)
-    for key in keys:
-        assert isinstance(attrs[key], xr.DataArray)
-        assert attrs[key].sizes == model._models.sizes
-
 
 @pytest.mark.parametrize(
     'X',
     [
         # with numpy arrays
         random_point_data(n_points=3, n_vars=3),
+        random_point_data(n_points=3, n_vars=1),
         random_grid_data(grid_shape=(2, 3), n_vars=3),
         random_grid_data(grid_shape=(2, 3), n_vars=3),
         # with dask arrays
         random_point_data(n_points=3, n_vars=3).chunk({'point': 1}),
+        random_point_data(n_points=3, n_vars=1).chunk({'point': 1}),
         random_grid_data(grid_shape=(2, 3), n_vars=3).chunk({'y': 1, 'x': 1}),
         random_grid_data(grid_shape=(2, 3), n_vars=3).chunk({'y': 1, 'x': 1}),
     ],

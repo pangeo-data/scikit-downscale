@@ -103,7 +103,6 @@ def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
     dims = list(X.dims)
     shape = list(X.shape)
     coords = dict(X.coords)
-
     xtrans = xr.DataArray(np.empty(shape, dtype=X.dtype), coords=coords, dims=dims)
 
     for index, model in xenumerate(models):
@@ -112,7 +111,7 @@ def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
             if key in xdf:
                 xdf.drop(key)
         xtrans_df = model.item().transform(xdf, **kwargs)
-        xtrans[index] = xtrans_df.squeeze()
+        xtrans[index] = xtrans_df
     return xtrans
 
 
