@@ -307,7 +307,8 @@ class PointWiseDownscaler:
             X = X.expand_dims(**{feature_dim: [f'{feature_dim}_0']}, axis=1)
 
         # all features must be in 1 chunk for map_blocks to work later on
-        X = X.chunk({feature_dim: -1})
+        if X.chunks:
+            X = X.chunk({feature_dim: -1})
         X = X.transpose(self._dim, feature_dim, ...)
 
         return X
