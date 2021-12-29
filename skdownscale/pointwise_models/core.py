@@ -95,6 +95,8 @@ def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM,
         ydf = model.item().predict(xdf, **kwargs)
         y[index] = ydf.squeeze()
 
+    print('in predict wrapper')
+    print(models.values[0].prediction_error_)
     return y
 
 
@@ -121,6 +123,9 @@ def _getattr_wrapper(models, key, dtype, template_output=None):
         shape = list(models.shape)
         coords = dict(models.coords)
     else:
+        if isinstance(template_output, xr.Dataset):
+            example_var = list(template_output.data_vars)[0]
+            template_output = template_output[example_var]
         dims = list(template_output.dims)
         shape = list(template_output.shape)
         coords = dict(template_output.coords)
@@ -230,7 +235,20 @@ class PointWiseDownscaler:
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         if X.chunks:
-            return xr.map_blocks(_predict_wrapper, X, args=[self._models], kwargs=kws)
+            reduce_dims = [kws['feature_dim']]
+            mask = _make_mask(X, reduce_dims)
+            template = xr.full_like(mask, None, dtype=object)
+            # change .predict in gard to return three columns 
+            # either make it a class attribute so that .predict_wrapper knows what to expect or accept a template output 
+
+
+            # predict_wrapper returns modified model objects, and prediction results is an attribute within it 
+            # this path only happens when it's a gard model 
+            # model._predictions and assign it to y 
+            y = xr.map_blocks(_predict_wrapper, X, args=[self._models], kwargs=kws, template=template)
+            y.values
+            print('in predict')
+            print(self._models.values[0].prediction_error_)
         else:
             return _predict_wrapper(X, self._models, **kws)
 
