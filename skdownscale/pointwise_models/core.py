@@ -88,17 +88,17 @@ def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM,
         yshape.pop(X.get_axis_num(feature_dim))
 
     for index, model in xenumerate(models):
-        try: 
+        try:
             n_outputs = model.item().n_outputs
             output_names = model.item().output_names
         except:
             n_outputs = 1
-        break 
+        break
 
     y = xr.DataArray(np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims)
     if n_outputs > 1:
-        X = X.expand_dims(**{feature_dim: output_names, axis=1)
-        X = X.transpose(along_dim, feature_dim, ...)
+        y = y.expand_dims(**{feature_dim: output_names}, axis=1).copy()
+        y = y.transpose(along_dim, feature_dim, ...)
 
     for index, model in xenumerate(models):
         xdf = X[index].pipe(_da_to_df, feature_dim)
@@ -243,10 +243,39 @@ class PointWiseDownscaler:
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         if X.chunks:
-            reduce_dims = [kws['feature_dim']]
-            mask = _make_mask(X, reduce_dims)
-            template = xr.full_like(mask, None, dtype=object)
-            return xr.map_blocks(_predict_wrapper, X, args=[self._models], kwargs=kws, template=template)
+            try:
+                n_outputs = self._model.n_outputs
+                output_names = self._model.output_names
+            except AttributeError:
+                n_outputs = 1
+
+            if n_outputs == 1:
+                reduce_dims = [kws['feature_dim']]
+                mask = _make_mask(X, reduce_dims)
+                template = xr.full_like(mask, None, dtype=object)
+            else:
+                ydims = list(X.dims)
+                yshape = list(X.shape)
+                ycoords = dict(X.coords)
+                if kws['feature_dim'] not in ydims:
+                    template = xr.DataArray(
+                        np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims
+                    )
+                    template = template.expand_dims(
+                        **{kws['feature_dim']: output_names}, axis=1
+                    ).copy()
+                    template = template.transpose(self._dim, kws['feature_dim'], ...)
+                else:
+                    yshape[X.get_axis_num(kws['feature_dim'])] = n_outputs
+                    ycoords[kws['feature_dim']] = output_names
+                    template = xr.DataArray(
+                        np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims
+                    )
+                template = template.chunk(X.chunksizes)
+
+            return xr.map_blocks(
+                _predict_wrapper, X, args=[self._models], kwargs=kws, template=template
+            )
         else:
             return _predict_wrapper(X, self._models, **kws)
 

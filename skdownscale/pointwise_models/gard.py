@@ -56,14 +56,9 @@ class AnalogBase(RegressorMixin, BaseEstimator):
     def _more_tags(self):
         return {
             '_xfail_checks': {
-                # following error is due to the difference in y and y_pred shape 
                 'check_fit_score_takes_y': 'GARD models output 3 columns pandas dataframe instead of one during predict',
                 'check_pipeline_consistency': 'GARD models output 3 columns pandas dataframe instead of one during predict',
                 'check_regressors_train': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                # following error is due to a pandas output instead of numpy 
-                'check_supervised_y_2d': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                'check_methods_sample_order_invariance': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                'check_fit_idempotent': 'GARD models output 3 columns pandas dataframe instead of one during predict',
             },
         }
 
@@ -94,12 +89,13 @@ class AnalogRegression(AnalogBase):
 
     Notes
     -----
-    GARD models generates three columns in the predict function, the columns include `pred`, the mean prediction value; 
-    `exceedance_prob`, the probability of exceeding self.thresh value; and `prediction_error`, the RMSE associated 
-    with the mean prediction. 
+    GARD models generates three columns in the predict function, the columns include `pred`, the mean prediction value;
+    `exceedance_prob`, the probability of exceeding self.thresh value; and `prediction_error`, the RMSE associated
+    with the mean prediction.
     """
-    # the number of columns outputed in the predict method 
-    n_outputs = 3 
+
+    # the number of columns outputed in the predict method
+    n_outputs = 3
     output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
     def __init__(
@@ -132,6 +128,7 @@ class AnalogRegression(AnalogBase):
             Returns predicted values, including the mean prediction, exceedance probability, and prediction error
         """
         # validate input data
+        return_df = isinstance(X, pd.DataFrame)
         check_is_fitted(self)
         X = check_array(X)
 
@@ -147,7 +144,7 @@ class AnalogRegression(AnalogBase):
             # predict for this time step
             out[i] = self._predict_one_step(logistic_model, lr_model, X[None, i],)
 
-        if isinstance(X, pd.DataFrame):
+        if return_df:
             return pd.DataFrame(out, columns=self.output_names)
         return out
 
@@ -208,10 +205,11 @@ class PureAnalog(AnalogBase):
 
     Notes
     -----
-    GARD models generates three columns in the predict function, the columns include `pred`, the mean prediction value; 
-    `exceedance_prob`, the probability of exceeding self.thresh value; and `prediction_error`, the RMSE associated 
-    with the mean prediction. 
+    GARD models generates three columns in the predict function, the columns include `pred`, the mean prediction value;
+    `exceedance_prob`, the probability of exceeding self.thresh value; and `prediction_error`, the RMSE associated
+    with the mean prediction.
     """
+
     n_outputs = 3
     output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
@@ -238,6 +236,7 @@ class PureAnalog(AnalogBase):
             Returns predicted values, including the mean prediction, exceedance probability, and prediction error
         """
         # validate input data
+        return_df = isinstance(X, pd.DataFrame)
         check_is_fitted(self)
         X = check_array(X)
 
@@ -298,16 +297,19 @@ class PureAnalog(AnalogBase):
             prediction_error = analogs.std(axis=1)
             exceedance_prob = np.ones(len(X), dtype=np.float64)
 
-        if isinstance(X, pd.DataFrame):
+        if return_df:
             out = pd.DataFrame(
                 {
                     'pred': predicted,
                     'exceedance_prob': exceedance_prob,
-                    'prediction_error': prediction_error
+                    'prediction_error': prediction_error,
                 }
             )
             return out[self.output_names]
         else:
+            predicted = predicted.reshape(-1, 1)
+            exceedance_prob = exceedance_prob.reshape(-1, 1)
+            prediction_error = prediction_error.reshape(-1, 1)
             return np.hstack((predicted, exceedance_prob, prediction_error))
 
 
@@ -329,8 +331,8 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
     Notes
     -----
-    GARD models generates three columns in the predict function, the columns include `pred`, the mean prediction value; 
-    `exceedance_prob`, the probability of exceeding self.thresh value; and `prediction_error`, the RMSE associated 
+    GARD models generates three columns in the predict function, the columns include `pred`, the mean prediction value;
+    `exceedance_prob`, the probability of exceeding self.thresh value; and `prediction_error`, the RMSE associated
     with the mean prediction.
     """
 
@@ -382,6 +384,7 @@ class PureRegression(RegressorMixin, BaseEstimator):
         C : pd.DataFrame, shape (n_samples, self.n_outputs)
             Returns predicted values, including the mean prediction, exceedance probability, and prediction error
         """
+        return_df = isinstance(X, pd.DataFrame)
         check_is_fitted(self)
 
         if self.thresh is not None:
@@ -395,28 +398,26 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
         predicted = self.linear_model_.predict(X)
 
-        if isinstance(X, pd.DataFrame):
+        if return_df:
             out = pd.DataFrame(
                 {
                     'pred': predicted,
                     'exceedance_prob': exceedance_prob,
-                    'prediction_error': prediction_error
+                    'prediction_error': prediction_error,
                 }
             )
             return out[self.output_names]
         else:
+            predicted = predicted.reshape(-1, 1)
+            exceedance_prob = exceedance_prob.reshape(-1, 1)
+            prediction_error = prediction_error.reshape(-1, 1)
             return np.hstack((predicted, exceedance_prob, prediction_error))
 
     def _more_tags(self):
         return {
             '_xfail_checks': {
-                # following error is due to the difference in y and y_pred shape 
                 'check_fit_score_takes_y': 'GARD models output 3 columns pandas dataframe instead of one during predict',
                 'check_pipeline_consistency': 'GARD models output 3 columns pandas dataframe instead of one during predict',
                 'check_regressors_train': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                # following error is due to a pandas output instead of numpy 
-                'check_supervised_y_2d': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                'check_methods_sample_order_invariance': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                'check_fit_idempotent': 'GARD models output 3 columns pandas dataframe instead of one during predict',
             },
         }

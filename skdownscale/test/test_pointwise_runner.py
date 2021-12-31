@@ -43,6 +43,7 @@ def test_pointwise_model(X, y):
     model = PointWiseDownscaler(model=pipeline)
     model.fit(X, y)
     y_pred = model.predict(X)
+    y_pred.values  # otherwise some of the code will not be tested when input is chunked
     assert isinstance(y_pred, type(y))
     assert y_pred.sizes == y.sizes
     assert y.chunks == y_pred.chunks
@@ -50,9 +51,13 @@ def test_pointwise_model(X, y):
     model = PointWiseDownscaler(model=AnalogRegression(thresh=0))
     model.fit(X, y)
     y_pred = model.predict(X)
-    assert isinstance(attrs, xr.DataArray)
-    assert attrs.sizes == template_output.sizes
-    assert attrs.dtype == dtype
+    y_pred.values  # otherwise some of the code will not be tested when input is chunked
+    assert isinstance(y_pred, type(y))
+    assert y_pred.sizes['variable'] == model._model.n_outputs
+    for dim in y.sizes:
+        assert y_pred.sizes[dim] == y.sizes[dim]
+    for dim in y.chunksizes:
+        assert y_pred.chunksizes[dim] == y.chunksizes[dim]
 
 
 @pytest.mark.parametrize(
