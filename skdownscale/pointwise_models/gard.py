@@ -100,6 +100,7 @@ class AnalogRegression(AnalogBase):
     """
     # the number of columns outputed in the predict method 
     n_outputs = 3 
+    output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
     def __init__(
         self,
@@ -145,7 +146,9 @@ class AnalogRegression(AnalogBase):
         for i in range(len(X)):
             # predict for this time step
             out[i] = self._predict_one_step(logistic_model, lr_model, X[None, i],)
-        out = pd.DataFrame(out, columns=['pred', 'exceedance_prob', 'prediction_error'])
+
+        if isinstance(X, pd.DataFrame):
+            return pd.DataFrame(out, columns=self.output_names)
         return out
 
     def _predict_one_step(self, logistic_model, lr_model, X):
@@ -210,6 +213,7 @@ class PureAnalog(AnalogBase):
     with the mean prediction. 
     """
     n_outputs = 3
+    output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
     def __init__(
         self, n_analogs=200, kind='best_analog', thresh=None, kdtree_kwargs=None, query_kwargs=None,
@@ -294,14 +298,17 @@ class PureAnalog(AnalogBase):
             prediction_error = analogs.std(axis=1)
             exceedance_prob = np.ones(len(X), dtype=np.float64)
 
-        out = pd.DataFrame(
-            {
-                'pred': predicted,
-                'exceedance_prob': exceedance_prob,
-                'prediction_error': prediction_error
-            }
-        )
-        return out
+        if isinstance(X, pd.DataFrame):
+            out = pd.DataFrame(
+                {
+                    'pred': predicted,
+                    'exceedance_prob': exceedance_prob,
+                    'prediction_error': prediction_error
+                }
+            )
+            return out[self.output_names]
+        else:
+            return np.hstack((predicted, exceedance_prob, prediction_error))
 
 
 class PureRegression(RegressorMixin, BaseEstimator):
@@ -333,6 +340,7 @@ class PureRegression(RegressorMixin, BaseEstimator):
         'fit_error_',
     ]
     n_outputs = 3
+    output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
     def __init__(
         self, thresh=None, logistic_kwargs=None, linear_kwargs=None,
@@ -387,14 +395,17 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
         predicted = self.linear_model_.predict(X)
 
-        out = pd.DataFrame(
-            {
-                'pred': predicted,
-                'exceedance_prob': exceedance_prob,
-                'prediction_error': prediction_error
-            }
-        )
-        return out
+        if isinstance(X, pd.DataFrame):
+            out = pd.DataFrame(
+                {
+                    'pred': predicted,
+                    'exceedance_prob': exceedance_prob,
+                    'prediction_error': prediction_error
+                }
+            )
+            return out[self.output_names]
+        else:
+            return np.hstack((predicted, exceedance_prob, prediction_error))
 
     def _more_tags(self):
         return {

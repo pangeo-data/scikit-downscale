@@ -79,7 +79,6 @@ def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **
 
 
 def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
-
     ydims = list(X.dims)
     yshape = list(X.shape)
     ycoords = dict(X.coords)
@@ -88,15 +87,24 @@ def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM,
         ydims.pop(X.get_axis_num(feature_dim))
         yshape.pop(X.get_axis_num(feature_dim))
 
+    for index, model in xenumerate(models):
+        try: 
+            n_outputs = model.item().n_outputs
+            output_names = model.item().output_names
+        except:
+            n_outputs = 1
+        break 
+
     y = xr.DataArray(np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims)
+    if n_outputs > 1:
+        X = X.expand_dims(**{feature_dim: output_names, axis=1)
+        X = X.transpose(along_dim, feature_dim, ...)
 
     for index, model in xenumerate(models):
         xdf = X[index].pipe(_da_to_df, feature_dim)
         ydf = model.item().predict(xdf, **kwargs)
         y[index] = ydf.squeeze()
 
-    print('in predict wrapper')
-    print(models.values[0].prediction_error_)
     return y
 
 
@@ -238,17 +246,7 @@ class PointWiseDownscaler:
             reduce_dims = [kws['feature_dim']]
             mask = _make_mask(X, reduce_dims)
             template = xr.full_like(mask, None, dtype=object)
-            # change .predict in gard to return three columns 
-            # either make it a class attribute so that .predict_wrapper knows what to expect or accept a template output 
-
-
-            # predict_wrapper returns modified model objects, and prediction results is an attribute within it 
-            # this path only happens when it's a gard model 
-            # model._predictions and assign it to y 
-            y = xr.map_blocks(_predict_wrapper, X, args=[self._models], kwargs=kws, template=template)
-            y.values
-            print('in predict')
-            print(self._models.values[0].prediction_error_)
+            return xr.map_blocks(_predict_wrapper, X, args=[self._models], kwargs=kws, template=template)
         else:
             return _predict_wrapper(X, self._models, **kws)
 
