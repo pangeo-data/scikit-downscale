@@ -144,6 +144,8 @@ class AnalogRegression(AnalogBase):
             # predict for this time step
             out[i] = self._predict_one_step(logistic_model, lr_model, X[None, i],)
 
+        # if the input is a dataframe, return dataframe, otherwise return a numpy array
+        # the output_names can be used to determine the order of columns
         if return_df:
             return pd.DataFrame(out, columns=self.output_names)
         return out
@@ -180,6 +182,7 @@ class AnalogRegression(AnalogBase):
 
         predicted = lr_model.predict(X)
 
+        # this order needs to be the same as output_names
         return [predicted, exceedance_prob, error]
 
 
@@ -297,6 +300,8 @@ class PureAnalog(AnalogBase):
             prediction_error = analogs.std(axis=1)
             exceedance_prob = np.ones(len(X), dtype=np.float64)
 
+        # if the input is a dataframe, return dataframe, otherwise return a numpy array
+        # the output_names can be used to determine the order of columns
         if return_df:
             out = pd.DataFrame(
                 {
@@ -310,6 +315,7 @@ class PureAnalog(AnalogBase):
             predicted = predicted.reshape(-1, 1)
             exceedance_prob = exceedance_prob.reshape(-1, 1)
             prediction_error = prediction_error.reshape(-1, 1)
+            # this order has to be the same as output_names
             return np.hstack((predicted, exceedance_prob, prediction_error))
 
 
@@ -398,6 +404,8 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
         predicted = self.linear_model_.predict(X)
 
+        # if the input is a dataframe, return dataframe, otherwise return a numpy array
+        # the output_names can be used to determine the order of columns
         if return_df:
             out = pd.DataFrame(
                 {
@@ -411,6 +419,7 @@ class PureRegression(RegressorMixin, BaseEstimator):
             predicted = predicted.reshape(-1, 1)
             exceedance_prob = exceedance_prob.reshape(-1, 1)
             prediction_error = prediction_error.reshape(-1, 1)
+            # this order has to be the same as output_names
             return np.hstack((predicted, exceedance_prob, prediction_error))
 
     def _more_tags(self):

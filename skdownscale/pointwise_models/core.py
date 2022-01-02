@@ -78,24 +78,30 @@ def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **
     return models
 
 
-def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
+def _predict_wrapper(
+    X,
+    models,
+    along_dim=None,
+    feature_dim=DEFAULT_FEATURE_DIM,
+    n_outputs=1,
+    output_names=None,
+    **kwargs,
+):
+    # determine the dimension/shape/coordinates of the prediction output
     ydims = list(X.dims)
     yshape = list(X.shape)
     ycoords = dict(X.coords)
+    # since most models can utilize many features to generate one prediction, remove the
+    # dimension of `feature_dim
     ycoords.pop(feature_dim)
     if feature_dim in ydims:
         ydims.pop(X.get_axis_num(feature_dim))
         yshape.pop(X.get_axis_num(feature_dim))
 
-    for index, model in xenumerate(models):
-        try:
-            n_outputs = model.item().n_outputs
-            output_names = model.item().output_names
-        except:
-            n_outputs = 1
-        break
-
     y = xr.DataArray(np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims)
+    # some models, such as the GARD models generate multiple columns instead of one column of prediction result
+    # in the .predict method. This would be set in `n_outputs` and `output_names`
+    # if there are multiple output columns, add the `feature_dim` back to accommodate them
     if n_outputs > 1:
         y = y.expand_dims(**{feature_dim: output_names}, axis=1).copy()
         y = y.transpose(along_dim, feature_dim, ...)
@@ -242,18 +248,22 @@ class PointWiseDownscaler:
 
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
-        if X.chunks:
-            try:
-                n_outputs = self._model.n_outputs
-                output_names = self._model.output_names
-            except AttributeError:
-                n_outputs = 1
+        # check the model type to see if the model returns multiple columns are returned in
+        # the .prdict function. notably, the GARD model family returns 3 columns
+        try:
+            kws['n_outputs'] = self._model.n_outputs
+            kws['output_names'] = self._model.output_names
+        except AttributeError:
+            kws['n_outputs'] = 1
 
-            if n_outputs == 1:
+        if X.chunks:
+            if kws['n_outputs'] == 1:
+                # if there's only one output columns, remove the feature_dim in input to generate output template
                 reduce_dims = [kws['feature_dim']]
                 mask = _make_mask(X, reduce_dims)
                 template = xr.full_like(mask, None, dtype=object)
             else:
+                # otherwise, maintain the `feature_dim` dimension to accommodate the number of outputs
                 ydims = list(X.dims)
                 yshape = list(X.shape)
                 ycoords = dict(X.coords)
@@ -262,12 +272,12 @@ class PointWiseDownscaler:
                         np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims
                     )
                     template = template.expand_dims(
-                        **{kws['feature_dim']: output_names}, axis=1
+                        **{kws['feature_dim']: kws['output_names']}, axis=1
                     ).copy()
                     template = template.transpose(self._dim, kws['feature_dim'], ...)
                 else:
-                    yshape[X.get_axis_num(kws['feature_dim'])] = n_outputs
-                    ycoords[kws['feature_dim']] = output_names
+                    yshape[X.get_axis_num(kws['feature_dim'])] = kws['n_outputs']
+                    ycoords[kws['feature_dim']] = kws['output_names']
                     template = xr.DataArray(
                         np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims
                     )
