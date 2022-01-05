@@ -78,17 +78,33 @@ def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **
     return models
 
 
-def _predict_wrapper(X, models, along_dim=None, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
-
+def _predict_wrapper(
+    X,
+    models,
+    along_dim=None,
+    feature_dim=DEFAULT_FEATURE_DIM,
+    n_outputs=1,
+    output_names=None,
+    **kwargs,
+):
+    # determine the dimension/shape/coordinates of the prediction output
     ydims = list(X.dims)
     yshape = list(X.shape)
     ycoords = dict(X.coords)
+    # since most models can utilize many features to generate one prediction, remove the
+    # dimension of `feature_dim
     ycoords.pop(feature_dim)
     if feature_dim in ydims:
         ydims.pop(X.get_axis_num(feature_dim))
         yshape.pop(X.get_axis_num(feature_dim))
 
     y = xr.DataArray(np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims)
+    # some models, such as the GARD models generate multiple columns instead of one column of prediction result
+    # in the .predict method. This would be set in `n_outputs` and `output_names`
+    # if there are multiple output columns, add the `feature_dim` back to accommodate them
+    if n_outputs > 1:
+        y = y.expand_dims(**{feature_dim: output_names}, axis=1).copy()
+        y = y.transpose(along_dim, feature_dim, ...)
 
     for index, model in xenumerate(models):
         xdf = X[index].pipe(_da_to_df, feature_dim)
@@ -121,6 +137,9 @@ def _getattr_wrapper(models, key, dtype, template_output=None):
         shape = list(models.shape)
         coords = dict(models.coords)
     else:
+        if isinstance(template_output, xr.Dataset):
+            example_var = list(template_output.data_vars)[0]
+            template_output = template_output[example_var]
         dims = list(template_output.dims)
         shape = list(template_output.shape)
         coords = dict(template_output.coords)
@@ -229,8 +248,44 @@ class PointWiseDownscaler:
 
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
+        # check the model type to see if the model returns multiple columns are returned in
+        # the .prdict function. notably, the GARD model family returns 3 columns
+        try:
+            kws['n_outputs'] = self._model.n_outputs
+            kws['output_names'] = self._model.output_names
+        except AttributeError:
+            kws['n_outputs'] = 1
+
         if X.chunks:
-            return xr.map_blocks(_predict_wrapper, X, args=[self._models], kwargs=kws)
+            if kws['n_outputs'] == 1:
+                # if there's only one output columns, remove the feature_dim in input to generate output template
+                reduce_dims = [kws['feature_dim']]
+                mask = _make_mask(X, reduce_dims)
+                template = xr.full_like(mask, None, dtype=object)
+            else:
+                # otherwise, maintain the `feature_dim` dimension to accommodate the number of outputs
+                ydims = list(X.dims)
+                yshape = list(X.shape)
+                ycoords = dict(X.coords)
+                if kws['feature_dim'] not in ydims:
+                    template = xr.DataArray(
+                        np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims
+                    )
+                    template = template.expand_dims(
+                        **{kws['feature_dim']: kws['output_names']}, axis=1
+                    ).copy()
+                    template = template.transpose(self._dim, kws['feature_dim'], ...)
+                else:
+                    yshape[X.get_axis_num(kws['feature_dim'])] = kws['n_outputs']
+                    ycoords[kws['feature_dim']] = kws['output_names']
+                    template = xr.DataArray(
+                        np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims
+                    )
+                template = template.chunk(X.chunksizes)
+
+            return xr.map_blocks(
+                _predict_wrapper, X, args=[self._models], kwargs=kws, template=template
+            )
         else:
             return _predict_wrapper(X, self._models, **kws)
 

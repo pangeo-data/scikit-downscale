@@ -43,9 +43,21 @@ def test_pointwise_model(X, y):
     model = PointWiseDownscaler(model=pipeline)
     model.fit(X, y)
     y_pred = model.predict(X)
+    y_pred.values  # otherwise some of the code will not be tested when input is chunked
     assert isinstance(y_pred, type(y))
     assert y_pred.sizes == y.sizes
     assert y.chunks == y_pred.chunks
+
+    model = PointWiseDownscaler(model=AnalogRegression(thresh=0))
+    model.fit(X, y)
+    y_pred = model.predict(X)
+    y_pred.values  # otherwise some of the code will not be tested when input is chunked
+    assert isinstance(y_pred, type(y))
+    assert y_pred.sizes['variable'] == model._model.n_outputs
+    for dim in y.sizes:
+        assert y_pred.sizes[dim] == y.sizes[dim]
+    for dim in y.chunksizes:
+        assert y_pred.chunksizes[dim] == y.chunksizes[dim]
 
 
 @pytest.mark.parametrize(
@@ -122,18 +134,6 @@ def test_pointwise_model_attributes(X, y):
     template_output = X.isel(time=0).drop('time')
     template_output = template_output.expand_dims({'var': np.arange(3)})
     attrs = model.get_attr(key, dtype=dtype, template_output=template_output['a'])
-    assert isinstance(attrs, xr.DataArray)
-    assert attrs.sizes == template_output.sizes
-    assert attrs.dtype == dtype
-
-    # testing an attribute with length equal to X, providing a template output for shape
-    model = PointWiseDownscaler(model=AnalogRegression(thresh=0))
-    model.fit(X, y)
-    model.predict(X)
-    key = 'prediction_error_'
-    dtype = 'float64'
-    template_output = X['a']
-    attrs = model.get_attr(key, dtype=dtype, template_output=template_output)
     assert isinstance(attrs, xr.DataArray)
     assert attrs.sizes == template_output.sizes
     assert attrs.dtype == dtype

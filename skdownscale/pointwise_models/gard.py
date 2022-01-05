@@ -1,6 +1,7 @@
 import warnings
 
 import numpy as np
+import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import mean_squared_error
@@ -20,7 +21,7 @@ def select_analogs(analogs, inds):
 
 
 class AnalogBase(RegressorMixin, BaseEstimator):
-    _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_', 'prediction_error_', 'exceedance_prob_']
+    _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_']
 
     def fit(self, X, y):
         """ Fit Analog model using a KDTree
@@ -37,8 +38,6 @@ class AnalogBase(RegressorMixin, BaseEstimator):
         self : returns an instance of self.
         """
         X, y = self._validate_data(X, y=y, y_numeric=True)
-        self.prediction_error_ = []  # populated in predict methods
-        self.exceedance_prob_ = []  # populated in predict methods
 
         if len(X) >= self.n_analogs:
             self.k_ = self.n_analogs
@@ -57,7 +56,9 @@ class AnalogBase(RegressorMixin, BaseEstimator):
     def _more_tags(self):
         return {
             '_xfail_checks': {
-                'check_dict_unchanged': 'GARD models store prediction error and exceedance probabilities during predict',
+                'check_fit_score_takes_y': 'GARD models output 3 columns pandas dataframe instead of one during predict',
+                'check_pipeline_consistency': 'GARD models output 3 columns pandas dataframe instead of one during predict',
+                'check_regressors_train': 'GARD models output 3 columns pandas dataframe instead of one during predict',
             },
         }
 
@@ -88,9 +89,14 @@ class AnalogRegression(AnalogBase):
 
     Notes
     -----
-    GARD models store prediction error  (`model.prediction_error_`) and
-    exceedance probabilities (`model.exceedance_prob_`) for the last prediction.
+    GARD models generates three columns in the predict function, the columns include `pred`, the mean prediction value;
+    `exceedance_prob`, the probability of exceeding self.thresh value; and `prediction_error`, the RMSE associated
+    with the mean prediction.
     """
+
+    # the number of columns outputed in the predict method
+    n_outputs = 3
+    output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
     def __init__(
         self,
@@ -101,7 +107,6 @@ class AnalogRegression(AnalogBase):
         logistic_kwargs=None,
         lr_kwargs=None,
     ):
-
         self.n_analogs = n_analogs
         self.thresh = thresh
         self.kdtree_kwargs = kdtree_kwargs
@@ -119,14 +124,13 @@ class AnalogRegression(AnalogBase):
 
         Returns
         -------
-        C : pd.DataFrame, shape (n_samples, 1)
-            Returns predicted values.
+        C : pd.DataFrame, shape (n_samples, self.n_outputs)
+            Returns predicted values, including the mean prediction, exceedance probability, and prediction error
         """
         # validate input data
+        return_df = isinstance(X, pd.DataFrame)
         check_is_fitted(self)
         X = check_array(X)
-
-        out = np.empty(len(X))
 
         # not used if self.thresh = None, instantiating to keep the code clean
         logistic_kwargs = default_none_kwargs(self.logistic_kwargs)
@@ -135,17 +139,18 @@ class AnalogRegression(AnalogBase):
         lr_kwargs = default_none_kwargs(self.lr_kwargs)
         lr_model = LinearRegression(**lr_kwargs)
 
-        # TODO - extract from lr_model's below.
-        self.prediction_error_ = np.zeros(len(X), dtype=np.float64)
-        self.exceedance_prob_ = np.ones(len(X), dtype=np.float64)
-
+        out = np.empty((len(X), self.n_outputs), dtype=np.float64)
         for i in range(len(X)):
             # predict for this time step
-            out[i] = self._predict_one_step(logistic_model, lr_model, X[None, i], i,)
+            out[i] = self._predict_one_step(logistic_model, lr_model, X[None, i],)
 
+        # if the input is a dataframe, return dataframe, otherwise return a numpy array
+        # the output_names can be used to determine the order of columns
+        if return_df:
+            return pd.DataFrame(out, columns=self.output_names)
         return out
 
-    def _predict_one_step(self, logistic_model, lr_model, X, i):
+    def _predict_one_step(self, logistic_model, lr_model, X):
         # get analogs
         query_kwargs = default_none_kwargs(self.query_kwargs)
         inds = self.kdtree_.query(X, k=self.k_, return_distance=False, **query_kwargs).squeeze()
@@ -164,9 +169,9 @@ class AnalogRegression(AnalogBase):
         binary_y = exceed_ind.astype(np.int8)
         if not np.all(binary_y == 1):
             logistic_model.fit(x, binary_y)
-            self.exceedance_prob_[i] = logistic_model.predict_proba(X)[0, 0]
+            exceedance_prob = logistic_model.predict_proba(X)[0, 0]
         else:
-            self.exceedance_prob_[i] = 1.0
+            exceedance_prob = 1.0
 
         # train linear regression model on data above threshold of interest
         lr_model.fit(x[exceed_ind], y[exceed_ind])
@@ -174,11 +179,11 @@ class AnalogRegression(AnalogBase):
         # calculate the rmse of prediction
         y_hat = lr_model.predict(x[exceed_ind])
         error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
-        self.prediction_error_[i] = error
 
         predicted = lr_model.predict(X)
 
-        return predicted
+        # this order needs to be the same as output_names
+        return [predicted, exceedance_prob, error]
 
 
 class PureAnalog(AnalogBase):
@@ -203,9 +208,13 @@ class PureAnalog(AnalogBase):
 
     Notes
     -----
-    GARD models store prediction error  (`model.prediction_error_`) and
-    exceedance probabilities (`model.exceedance_prob_`) for the last prediction.
+    GARD models generates three columns in the predict function, the columns include `pred`, the mean prediction value;
+    `exceedance_prob`, the probability of exceeding self.thresh value; and `prediction_error`, the RMSE associated
+    with the mean prediction.
     """
+
+    n_outputs = 3
+    output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
     def __init__(
         self, n_analogs=200, kind='best_analog', thresh=None, kdtree_kwargs=None, query_kwargs=None,
@@ -226,10 +235,11 @@ class PureAnalog(AnalogBase):
 
         Returns
         -------
-        C : pd.DataFrame, shape (n_samples, 1)
-            Returns predicted values.
+        C : pd.DataFrame, shape (n_samples, self.n_outputs)
+            Returns predicted values, including the mean prediction, exceedance probability, and prediction error
         """
         # validate input data
+        return_df = isinstance(X, pd.DataFrame)
         check_is_fitted(self)
         X = check_array(X)
 
@@ -284,13 +294,29 @@ class PureAnalog(AnalogBase):
             # for mean/weight cases, this fills nans when all analogs
             # were below thresh
             predicted = np.nan_to_num(predicted, nan=0.0)
-            self.prediction_error_ = masked_analogs.std(axis=1)
-            self.exceedance_prob_ = np.where(analog_mask, 1, 0).mean(axis=1)
+            prediction_error = masked_analogs.std(axis=1)
+            exceedance_prob = np.where(analog_mask, 1, 0).mean(axis=1)
         else:
-            self.prediction_error_ = analogs.std(axis=1)
-            self.exceedance_prob_ = np.ones(len(X), dtype=np.float64)
+            prediction_error = analogs.std(axis=1)
+            exceedance_prob = np.ones(len(X), dtype=np.float64)
 
-        return predicted
+        # if the input is a dataframe, return dataframe, otherwise return a numpy array
+        # the output_names can be used to determine the order of columns
+        if return_df:
+            out = pd.DataFrame(
+                {
+                    'pred': predicted,
+                    'exceedance_prob': exceedance_prob,
+                    'prediction_error': prediction_error,
+                }
+            )
+            return out[self.output_names]
+        else:
+            predicted = predicted.reshape(-1, 1)
+            exceedance_prob = exceedance_prob.reshape(-1, 1)
+            prediction_error = prediction_error.reshape(-1, 1)
+            # this order has to be the same as output_names
+            return np.hstack((predicted, exceedance_prob, prediction_error))
 
 
 class PureRegression(RegressorMixin, BaseEstimator):
@@ -311,17 +337,18 @@ class PureRegression(RegressorMixin, BaseEstimator):
 
     Notes
     -----
-    GARD pure regression models store prediction error  (`model.prediction_error_`) for the last fit and
-    exceedance probabilities (`model.exceedance_prob_`) for the last prediction.
+    GARD models generates three columns in the predict function, the columns include `pred`, the mean prediction value;
+    `exceedance_prob`, the probability of exceeding self.thresh value; and `prediction_error`, the RMSE associated
+    with the mean prediction.
     """
 
     _fit_attributes = [
         'logistic_model_',
         'linear_model_',
-        'prediction_error_',
         'fit_error_',
-        'exceedance_prob_',
     ]
+    n_outputs = 3
+    output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
     def __init__(
         self, thresh=None, logistic_kwargs=None, linear_kwargs=None,
@@ -347,28 +374,59 @@ class PureRegression(RegressorMixin, BaseEstimator):
         y_hat = self.linear_model_.predict(X[exceed_ind])
         error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
         self.fit_error_ = error
-        self.prediction_error_ = []  # populated in predict
-        self.exceedance_prob_ = []  # populated in predict
 
         return self
 
     def predict(self, X):
+        """Predict using the PureRegression model
+
+        Parameters
+        ----------
+        X : pd.Series or pd.DataFrame, shape (n_samples, 1)
+            Samples.
+
+        Returns
+        -------
+        C : pd.DataFrame, shape (n_samples, self.n_outputs)
+            Returns predicted values, including the mean prediction, exceedance probability, and prediction error
+        """
+        return_df = isinstance(X, pd.DataFrame)
         check_is_fitted(self)
 
         if self.thresh is not None:
-            self.exceedance_prob_ = self.logistic_model_.predict_proba(X)[:, 0]
+            exceedance_prob = self.logistic_model_.predict_proba(X)[:, 0]
         else:
-            self.exceedance_prob_ = np.ones(len(np.asarray(X)), dtype=np.float64)
+            exceedance_prob = np.ones(len(np.asarray(X)), dtype=np.float64)
 
-        self.prediction_error_ = np.full(
+        prediction_error = np.full(
             shape=len(np.asarray(X)), dtype=np.float64, fill_value=self.fit_error_
         )
 
-        return self.linear_model_.predict(X)
+        predicted = self.linear_model_.predict(X)
+
+        # if the input is a dataframe, return dataframe, otherwise return a numpy array
+        # the output_names can be used to determine the order of columns
+        if return_df:
+            out = pd.DataFrame(
+                {
+                    'pred': predicted,
+                    'exceedance_prob': exceedance_prob,
+                    'prediction_error': prediction_error,
+                }
+            )
+            return out[self.output_names]
+        else:
+            predicted = predicted.reshape(-1, 1)
+            exceedance_prob = exceedance_prob.reshape(-1, 1)
+            prediction_error = prediction_error.reshape(-1, 1)
+            # this order has to be the same as output_names
+            return np.hstack((predicted, exceedance_prob, prediction_error))
 
     def _more_tags(self):
         return {
             '_xfail_checks': {
-                'check_dict_unchanged': 'GARD models store prediction error and exceedance probabilities during predict',
+                'check_fit_score_takes_y': 'GARD models output 3 columns pandas dataframe instead of one during predict',
+                'check_pipeline_consistency': 'GARD models output 3 columns pandas dataframe instead of one during predict',
+                'check_regressors_train': 'GARD models output 3 columns pandas dataframe instead of one during predict',
             },
         }
