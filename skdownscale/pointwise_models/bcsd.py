@@ -136,7 +136,7 @@ class BcsdPrecipitation(BcsdBase):
         # calculate the climatologies
         self.y_climo_ = y_groups.mean()
 
-        if self.y_climo_.values.min() <= 0:
+        if self.return_anoms and self.y_climo_.values.min() <= 0:
             raise ValueError('Invalid value in target climatology')
 
         # fit the quantile mappers
