@@ -107,9 +107,10 @@ def _predict_wrapper(
         y = y.transpose(along_dim, feature_dim, ...)
 
     for index, model in xenumerate(models):
-        xdf = X[index].pipe(_da_to_df, feature_dim)
-        ydf = model.item().predict(xdf, **kwargs)
-        y[index] = ydf.squeeze()
+        if model.item():
+            xdf = X[index].pipe(_da_to_df, feature_dim)
+            ydf = model.item().predict(xdf, **kwargs)
+            y[index] = ydf.squeeze()
 
     return y
 
