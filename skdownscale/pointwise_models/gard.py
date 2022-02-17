@@ -20,7 +20,24 @@ def select_analogs(analogs, inds):
     return out
 
 
-class AnalogBase(RegressorMixin, BaseEstimator):
+class NamedColumnBaseEstimator(BaseEstimator):
+    # TODO: This class might make more sense to move to base.py so it can be used
+    # by other downscaling methods
+    def _validate_data(self,
+                       X="no_validation",
+                       y="no_validation",
+                       **check_params,):
+        if isinstance(X, pd.DataFrame):
+            feature_names = X.columns
+        else:
+            feature_names = None
+        X, y = super()._validate_data(X, y=y, **check_params)
+        if feature_names is not None:
+            X = pd.DataFrame(X, columns=feature_names)
+        return X, y
+
+
+class AnalogBase(RegressorMixin, NamedColumnBaseEstimator):
     _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_']
 
     def fit(self, X, y):
@@ -37,13 +54,8 @@ class AnalogBase(RegressorMixin, BaseEstimator):
         -------
         self : returns an instance of self.
         """
-        if isinstance(X, pd.DataFrame):
-            feature_names = X.columns
-        else:
-            feature_names = False
+
         X, y = self._validate_data(X, y=y, y_numeric=True)
-        if feature_names is not False:
-            X = pd.DataFrame(X, columns=feature_names)
 
         if len(X) >= self.n_analogs:
             self.k_ = self.n_analogs
@@ -325,7 +337,7 @@ class PureAnalog(AnalogBase):
             return np.hstack((predicted, exceedance_prob, prediction_error))
 
 
-class PureRegression(RegressorMixin, BaseEstimator):
+class PureRegression(RegressorMixin, NamedColumnBaseEstimator):
     """ PureRegression
     Parameters
     ----------
@@ -364,13 +376,7 @@ class PureRegression(RegressorMixin, BaseEstimator):
         self.linear_kwargs = linear_kwargs
 
     def fit(self, X, y):
-        if isinstance(X, pd.DataFrame):
-            feature_names = X.columns
-        else:
-            feature_names = False
         X, y = self._validate_data(X, y=y, y_numeric=True)
-        if feature_names is not False:
-            X = pd.DataFrame(X, columns=feature_names)
 
         if self.thresh is not None:
             exceed_ind = y > self.thresh
