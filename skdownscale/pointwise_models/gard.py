@@ -37,9 +37,11 @@ class AnalogBase(RegressorMixin, BaseEstimator):
         -------
         self : returns an instance of self.
         """
-        feature_names = X.columns
+        if isinstance(X, pd.Dataframe):
+            feature_names = X.columns
         X, y = self._validate_data(X, y=y, y_numeric=True)
-        X = pd.DataFrame(X, columns=feature_names)
+        if feature_names:
+            X = pd.DataFrame(X, columns=feature_names)
 
         if len(X) >= self.n_analogs:
             self.k_ = self.n_analogs
@@ -360,9 +362,11 @@ class PureRegression(RegressorMixin, BaseEstimator):
         self.linear_kwargs = linear_kwargs
 
     def fit(self, X, y):
-        feature_names = X.columns
+        if isinstance(X, pd.DataFrame):
+            feature_names = X.columns
         X, y = self._validate_data(X, y=y, y_numeric=True)
-        X = pd.DataFrame(X, columns=feature_names)
+        if feature_names:
+            X = pd.DataFrame(X, columns=feature_names)
         
         if self.thresh is not None:
             exceed_ind = y > self.thresh
