@@ -23,10 +23,9 @@ def select_analogs(analogs, inds):
 class NamedColumnBaseEstimator(BaseEstimator):
     # TODO: This class might make more sense to move to base.py so it can be used
     # by other downscaling methods
-    def _validate_data(self,
-                       X="no_validation",
-                       y="no_validation",
-                       **check_params,):
+    def _validate_data(
+        self, X='no_validation', y='no_validation', **check_params,
+    ):
         if isinstance(X, pd.DataFrame):
             feature_names = X.columns
         else:
