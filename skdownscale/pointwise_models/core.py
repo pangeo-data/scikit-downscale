@@ -282,7 +282,11 @@ class PointWiseDownscaler:
                     template = xr.DataArray(
                         np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims
                     )
-                template = template.chunk(X.chunksizes)
+                chunksizes = {}
+                for k, v in X.chunksizes.items():
+                    chunksizes[k] = v
+                chunksizes[kws['feature_dim']] = kws['n_outputs']
+                template = template.chunk(chunksizes)
 
             return xr.map_blocks(
                 _predict_wrapper, X, args=[self._models], kwargs=kws, template=template
