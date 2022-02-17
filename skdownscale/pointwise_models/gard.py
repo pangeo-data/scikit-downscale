@@ -371,7 +371,7 @@ class PureRegression(RegressorMixin, BaseEstimator):
         X, y = self._validate_data(X, y=y, y_numeric=True)
         if feature_names is not False:
             X = pd.DataFrame(X, columns=feature_names)
-        
+
         if self.thresh is not None:
             exceed_ind = y > self.thresh
             binary_y = exceed_ind.astype(np.int8)
