@@ -97,7 +97,7 @@ def arrm_breakpoints(X, y, window_width, max_breakpoints):
 
 
 class PiecewiseLinearRegression(RegressorMixin, BaseEstimator):
-    """ Piecewise Linear Regression
+    """Piecewise Linear Regression
 
     Parameters
     ----------

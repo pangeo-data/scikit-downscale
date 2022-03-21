@@ -1,11 +1,11 @@
 import importlib
 import string
-from distutils.version import LooseVersion
 
 import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+from distutils.version import LooseVersion
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler

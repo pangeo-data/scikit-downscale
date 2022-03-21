@@ -5,7 +5,7 @@ from .utils import default_none_kwargs
 
 
 class GroupedRegressor:
-    """ Grouped Regressor
+    """Grouped Regressor
 
     Wrapper supporting fitting seperate estimators distinct groups
 
@@ -45,7 +45,7 @@ class GroupedRegressor:
         self.predict_grouper_kwargs = predict_grouper_kwargs
 
     def fit(self, X, y, **fit_kwargs):
-        """ Fit the grouped regressor
+        """Fit the grouped regressor
 
         Parameters
         ----------
@@ -76,7 +76,7 @@ class GroupedRegressor:
         return self
 
     def predict(self, X):
-        """ Predict estimator target for X
+        """Predict estimator target for X
 
         Parameters
         ----------
@@ -100,7 +100,7 @@ class GroupedRegressor:
 
 
 class PaddedDOYGrouper:
-    """ Grouper to group an Index by day-of-year +/ pad
+    """Grouper to group an Index by day-of-year +/ pad
 
     Parameters
     ----------
@@ -130,5 +130,5 @@ class PaddedDOYGrouper:
 
     @property
     def groups(self):
-        """ Dict {doy -> group indicies}."""
+        """Dict {doy -> group indicies}."""
         return self._groups

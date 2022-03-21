@@ -104,7 +104,11 @@ def zscore_ds_plot(training, target, future, corrected):
 
     plt.plot(time_future, future.uas, label='future', alpha=alpha, c=colors['future'])
     plt.plot(
-        time_future, corrected.uas, label='corrected', alpha=alpha, c=colors['corrected'],
+        time_future,
+        corrected.uas,
+        label='corrected',
+        alpha=alpha,
+        c=colors['corrected'],
     )
 
     plt.xlabel('Time')

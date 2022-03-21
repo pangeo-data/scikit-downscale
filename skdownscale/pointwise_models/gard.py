@@ -24,7 +24,10 @@ class NamedColumnBaseEstimator(BaseEstimator):
     # TODO: This class might make more sense to move to base.py so it can be used
     # by other downscaling methods
     def _validate_data(
-        self, X='no_validation', y='no_validation', **check_params,
+        self,
+        X='no_validation',
+        y='no_validation',
+        **check_params,
     ):
         if isinstance(X, pd.DataFrame):
             feature_names = X.columns
@@ -40,7 +43,7 @@ class AnalogBase(RegressorMixin, NamedColumnBaseEstimator):
     _fit_attributes = ['kdtree_', 'X_', 'y_', 'k_']
 
     def fit(self, X, y):
-        """ Fit Analog model using a KDTree
+        """Fit Analog model using a KDTree
 
         Parameters
         ----------
@@ -81,7 +84,7 @@ class AnalogBase(RegressorMixin, NamedColumnBaseEstimator):
 
 
 class AnalogRegression(AnalogBase):
-    """ AnalogRegression
+    """AnalogRegression
 
     Parameters
     ----------
@@ -132,7 +135,7 @@ class AnalogRegression(AnalogBase):
         self.lr_kwargs = lr_kwargs
 
     def predict(self, X):
-        """ Predict using the AnalogRegression model
+        """Predict using the AnalogRegression model
 
         Parameters
         ----------
@@ -159,7 +162,11 @@ class AnalogRegression(AnalogBase):
         out = np.empty((len(X), self.n_outputs), dtype=np.float64)
         for i in range(len(X)):
             # predict for this time step
-            out[i] = self._predict_one_step(logistic_model, lr_model, X[None, i],)
+            out[i] = self._predict_one_step(
+                logistic_model,
+                lr_model,
+                X[None, i],
+            )
 
         # if the input is a dataframe, return dataframe, otherwise return a numpy array
         # the output_names can be used to determine the order of columns
@@ -204,7 +211,7 @@ class AnalogRegression(AnalogBase):
 
 
 class PureAnalog(AnalogBase):
-    """ PureAnalog
+    """PureAnalog
     Parameters
     ----------
     n_analogs : int
@@ -234,7 +241,12 @@ class PureAnalog(AnalogBase):
     output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
     def __init__(
-        self, n_analogs=200, kind='best_analog', thresh=None, kdtree_kwargs=None, query_kwargs=None,
+        self,
+        n_analogs=200,
+        kind='best_analog',
+        thresh=None,
+        kdtree_kwargs=None,
+        query_kwargs=None,
     ):
         self.n_analogs = n_analogs
         self.kind = kind
@@ -337,7 +349,7 @@ class PureAnalog(AnalogBase):
 
 
 class PureRegression(RegressorMixin, NamedColumnBaseEstimator):
-    """ PureRegression
+    """PureRegression
     Parameters
     ----------
     thresh : float
@@ -368,7 +380,10 @@ class PureRegression(RegressorMixin, NamedColumnBaseEstimator):
     output_names = ['pred', 'exceedance_prob', 'prediction_error']
 
     def __init__(
-        self, thresh=None, logistic_kwargs=None, linear_kwargs=None,
+        self,
+        thresh=None,
+        logistic_kwargs=None,
+        linear_kwargs=None,
     ):
         self.thresh = thresh
         self.logistic_kwargs = logistic_kwargs

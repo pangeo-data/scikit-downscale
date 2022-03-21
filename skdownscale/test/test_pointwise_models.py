@@ -141,7 +141,8 @@ def test_linear_model(model):
 
 
 @pytest.mark.parametrize(
-    'model_cls', [PureAnalog, AnalogRegression, PureRegression],
+    'model_cls',
+    [PureAnalog, AnalogRegression, PureRegression],
 )
 def test_models_with_multiple_features(sample_X_y, model_cls):
     X, y = sample_X_y
@@ -152,7 +153,8 @@ def test_models_with_multiple_features(sample_X_y, model_cls):
 
 
 @pytest.mark.parametrize(
-    'kind', ['best_analog', 'sample_analogs', 'weight_analogs', 'mean_analogs'],
+    'kind',
+    ['best_analog', 'sample_analogs', 'weight_analogs', 'mean_analogs'],
 )
 def test_gard_analog_models(sample_X_y, kind):
     X, y = sample_X_y

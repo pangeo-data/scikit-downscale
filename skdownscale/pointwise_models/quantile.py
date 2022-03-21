@@ -290,7 +290,7 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
     def _calc_extrapolated_cdf(
         self, data, sort=True, extrapolate=None, pp_min=SYNTHETIC_MIN, pp_max=SYNTHETIC_MAX
     ):
-        """ Calculate a new extrapolated cdf
+        """Calculate a new extrapolated cdf
 
         The goal of this function is to create a CDF with bounds outside the [0, 1] range.
         This allows for quantile mapping beyond observed data points.

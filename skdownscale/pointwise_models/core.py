@@ -35,7 +35,7 @@ def _make_mask(da, reduce_dims):
 
 
 def _da_to_df(da, feature_dim=DEFAULT_FEATURE_DIM):
-    """ manually construct dataframe """
+    """manually construct dataframe"""
     if feature_dim in da.dims:
         if feature_dim in da.coords:
             columns = da.coords[feature_dim]

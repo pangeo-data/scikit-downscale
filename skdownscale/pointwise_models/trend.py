@@ -67,7 +67,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         return X + self.trendline(X)
 
     def trendline(self, X):
-        """ helper function to calculate a linear trendline """
+        """helper function to calculate a linear trendline"""
         X = self._validate_data(X)
         return self.lr_model_.predict(np.arange(len(X)).reshape(-1, 1))
 
