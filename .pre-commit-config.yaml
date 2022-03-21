@@ -4,7 +4,7 @@ ci:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+    rev: v4.1.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -14,7 +14,7 @@ repos:
       - id: double-quote-string-fixer
 
   - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.8.3
+    rev: 3.9.2
     hooks:
       - id: flake8
   - repo: https://github.com/asottile/seed-isort-config
@@ -22,12 +22,12 @@ repos:
     hooks:
       - id: seed-isort-config
   - repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.2.2
+    rev: v5.10.1
     hooks:
       - id: isort
 
   - repo: https://github.com/ambv/black
-    rev: 19.10b0
+    rev: 22.1.0
     hooks:
       - id: black
         args: ["--line-length", "100", "--skip-string-normalization"]
