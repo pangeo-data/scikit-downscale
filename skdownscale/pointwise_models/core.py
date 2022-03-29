@@ -216,6 +216,8 @@ class PointWiseDownscaler:
         if X.chunks:
             reduce_dims = [self._dim, kws['feature_dim']]
             mask = _make_mask(X, reduce_dims)
+            # we want the datatype to be an object because it will be populated
+            # with fitted models (which have a dtype of object!)
             template = xr.full_like(mask, None, dtype=object)
             self._models = xr.map_blocks(_fit_wrapper, X, args=args, kwargs=kws, template=template)
         else:
@@ -262,7 +264,9 @@ class PointWiseDownscaler:
                 # if there's only one output columns, remove the feature_dim in input to generate output template
                 reduce_dims = [kws['feature_dim']]
                 mask = _make_mask(X, reduce_dims)
-                template = xr.full_like(mask, None, dtype=object)
+                # we want the datatype to be the same as the input dataset (an object
+                # is much bigger unnecessarily and has different behavior)
+                template = xr.full_like(mask, None, dtype=X.dtype)
             else:
                 # otherwise, maintain the `feature_dim` dimension to accommodate the number of outputs
                 ydims = list(X.dims)
