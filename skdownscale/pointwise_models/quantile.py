@@ -82,7 +82,6 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
 
         if 'n_quantiles' not in qt_kws:
             qt_kws['n_quantiles'] = len(X)
-
         # maybe detrend the input datasets
         if self.detrend:
             lt_kwargs = default_none_kwargs(self.lt_kwargs)
@@ -396,6 +395,73 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
                 'check_fit_check_is_fitted': 'QuantileMappingReressor only suppers 1 feature',
             },
         }
+
+
+class CunnaneTransformer:
+
+    def __init__(self, *, alpha=0.4, beta=0.4, extrapolate='both', n_endpoints=10):
+
+        self.alpha = alpha
+        self.beta = beta
+
+        self.extrapolate = extrapolate
+        self.n_endpoints = n_endpoints
+
+    def fit(self, X):
+
+        xs = X.squeeze()
+        self.cdf_ = Cdf(
+            plotting_positions(len(xs)),
+            np.sort(xs)
+        )
+        return self
+
+    def transform(self, X):
+
+        left = -np.inf if self.extrapolate in ['min', 'both'] else None
+        right = np.inf if self.extrapolate in ['max', 'both'] else None
+
+        pps = np.interp(X.squeeze(), self.cdf_.vals, self.cdf_.pp, left=left, right=right)
+        if np.isinf(pps).any():
+            lower_inds = np.nonzero(-np.inf == pps)[0]
+            upper_inds = np.nonzero(np.inf == pps)[0]
+            model = LinearRegression()
+            if len(lower_inds):
+                s = slice(None, self.n_endpoints)
+                model.fit(self.cdf_.vals[s].reshape(-1, 1), self.cdf_.pp[s].reshape(-1, 1))
+                pps[lower_inds] = model.predict(X.squeeze()[lower_inds].values.reshape(-1, 1)).squeeze()
+            if len(upper_inds):
+                s = slice(-self.n_endpoints, None)
+                model.fit(self.cdf_.vals[s].reshape(-1, 1), self.cdf_.pp[s].reshape(-1, 1))
+                pps[upper_inds] = model.predict(X.squeeze()[upper_inds].values.reshape(-1, 1)).squeeze()
+
+        return pps.reshape(-1, 1)
+
+    def inverse_transform(self, X):
+
+        X = check_array(X, ensure_2d=True)
+
+        X = X[:, 0]
+
+        left = -np.inf if self.extrapolate in ['min', 'both'] else None
+        right = np.inf if self.extrapolate in ['max', 'both'] else None
+
+        vals = np.interp(X, self.cdf_.pp, self.cdf_.vals, left=left, right=right)
+
+        if np.isinf(vals).any():
+            lower_inds = np.nonzero(-np.inf == vals)[0]
+            upper_inds = np.nonzero(np.inf == vals)[0]
+            model = LinearRegression()
+            if len(lower_inds):
+                s = slice(None, self.n_endpoints)
+                model.fit(self.cdf_.pp[s].reshape(-1, 1), self.cdf_.vals[s].reshape(-1, 1))
+                vals[lower_inds] = model.predict(X[lower_inds].reshape(-1, 1)).squeeze()
+            if len(upper_inds):
+                s = slice(-self.n_endpoints, None)
+                model.fit(self.cdf_.pp[s].reshape(-1, 1), self.cdf_.vals[s].reshape(-1, 1))
+                vals[upper_inds] = model.predict(X[upper_inds].reshape(-1, 1)).squeeze()
+
+        return vals.reshape(-1, 1)
 
 
 class EquidistantCdfMatcher(QuantileMappingReressor):
