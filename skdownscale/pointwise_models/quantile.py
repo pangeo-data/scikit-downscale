@@ -132,33 +132,30 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
         return x_qmapped
 
     def _more_tags(self):
-        return {'_xfail_checks': {'check_methods_subset_invariance': 'because'}}
-
-    def _more_tags(self):
         return {
             '_xfail_checks': {
-                'check_estimators_dtypes': 'CunnaneTransformer only suppers 1 feature',
-                'check_fit_score_takes_y': 'CunnaneTransformer only suppers 1 feature',
-                'check_transformer_data_not_an_array': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_fit_returns_self': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_fit_returns_self(readonly_memmap=True)': 'CunnaneTransformer only suppers 1 feature',
-                'check_dtype_object': 'CunnaneTransformer only suppers 1 feature',
-                'check_pipeline_consistency': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_nan_inf': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_overwrite_params': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_pickle': 'CunnaneTransformer only suppers 1 feature',
-                'check_fit2d_predict1d': 'CunnaneTransformer only suppers 1 feature',
-                'check_methods_subset_invariance': 'CunnaneTransformer only suppers 1 feature',
-                'check_fit2d_1sample': 'CunnaneTransformer only suppers 1 feature',
-                'check_dict_unchanged': 'CunnaneTransformer only suppers 1 feature',
-                'check_dont_overwrite_parameters': 'CunnaneTransformer only suppers 1 feature',
-                'check_fit_idempotent': 'CunnaneTransformer only suppers 1 feature',
-                'check_n_features_in': 'CunnaneTransformer only suppers 1 feature',
+                'check_estimators_dtypes': 'QuantileMapper only suppers 1 feature',
+                'check_fit_score_takes_y': 'QuantileMapper only suppers 1 feature',
+                'check_transformer_data_not_an_array': 'QuantileMapper only suppers 1 feature',
+                'check_estimators_fit_returns_self': 'QuantileMapper only suppers 1 feature',
+                'check_estimators_fit_returns_self(readonly_memmap=True)': 'QuantileMapper only suppers 1 feature',
+                'check_dtype_object': 'QuantileMapper only suppers 1 feature',
+                'check_pipeline_consistency': 'QuantileMapper only suppers 1 feature',
+                'check_estimators_nan_inf': 'QuantileMapper only suppers 1 feature',
+                'check_estimators_overwrite_params': 'QuantileMapper only suppers 1 feature',
+                'check_estimators_pickle': 'QuantileMapper only suppers 1 feature',
+                'check_fit2d_predict1d': 'QuantileMapper only suppers 1 feature',
+                'check_methods_subset_invariance': 'QuantileMapper only suppers 1 feature',
+                'check_fit2d_1sample': 'QuantileMapper only suppers 1 feature',
+                'check_dict_unchanged': 'QuantileMapper only suppers 1 feature',
+                'check_dont_overwrite_parameters': 'QuantileMapper only suppers 1 feature',
+                'check_fit_idempotent': 'QuantileMapper only suppers 1 feature',
+                'check_n_features_in': 'QuantileMapper only suppers 1 feature',
                 'check_estimators_empty_data_messages': 'skip due to odd sklearn string matching in unit test',
-                'check_fit_check_is_fitted': 'CunnaneTransformer only suppers 1 feature',
-                'check_transformer_general': 'CunnaneTransformer only suppers 1 feature',
-                'check_transformer_preserve_dtypes': 'CunnaneTransformer only suppers 1 feature',
-                'check_methods_sample_order_invariance': 'CunnaneTransformer only suppers 1 feature',
+                'check_fit_check_is_fitted': 'QuantileMapper only suppers 1 feature',
+                'check_transformer_general': 'QuantileMapper only suppers 1 feature',
+                'check_transformer_preserve_dtypes': 'QuantileMapper only suppers 1 feature',
+                'check_methods_sample_order_invariance': 'QuantileMapper only suppers 1 feature',
             },
         }
 
@@ -426,7 +423,7 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
     alpha : float, optional
         Plotting positions parameter. Default is 0.4.
     beta : float, optional
-        Plotting positions parameter. Default is 0.4.       
+        Plotting positions parameter. Default is 0.4.
     extrapolate : str, optional
         How to extend the cdfs at the tails. Valid options include {`'min'`, `'max'`, `'both'`, `'1to1'`, `None`}. Default is None.
     n_endpoints : int
@@ -450,17 +447,17 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
 
     def fit(self, X, y=None):
         """Compute CDF and plotting positions for X.
-        
+
         Parameters
         ----------
-        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        X : {array-like, sparse matrix} of shape (n_samples, 1)
             The data used to scale along the features axis. If a sparse
             matrix is provided, it will be converted into a sparse
             ``csc_matrix``. Additionally, the sparse matrix needs to be
             nonnegative if `ignore_implicit_zeros` is False.
         y : None
             Ignored.
-        
+
         Returns
         -------
         self : object
@@ -472,13 +469,22 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
             raise ValueError('CunnaneTransformer.fit() only supports a single feature')
         X = X[:, 0]
 
-        self.cdf_ = Cdf(
-            plotting_positions(len(X)),
-            np.sort(X)
-        )
+        self.cdf_ = Cdf(plotting_positions(len(X)), np.sort(X))
         return self
 
     def transform(self, X):
+        """Perform the quantile transform.
+
+        Parameters
+        ----------
+        X : array_like, shape [n_samples, 1]
+            Samples.
+
+        Returns
+        -------
+        y : ndarray of shape (n_samples, )
+            Transformed data
+        """
 
         X = check_array(X, ensure_2d=True)
 
@@ -490,7 +496,7 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
         right = np.inf if self.extrapolate in ['max', 'both'] else None
 
         pps = np.interp(X, self.cdf_.vals, self.cdf_.pp, left=left, right=right)
-        
+
         if np.isinf(pps).any():
             lower_inds = np.nonzero(-np.inf == pps)[0]
             upper_inds = np.nonzero(np.inf == pps)[0]
@@ -508,14 +514,14 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
 
     def fit_transform(self, X, y=None):
         """Fit `CunnaneTransform` to `X`, then transform `X`.
-        
+
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
             The data used to generate the fit CDF.
         y : Ignored
             Not used, present for API consistency by convention.
-        
+
         Returns
         -------
         X_new : ndarray of shape (n_samples, n_features)

@@ -352,7 +352,9 @@ class PointWiseDownscaler:
         print(X)
         print(self._models)
         if X.chunks:
-            return xr.map_blocks(_transform_wrapper, X, args=[self._models, 'inverse_transform'], kwargs=kws)
+            return xr.map_blocks(
+                _transform_wrapper, X, args=[self._models, 'inverse_transform'], kwargs=kws
+            )
         else:
             return _transform_wrapper(X, self._models, 'inverse_transform', **kws)
 
