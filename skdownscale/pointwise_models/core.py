@@ -121,7 +121,7 @@ def _transform_wrapper(X, models, direction='transform', feature_dim=DEFAULT_FEA
     shape = list(X.shape)
     coords = dict(X.coords)
     xtrans = xr.DataArray(np.empty(shape, dtype=X.dtype), coords=coords, dims=dims)
-    # print(models)
+
     for index, model in xenumerate(models):
         xdf = X[index].pipe(_da_to_df, feature_dim)
         for key in models.coords.keys():
@@ -349,8 +349,7 @@ class PointWiseDownscaler:
         kws.update(kwargs)
 
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
-        print(X)
-        print(self._models)
+
         if X.chunks:
             return xr.map_blocks(
                 _transform_wrapper, X, args=[self._models, 'inverse_transform'], kwargs=kws

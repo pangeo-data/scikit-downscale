@@ -122,7 +122,7 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
         # do the final mapping
         qt_kws = default_none_kwargs(self.qt_kwargs, copy=True)
 
-        x_quantiles = CunnaneTransformer(**qt_kws).fit(x_to_cdf).transform(x_to_cdf)
+        x_quantiles = CunnaneTransformer(**qt_kws).fit_transform(x_to_cdf)
         x_qmapped = self.x_cdf_fit_.inverse_transform(x_quantiles)
 
         # add the trend back
