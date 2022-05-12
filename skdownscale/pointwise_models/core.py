@@ -61,7 +61,9 @@ def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **
     mask = _make_mask(X, reduce_dims)
 
     # create the empty output array
-    models = xr.DataArray(np.empty(mask.shape, dtype=np.object), coords=mask.coords, dims=mask.dims)
+    models = xr.DataArray(
+        np.full(mask.shape, None, dtype=np.object), coords=mask.coords, dims=mask.dims
+    )
 
     scalar_obj = np.empty((1), dtype=np.object)
     for index, val in xenumerate(mask):
@@ -98,7 +100,7 @@ def _predict_wrapper(
         ydims.pop(X.get_axis_num(feature_dim))
         yshape.pop(X.get_axis_num(feature_dim))
 
-    y = xr.DataArray(np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims)
+    y = xr.DataArray(np.full(yshape, np.nan, dtype=X.dtype), coords=ycoords, dims=ydims)
     # some models, such as the GARD models generate multiple columns instead of one column of prediction result
     # in the .predict method. This would be set in `n_outputs` and `output_names`
     # if there are multiple output columns, add the `feature_dim` back to accommodate them
@@ -120,7 +122,7 @@ def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
     dims = list(X.dims)
     shape = list(X.shape)
     coords = dict(X.coords)
-    xtrans = xr.DataArray(np.empty(shape, dtype=X.dtype), coords=coords, dims=dims)
+    xtrans = xr.DataArray(np.full(shape, np.nan, dtype=X.dtype), coords=coords, dims=dims)
 
     for index, model in xenumerate(models):
         xdf = X[index].pipe(_da_to_df, feature_dim)
@@ -146,7 +148,7 @@ def _getattr_wrapper(models, key, dtype, template_output=None):
         coords = dict(template_output.coords)
 
     # construct output dataset
-    out = xr.DataArray(np.empty(shape, dtype), coords=coords, dims=dims)
+    out = xr.DataArray(np.full(shape, np.nan, dtype), coords=coords, dims=dims)
 
     # iterate through models to get attribute values
     for index, model in xenumerate(models):
@@ -274,7 +276,7 @@ class PointWiseDownscaler:
                 ycoords = dict(X.coords)
                 if kws['feature_dim'] not in ydims:
                     template = xr.DataArray(
-                        np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims
+                        np.full(yshape, np.nan, dtype=X.dtype), coords=ycoords, dims=ydims
                     )
                     template = template.expand_dims(
                         **{kws['feature_dim']: kws['output_names']}, axis=1
@@ -284,7 +286,7 @@ class PointWiseDownscaler:
                     yshape[X.get_axis_num(kws['feature_dim'])] = kws['n_outputs']
                     ycoords[kws['feature_dim']] = kws['output_names']
                     template = xr.DataArray(
-                        np.empty(yshape, dtype=X.dtype), coords=ycoords, dims=ydims
+                        np.full(yshape, np.nan, dtype=X.dtype), coords=ycoords, dims=ydims
                     )
                 chunksizes = dict(X.chunksizes)
                 chunksizes[kws['feature_dim']] = kws['n_outputs']
