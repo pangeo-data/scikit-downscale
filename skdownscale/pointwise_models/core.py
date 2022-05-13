@@ -129,9 +129,9 @@ def _transform_wrapper(X, models, direction='transform', feature_dim=DEFAULT_FEA
         for key in models.coords.keys():
             if key in xdf:
                 xdf.drop(key)
-        xtrans_df = getattr(model.item(), direction)(xdf, **kwargs)
-
-        xtrans[index] = xtrans_df
+        if model.item():
+            xtrans_df = getattr(model.item(), direction)(xdf, **kwargs)
+            xtrans[index] = xtrans_df
     return xtrans
 
 
@@ -153,7 +153,8 @@ def _getattr_wrapper(models, key, dtype, template_output=None):
 
     # iterate through models to get attribute values
     for index, model in xenumerate(models):
-        out[index] = getattr(model.item(), key)
+        if model.item():
+            out[index] = getattr(model.item(), key)
 
     return out
 
