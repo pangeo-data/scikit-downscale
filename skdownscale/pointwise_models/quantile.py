@@ -411,6 +411,7 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
                 'check_regressors_int': 'QuantileMappingReressor only suppers 1 feature',
                 'check_methods_sample_order_invariance': 'QuantileMappingReressor only suppers 1 feature',
                 'check_fit_check_is_fitted': 'QuantileMappingReressor only suppers 1 feature',
+                'check_requires_y_none': 'QuantileMappingReressor only suppers 1 feature',
             },
         }
 
