@@ -117,7 +117,7 @@ def _predict_wrapper(
     return y
 
 
-def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
+def _transform_wrapper(X, models, direction='transform', feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
 
     dims = list(X.dims)
     shape = list(X.shape)
@@ -129,7 +129,8 @@ def _transform_wrapper(X, models, feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
         for key in models.coords.keys():
             if key in xdf:
                 xdf.drop(key)
-        xtrans_df = model.item().transform(xdf, **kwargs)
+        xtrans_df = getattr(model.item(), direction)(xdf, **kwargs)
+
         xtrans[index] = xtrans_df
     return xtrans
 
@@ -326,6 +327,37 @@ class PointWiseDownscaler:
             return xr.map_blocks(_transform_wrapper, X, args=[self._models], kwargs=kws)
         else:
             return _transform_wrapper(X, self._models, **kws)
+
+    def inverse_transform(self, X, **kwargs):
+        """Apply inverse transforms to the data, and transform with the final estimator
+
+        Parameters
+        ----------
+        X : xarray.DataArray
+            Data to transform on. Must fulfill input requirements of first step
+            of the model or pipeline.
+        feature_dim : str, optional
+            Name of feature dimension.
+        **transform_params : dict of string -> object
+            Parameters to the ``transform`` called at the end of all
+            transformations in the pipeline.
+
+        Returns
+        -------
+        y_inverse_trans : xarray.DataArray
+        """
+
+        kws = {'feature_dim': DEFAULT_FEATURE_DIM}
+        kws.update(kwargs)
+
+        X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
+
+        if X.chunks:
+            return xr.map_blocks(
+                _transform_wrapper, X, args=[self._models, 'inverse_transform'], kwargs=kws
+            )
+        else:
+            return _transform_wrapper(X, self._models, 'inverse_transform', **kws)
 
     def get_attr(
         self, key: str, dtype: str, template_output: Optional[Union[xr.DataArray]] = None

@@ -8,6 +8,7 @@ from skdownscale.pointwise_models import (
     AnalogRegression,
     BcsdPrecipitation,
     BcsdTemperature,
+    CunnaneTransformer,
     EquidistantCdfMatcher,
     LinearTrendTransformer,
     PaddedDOYGrouper,
@@ -44,6 +45,7 @@ def sample_X_y(n=365):
         EquidistantCdfMatcher(kind='ratio', n_endpoints=2),
         # transformers
         LinearTrendTransformer(),
+        CunnaneTransformer(),
         QuantileMapper(),
     ]
 )

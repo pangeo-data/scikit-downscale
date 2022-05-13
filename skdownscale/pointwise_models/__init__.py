@@ -5,6 +5,7 @@ from .gard import AnalogRegression, PureAnalog, PureRegression
 from .groupers import DAY_GROUPER, MONTH_GROUPER, PaddedDOYGrouper
 from .grouping import GroupedRegressor
 from .quantile import (
+    CunnaneTransformer,
     EquidistantCdfMatcher,
     QuantileMapper,
     QuantileMappingReressor,
