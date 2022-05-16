@@ -82,7 +82,8 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
         # maybe detrend the input datasets
         if self.detrend:
             lt_kwargs = default_none_kwargs(self.lt_kwargs)
-            x_to_cdf = LinearTrendTransformer(**lt_kwargs).fit_transform(X)
+            self.x_trend_fit_ = LinearTrendTransformer(**lt_kwargs).fit(X)
+            x_to_cdf = self.x_trend_fit_.transform(X)
         else:
             x_to_cdf = X
 
@@ -128,6 +129,8 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
         # add the trend back
         if self.detrend:
             x_qmapped = x_trend.inverse_transform(x_qmapped)
+            # reset the baseline (remove bias)
+            x_qmapped -= x_trend.lr_model_.intercept_ - self.x_trend_fit_.lr_model_.intercept_
 
         return x_qmapped
 
