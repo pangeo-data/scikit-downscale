@@ -426,7 +426,8 @@ class PureRegression(RegressorMixin, NamedColumnBaseEstimator):
         check_is_fitted(self)
 
         if self.thresh is not None:
-            exceedance_prob = self.logistic_model_.predict_proba(X)[:, 0]
+            # 0 accesses the probability of no rain, 1 accesses probability of rainy day
+            exceedance_prob = self.logistic_model_.predict_proba(X)[:, 1]
         else:
             exceedance_prob = np.ones(len(np.asarray(X)), dtype=np.float64)
 
