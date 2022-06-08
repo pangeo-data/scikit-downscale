@@ -396,7 +396,26 @@ class PureRegression(RegressorMixin, NamedColumnBaseEstimator):
             exceed_ind = y > self.thresh
             binary_y = exceed_ind.astype(np.int8)
             logistic_kwargs = default_none_kwargs(self.logistic_kwargs)
-            self.logistic_model_ = LogisticRegression(**logistic_kwargs).fit(X, binary_y)
+            try:
+                self.logistic_model_ = LogisticRegression(**logistic_kwargs).fit(X, binary_y)
+            except ValueError:
+                # if the value error is raised enter here - this is
+                # more efficient for this very rare corner case
+                # confirm that this error is due to the there being no dry days
+                if len(np.unique(exceed_ind)) > 1:
+                    raise
+                else:
+                    warnings.warn(
+                        'Found only one class while attempting logistic regression. Mutating attribute thresh'
+                    )
+                    # if you get a value error, just set the threshold to None
+                    # so that when you get to the predict you'll just act as if it's a normal linear
+                    # don't need to adjust the exceed_ind because (a) if they're all exceeding then
+                    # exceed_ind is already all 1s (as would be done below in the case of self.thresh=None)
+                    # and (b) if they're all not exceeding, then they'll just get the 1's applied to the error term
+                    # which, in the case of all zeros, will be 0, and in the case of non-zero but below the threshold,
+                    # we want to retain.
+                    self.thresh = None
         else:
             exceed_ind = np.ones(len(y), dtype=bool)
 
