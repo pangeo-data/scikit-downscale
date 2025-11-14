@@ -1,2 +1,124 @@
 [build-system]
-requires = ["setuptools>=30.3.0", "wheel", "setuptools_scm"]
+    build-backend = "setuptools.build_meta"
+    requires      = ["setuptools-scm[toml]>=6.2", "setuptools>=64"]
+
+[project]
+    authors = [{ name = "Joe Hamman", email = "jhamman@ucar.edu" }]
+    classifiers = [
+        "Development Status :: 2 - Pre-Alpha",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: Apache Software License",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python",
+        "Topic :: Scientific/Engineering",
+    ]
+    dependencies = ["scikit-learn", "xarray>=2023"]
+    description = "Statistical downscaling and postprocessing models for climate and weather model simulations."
+    dynamic = ["version"]
+    license = { text = "Apache" }
+    name = "scikit-downscale"
+    readme = "README.md"
+    requires-python = ">=3.9"
+
+[project.urls]
+    Homepage = "https://github.com/pangeo-data/scikit-downscale"
+
+[tool.setuptools.packages.find]
+    include = ["ocr*"]
+
+[tool.setuptools_scm]
+    fallback_version = "999"
+    local_scheme     = "node-and-date"
+    version_scheme   = "post-release"
+
+[tool.coverage.run]
+    branch = true
+    omit   = ["tests/*"]
+
+[dependency-groups]
+    dev = [
+        "netcdf4",
+        "numpydoc>=1.9.0",
+        "pooch>=1.8.2",
+        "pre-commit",
+        "pytest",
+        "pytest-cov",
+        "pytest-sugar",
+    ]
+    docs = [
+        "dask",
+        "jupyterlab",
+        "netcdf4",
+        "numpydoc>=1.9.0",
+        "scipy",
+        "sphinx",
+        "sphinx-gallery>=0.19.0",
+        "sphinx-rtd-theme>=3.0.2",
+    ]
+
+[tool.ruff]
+    builtins = ["ellipsis"]
+    exclude = [
+        ".bzr",
+        ".direnv",
+        ".eggs",
+        ".git",
+        ".git-rewrite",
+        ".hg",
+        ".ipynb_checkpoints",
+        ".mypy_cache",
+        ".nox",
+        ".pants.d",
+        ".pyenv",
+        ".pytest_cache",
+        ".pytype",
+        ".ruff_cache",
+        ".svn",
+        ".tox",
+        ".venv",
+        ".vscode",
+        "__pypackages__",
+        "_build",
+        "buck-out",
+        "build",
+        "dist",
+        "node_modules",
+        "site-packages",
+        "venv",
+    ]
+    extend-include = ["*.ipynb"]
+    line-length = 100
+    target-version = "py39"
+
+[tool.ruff.lint]
+    ignore = [
+        "E501", # Conflicts with ruff format
+        "E721", # Comparing types instead of isinstance
+        "E741", # Ambiguous variable names
+    ]
+    per-file-ignores = {}
+    select = ["E", "F", "I", "UP", "W"]
+
+[tool.ruff.lint.mccabe]
+    max-complexity = 18
+
+[tool.ruff.lint.isort]
+    combine-as-imports = true
+    known-first-party  = []
+
+[tool.ruff.format]
+    docstring-code-format = true
+    quote-style           = "single"
+
+[tool.ruff.lint.pydocstyle]
+    convention = "numpy"
+
+[tool.ruff.lint.pyupgrade]
+    keep-runtime-typing = true
+
+[tool.uv.sources]
+    ocr = { workspace = true }
