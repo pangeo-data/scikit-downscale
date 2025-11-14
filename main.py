@@ -1,6 +1,6 @@
 def main():
-    print("Hello from scikit-downscale!")
+    print('Hello from scikit-downscale!')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

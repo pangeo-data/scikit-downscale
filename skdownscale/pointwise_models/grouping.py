@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 from .utils import default_none_kwargs
 
@@ -34,7 +33,6 @@ class GroupedRegressor:
         fit_grouper_kwargs=None,
         predict_grouper_kwargs=None,
     ):
-
         self.estimator = estimator
         self.estimator_kwargs = estimator_kwargs
 

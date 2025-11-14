@@ -8,7 +8,6 @@ from matplotlib import pyplot as plt
 
 
 def get_sample_data(kind):
-
     if kind == 'training':
         data = xr.open_zarr('../data/downscale_test_data.zarr.zip', group=kind)
         # extract 1 point of training data for precipitation and temperature
@@ -60,14 +59,12 @@ def get_sample_data(kind):
 
 
 def prob_plots(x, y, y_hat, shape=(2, 2), figsize=(8, 8)):
-
     fig, axes = plt.subplots(*shape, sharex=True, sharey=True, figsize=figsize)
 
     scatter_kws = dict(label='', marker=None, linestyle='-')
     common_opts = dict(plottype='qq', problabel='', datalabel='')
 
     for ax, (label, series) in zip(axes.flat, y_hat.items()):
-
         scatter_kws['label'] = 'original'
         fig = probscale.probplot(x, ax=ax, scatter_kws=scatter_kws, **common_opts)
 

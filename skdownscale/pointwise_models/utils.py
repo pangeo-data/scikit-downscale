@@ -9,14 +9,13 @@ def check_max_features(array, n=1):
         n_features = array.shape[1]
         if n_features > n:
             raise ValueError(
-                'Found array with %d features (shape=%s) while '
-                'a maximum of %d is required' % (n_features, array.shape, n)
+                f'Found array with {n_features} features (shape={array.shape}) while '
+                f'a maximum of {n} is required'
             )
 
     else:
         raise ValueError(
-            'Found array with %d dimensions. Unclear which should '
-            'be the feature dim.' % array.ndim
+            f'Found array with {array.ndim} dimensions. Unclear which should be the feature dim.'
         )
     return array
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Configuration file for the Sphinx documentation builder.
 #
@@ -18,7 +17,6 @@
 
 
 # -- Project information -----------------------------------------------------
-from pkg_resources import get_distribution
 
 import skdownscale
 
