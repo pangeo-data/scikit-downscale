@@ -7,12 +7,12 @@ from .utils import check_max_features, default_none_kwargs
 
 try:
     import pwlf
-except:
+except Exception:
     pwlf = None
 
 
 def arrm_breakpoints(X, y, window_width, max_breakpoints):
-    '''Calculate breakpoints in x and y
+    """Calculate breakpoints in x and y
 
     Parameters
     ----------
@@ -26,7 +26,7 @@ def arrm_breakpoints(X, y, window_width, max_breakpoints):
     Returns
     -------
     breakpoints : ndarray
-    '''
+    """
     min_width = 10
 
     npoints = len(X)
@@ -58,7 +58,7 @@ def arrm_breakpoints(X, y, window_width, max_breakpoints):
         r2[mid] = np.corrcoef(X[s], y[s])[0, 1] ** 2
 
     # select breakpoints for the upper half of the distribution
-    for bp in range(max_breakpoints // 2):  # this means max_breakpoints must always be even
+    for _ in range(max_breakpoints // 2):
         mind = np.argmin(r2)  # find minimum r2 index location
         breakpoints.append(mind)
 
@@ -120,7 +120,6 @@ class PiecewiseLinearRegression(RegressorMixin, BaseEstimator):
     _fit_attributes = ['model_', 'fit_breaks_']
 
     def __init__(self, n_segments=7, fit_option='auto', pwlf_kwargs=None):
-
         if pwlf is None:
             raise ImportError('pwlf is not installed')
 
@@ -129,7 +128,6 @@ class PiecewiseLinearRegression(RegressorMixin, BaseEstimator):
         self.pwlf_kwargs = pwlf_kwargs
 
     def fit(self, X, y, **kwargs):
-
         # Check that X and y have correct shape
         X, y = check_X_y(X, y, y_numeric=True)
         X = check_max_features(X)
@@ -155,7 +153,6 @@ class PiecewiseLinearRegression(RegressorMixin, BaseEstimator):
         return self
 
     def predict(self, X):
-
         # Check is fit had been called
         check_is_fitted(self)
 

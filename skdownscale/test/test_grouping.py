@@ -6,7 +6,6 @@ from skdownscale.pointwise_models.grouping import GroupedRegressor, PaddedDOYGro
 
 
 def test_groupers():
-
     estimator = LinearRegression
     fit_grouper = PaddedDOYGrouper
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 import gc
 import os
@@ -63,7 +62,6 @@ def run_ak(obs_fname, train_fname, predict_fname):
     ]
 
     for obs_var, gcm_var in varnames.items():
-
         obs_keep_vars = [obs_var, 'xc', 'yc', 'xv', 'yv']
         ds_obs_daily = ds_obs[obs_keep_vars]
         ds_obs_daily[obs_var] = ds_obs_daily[obs_var].astype('f4')

@@ -1,14 +1,13 @@
 import warnings
 
 import pandas as pd
-from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.base import BaseEstimator
 from sklearn.utils import check_array, check_X_y
-from sklearn.utils.validation import check_is_fitted
 
 
 class TimeSynchronousDownscaler(BaseEstimator):
     def _check_X_y(self, X, y, **kwargs):
-        if isinstance(X, pd.DataFrame) and isinstance(X, pd.DataFrame):
+        if isinstance(X, pd.DataFrame) and isinstance(y, pd.DataFrame):
             assert X.index.equals(y.index)
             check_X_y(X, y)  # this may be inefficient
         else:

@@ -317,7 +317,7 @@ class PureAnalog(AnalogBase):
                 predicted = analogs.mean(axis=1)
 
         else:
-            raise ValueError('got unexpected kind %s' % kind)
+            raise ValueError(f'got unexpected kind {kind}')
 
         if self.thresh is not None:
             # for mean/weight cases, this fills nans when all analogs

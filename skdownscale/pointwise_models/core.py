@@ -1,5 +1,4 @@
 import copy
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -118,7 +117,6 @@ def _predict_wrapper(
 
 
 def _transform_wrapper(X, models, direction='transform', feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
-
     dims = list(X.dims)
     shape = list(X.shape)
     coords = dict(X.coords)
@@ -181,8 +179,7 @@ class PointWiseDownscaler:
 
         if not hasattr(model, 'fit'):
             raise TypeError(
-                'Type %s does not have the fit method required'
-                ' by PointWiseDownscaler' % type(model)
+                f'Type {type(model)} does not have the fit method required by PointWiseDownscaler'
             )
 
     def fit(self, X, *args, **kwargs):
@@ -361,7 +358,7 @@ class PointWiseDownscaler:
             return _transform_wrapper(X, self._models, 'inverse_transform', **kws)
 
     def get_attr(
-        self, key: str, dtype: str, template_output: Optional[Union[xr.DataArray]] = None
+        self, key: str, dtype: str, template_output: xr.DataArray | None = None
     ) -> xr.Dataset:
         """
         Get attribute values specified in key from each of the pointwise models
@@ -411,7 +408,7 @@ class PointWiseDownscaler:
         return X
 
     def __repr__(self):
-        summary = ['<skdownscale.{}>'.format(self.__class__.__name__)]
-        summary.append('  Fit Status: {}'.format(self._models is not None))
-        summary.append('  Model:\n    {}'.format(self._model))
+        summary = [f'<skdownscale.{self.__class__.__name__}>']
+        summary.append(f'  Fit Status: {self._models is not None}')
+        summary.append(f'  Model:\n    {self._model}')
         return '\n'.join(summary)
