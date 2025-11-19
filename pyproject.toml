@@ -40,6 +40,10 @@
 
 [dependency-groups]
     dev = [
+        "boto3>=1.40.70",
+        "dask>=2024.11",
+        "jupyterlab>=4.3",
+        "matplotlib>=3.9.4",
         "netcdf4>=1.7",
         "numpydoc>=1.9.0",
         "pooch>=1.8.2",
@@ -47,6 +51,7 @@
         "pytest-cov>=6.0",
         "pytest-sugar>=1.0",
         "pytest>=8.0",
+        "zarr>=2.18.2",
     ]
     docs = [
         "boto3>=1.40.70",
