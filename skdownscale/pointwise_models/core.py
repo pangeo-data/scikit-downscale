@@ -44,7 +44,22 @@ def _da_to_df(da, feature_dim=DEFAULT_FEATURE_DIM):
     else:
         columns = [f'{feature_dim}_0']
     data = da.transpose('time', ...).data
-    return pd.DataFrame(data, columns=columns, index=da.indexes['time'])
+
+    # Get time index, handling cases where it might not be a proper pandas index
+    if 'time' not in da.dims:
+        raise ValueError('DataArray must have a "time" dimension')
+
+    try:
+        time_index = da.indexes['time']
+    except (KeyError, AttributeError):
+        # If indexes doesn't exist or 'time' is not in indexes, use the coordinate values
+        if 'time' in da.coords:
+            time_index = da.coords['time'].values
+        else:
+            # Fallback to range index if no time coordinate exists
+            time_index = pd.RangeIndex(da.sizes['time'])
+
+    return pd.DataFrame(data, columns=columns, index=time_index)
 
 
 def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **kwargs):

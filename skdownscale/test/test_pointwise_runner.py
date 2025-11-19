@@ -143,3 +143,29 @@ def test_pointwise_model_attributes(X, y):
     assert isinstance(attrs, xr.DataArray)
     assert attrs.sizes == template_output.sizes
     assert attrs.dtype == dtype
+
+
+def test_pointwise_model_with_non_pandas_time_index():
+    """Test that PointWiseDownscaler works with non-pandas time indices"""
+    # Create data with numeric time coordinate (not a pandas DatetimeIndex)
+    n_times = 50
+    ds = xr.Dataset()
+    # Use numeric time values instead of pandas DatetimeIndex
+    time_values = np.arange(n_times)
+    ds['a'] = xr.DataArray(
+        np.random.random(size=(n_times, 2)), dims=('time', 'point'), coords={'time': time_values}
+    )
+    ds['b'] = xr.DataArray(
+        np.random.random(size=(n_times, 2)), dims=('time', 'point'), coords={'time': time_values}
+    )
+
+    X = ds
+    y = ds['a']
+
+    pipeline = make_linear_reg_pipeline()
+    model = PointWiseDownscaler(model=pipeline)
+    model.fit(X, y)
+    y_pred = model.predict(X)
+
+    assert isinstance(y_pred, type(y))
+    assert y_pred.sizes == y.sizes
