@@ -22,11 +22,12 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
     _fit_attributes = ['shift_', 'scale_']
     _timestep = 'M'
 
-    def __init__(self, window_width=31):
-        assert window_width > 0, window_width
+    def __init__(self, window_width: int = 31):
+        if window_width <= 0:
+            raise ValueError(f'window_width must be positive, got {window_width}')
         self.window_width = window_width
 
-    def fit(self, X, y):
+    def fit(self, X: pd.Series | pd.DataFrame, y: pd.Series | pd.DataFrame):
         """Fit Z-Score Model finds the shift and scale parameters
         to inform bias correction.
 
@@ -45,8 +46,10 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
         if self.n_features_in_ != 1:
             raise ValueError(f'Zscore only supports 1 feature, found {self.n_features_in_}')
 
-        assert isinstance(X.squeeze(), pd.Series)
-        assert isinstance(y.squeeze(), pd.Series)
+        if not isinstance(X.squeeze(), pd.Series):
+            raise TypeError(f'X.squeeze() must be a pd.Series, got {type(X.squeeze()).__name__}')
+        if not isinstance(y.squeeze(), pd.Series):
+            raise TypeError(f'y.squeeze() must be a pd.Series, got {type(y.squeeze()).__name__}')
 
         X_mean, X_std = _calc_stats(X.squeeze(), self.window_width)
         y_mean, y_std = _calc_stats(y.squeeze(), self.window_width)
@@ -81,8 +84,10 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
         check_is_fitted(self)
         X = self._validate_data(X)
 
-        assert isinstance(X, pd.DataFrame)
-        assert X.shape[1] == 1
+        if not isinstance(X, pd.DataFrame):
+            raise TypeError(f'X must be a pd.DataFrame, got {type(X).__name__}')
+        if X.shape[1] != 1:
+            raise ValueError(f'X must have exactly 1 feature, got {X.shape[1]}')
 
         name = list(X.keys())[0]
 
@@ -132,11 +137,13 @@ def _reshape(da, window_width):
         Reshaped xr.Dataset
     """
 
-    assert da.ndim == 1
+    if da.ndim != 1:
+        raise ValueError(f'Input array must be 1-dimensional, got {da.ndim} dimensions')
 
     if 'time' not in da.coords and 'index' in da.coords:
         da = da.rename({'index': 'time'})
-    assert 'time' in da.coords
+    if 'time' not in da.coords:
+        raise ValueError('Input array must have a "time" coordinate')
 
     def split(g):
         return g.rename({'time': 'day'}).assign_coords(day=g.time.dt.dayofyear.values)
@@ -218,7 +225,10 @@ def _get_params(hist_mean, hist_std, meas_mean, meas_std):
     # assert len(hist_std) == 364, len(hist_std)
     # assert len(meas_mean) == 364, len(meas_mean)
     # assert len(meas_std) == 364, len(meas_std)
-    assert all([s.ndim for s in [hist_mean, hist_std, meas_mean, meas_std]])
+    if any(s.ndim != 1 for s in [hist_mean, hist_std, meas_mean, meas_std]):
+        raise ValueError(
+            'All statistics (hist_mean, hist_std, meas_mean, meas_std) must be 1-dimensional'
+        )
 
     shift = meas_mean - hist_mean
     scale = meas_std / hist_std
@@ -281,7 +291,7 @@ def _expand_params(series, shift, scale):
     """
 
     n_samples = len(series)
-    len_avgyr = 364 if n_samples > 364 else n_samples
+    len_avgyr = min(n_samples, 364)
     # TODO: update doc string
     # assert len(shift) == len_avgyr, len(shift)
     # assert len(scale) == len_avgyr, len(scale)
@@ -290,7 +300,10 @@ def _expand_params(series, shift, scale):
     remainder = n_samples % len_avgyr
 
     inds = np.concatenate([np.tile(np.arange(len_avgyr), repeats), np.arange(remainder)])
-    assert len(inds) == n_samples, (len(inds), n_samples)
+    if len(inds) != n_samples:
+        raise ValueError(
+            f'Generated indices length {len(inds)} does not match expected n_samples {n_samples}'
+        )
 
     shift_expanded = shift.iloc[inds]
     shift_expanded.index = series.index

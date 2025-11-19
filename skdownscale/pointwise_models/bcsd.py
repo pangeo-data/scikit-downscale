@@ -84,7 +84,8 @@ class BcsdBase(TimeSynchronousDownscaler):
                 dfs.append(group - climatology.loc[key])
 
         result = pd.concat(dfs).sort_index()
-        assert obj.shape == result.shape
+        if obj.shape != result.shape:
+            raise ValueError(f'Result shape {result.shape} does not match input shape {obj.shape}')
         return result
 
 
@@ -174,7 +175,8 @@ class BcsdPrecipitation(BcsdBase):
                 dfs.append(group / climatology.loc[key])
 
         result = pd.concat(dfs).sort_index()
-        assert obj.shape == result.shape
+        if obj.shape != result.shape:
+            raise ValueError(f'Result shape {result.shape} does not match input shape {obj.shape}')
 
         return result
 

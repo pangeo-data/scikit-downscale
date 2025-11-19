@@ -227,7 +227,8 @@ class PointWiseDownscaler:
             ``p`` for step ``s`` has key ``s__p``.
         """
         kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM} | kwargs
-        assert len(args) <= 1
+        if len(args) > 1:
+            raise ValueError(f'Expected at most 1 positional argument, got {len(args)}')
         args = list(args)
         args.append(self._model)
 
