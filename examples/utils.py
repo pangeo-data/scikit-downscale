@@ -52,33 +52,24 @@ def get_sample_data(
             data['uas.hist.CanESM2.CRCM5-UQAM.day.NAM-44i.raw']
             .sel(lat=40.25, lon=-109.2, method='nearest')
             .to_dataset()[['uas']]
-            .convert_calendar('standard')
             .squeeze()
             .to_dataframe()[['uas']]
-            .resample('1d')
-            .first()
         )
     elif kind == 'wind-obs':
         return (
             data['uas.gridMET.NAM-44i']
             .sel(lat=40.25, lon=-109.2, method='nearest')
             .to_dataset()[['uas']]
-            .convert_calendar('standard')
             .squeeze()
             .to_dataframe()[['uas']]
-            .resample('1d')
-            .first()
         )
     elif kind == 'wind-rcp':
         return (
             data['uas.rcp85.CanESM2.CRCM5-UQAM.day.NAM-44i.raw']
             .sel(lat=40.25, lon=-109.2, method='nearest')
             .to_dataset()[['uas']]
-            .convert_calendar('standard')
             .squeeze()
             .to_dataframe()[['uas']]
-            .resample('1d')
-            .first()
         )
     else:
         raise ValueError(kind)
