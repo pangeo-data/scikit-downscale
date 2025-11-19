@@ -17,8 +17,7 @@
     dependencies = ["scikit-learn>=1.5", "xarray>=2024.10"]
     description = "Statistical downscaling and postprocessing models for climate and weather model simulations."
     dynamic = ["version"]
-    license = "Apache Software License 2.0"
-    license-files = ["LICENSE"]
+    license = "Apache-2.0"
     name = "scikit-downscale"
     readme = "README.md"
     requires-python = ">=3.12"
