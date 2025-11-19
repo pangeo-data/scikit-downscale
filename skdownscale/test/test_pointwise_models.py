@@ -24,7 +24,7 @@ from skdownscale.pointwise_models import (
 def sample_X_y(n=365):
     index = pd.date_range('2019-01-01', periods=n)
     X = pd.DataFrame(
-        {'foo': np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10, 'bar': np.random.rand((n))},
+        {'foo': np.sin(np.linspace(-10 * np.pi, 10 * np.pi, n)) * 10, 'bar': np.random.rand(n)},
         index=index,
     )
     y = X['foo'] + 2
@@ -129,7 +129,6 @@ def test_quantile_mapper_detrend():
     ],
 )
 def test_linear_model(model):
-
     n = 365
     # TODO: add test for time other time ranges (e.g. < 365 days)
     index = pd.date_range('2019-01-01', periods=n)
@@ -221,7 +220,6 @@ def test_gard_pure_regression_models(sample_X_y, thresh):
 
 @pytest.mark.parametrize('model_cls', [BcsdPrecipitation])
 def test_linear_model_prec(model_cls):
-
     n = 365
     # TODO: add test for time other time ranges (e.g. < 365 days)
     index = pd.date_range('2019-01-01', periods=n)

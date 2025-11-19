@@ -1,13 +1,10 @@
-import collections
-
-import numpy as np
 import pandas as pd
 from sklearn.utils.validation import check_is_fitted
 
 from .base import TimeSynchronousDownscaler
 from .groupers import DAY_GROUPER, MONTH_GROUPER, PaddedDOYGrouper
 from .quantile import QuantileMapper
-from .utils import default_none_kwargs, ensure_samples_features
+from .utils import default_none_kwargs
 
 
 class BcsdBase(TimeSynchronousDownscaler):
@@ -24,7 +21,6 @@ class BcsdBase(TimeSynchronousDownscaler):
         return_anoms=True,
         qm_kwargs=None,
     ):
-
         self.time_grouper = time_grouper
         self.climate_trend_grouper = climate_trend_grouper
         self.climate_trend = climate_trend
@@ -54,7 +50,7 @@ class BcsdBase(TimeSynchronousDownscaler):
             else:
                 return self.time_grouper(df)
         else:
-            raise TypeError('unexpected time grouper type %s' % self.time_grouper)
+            raise TypeError(f'unexpected time grouper type {self.time_grouper}')
 
     def _qm_fit_by_group(self, groups):
         """helper function to fit quantile mappers by group

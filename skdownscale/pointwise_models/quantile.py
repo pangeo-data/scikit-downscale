@@ -17,7 +17,7 @@ Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
 
 
 def plotting_positions(n, alpha=0.4, beta=0.4):
-    '''Returns a monotonic array of plotting positions.
+    """Returns a monotonic array of plotting positions.
 
     Parameters
     ----------
@@ -35,7 +35,7 @@ def plotting_positions(n, alpha=0.4, beta=0.4):
     See Also
     --------
     scipy.stats.mstats.plotting_positions
-    '''
+    """
     return (np.arange(1, n + 1) - alpha) / (n + 1.0 - alpha - beta)
 
 
@@ -61,7 +61,6 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
     _fit_attributes = ['x_cdf_fit_']
 
     def __init__(self, detrend=False, lt_kwargs=None, qt_kwargs=None):
-
         self.detrend = detrend
         self.lt_kwargs = lt_kwargs
         self.qt_kwargs = qt_kwargs
@@ -361,10 +360,9 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
             pp[0] = pp_min
             pp[-1] = pp[-2]
         else:
-            raise ValueError('unknown value for extrapolate: %s' % extrapolate)
+            raise ValueError(f'unknown value for extrapolate: {extrapolate}')
 
         if extrapolate in ['min', 'max', 'both']:
-
             model = LinearRegression()
 
             # extrapolate lower end point
@@ -442,7 +440,6 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
     _fit_attributes = ['cdf_']
 
     def __init__(self, *, alpha=0.4, beta=0.4, extrapolate='both', n_endpoints=10):
-
         self.alpha = alpha
         self.beta = beta
 
@@ -535,7 +532,6 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
         return self.fit(X).transform(X)
 
     def inverse_transform(self, X):
-
         X = check_array(X, ensure_2d=True)
         X = X[:, 0]
 

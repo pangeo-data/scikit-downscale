@@ -1,15 +1,36 @@
-from .arrm import PiecewiseLinearRegression
-from .bcsd import BcsdPrecipitation, BcsdTemperature
-from .core import PointWiseDownscaler
-from .gard import AnalogRegression, PureAnalog, PureRegression
-from .groupers import DAY_GROUPER, MONTH_GROUPER, PaddedDOYGrouper
-from .grouping import GroupedRegressor
-from .quantile import (
+from skdownscale.pointwise_models.arrm import PiecewiseLinearRegression
+from skdownscale.pointwise_models.bcsd import BcsdPrecipitation, BcsdTemperature
+from skdownscale.pointwise_models.core import PointWiseDownscaler
+from skdownscale.pointwise_models.gard import AnalogRegression, PureAnalog, PureRegression
+from skdownscale.pointwise_models.groupers import DAY_GROUPER, MONTH_GROUPER, PaddedDOYGrouper
+from skdownscale.pointwise_models.grouping import GroupedRegressor
+from skdownscale.pointwise_models.quantile import (
     CunnaneTransformer,
     EquidistantCdfMatcher,
     QuantileMapper,
     QuantileMappingReressor,
     TrendAwareQuantileMappingRegressor,
 )
-from .trend import LinearTrendTransformer
-from .zscore import ZScoreRegressor
+from skdownscale.pointwise_models.trend import LinearTrendTransformer
+from skdownscale.pointwise_models.zscore import ZScoreRegressor
+
+__all__ = [
+    'PiecewiseLinearRegression',
+    'BcsdPrecipitation',
+    'BcsdTemperature',
+    'PointWiseDownscaler',
+    'AnalogRegression',
+    'PureAnalog',
+    'PureRegression',
+    'DAY_GROUPER',
+    'MONTH_GROUPER',
+    'PaddedDOYGrouper',
+    'GroupedRegressor',
+    'CunnaneTransformer',
+    'EquidistantCdfMatcher',
+    'QuantileMapper',
+    'QuantileMappingReressor',
+    'TrendAwareQuantileMappingRegressor',
+    'LinearTrendTransformer',
+    'ZScoreRegressor',
+]

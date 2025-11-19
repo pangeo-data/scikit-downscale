@@ -23,7 +23,6 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
     _timestep = 'M'
 
     def __init__(self, window_width=31):
-
         assert window_width > 0, window_width
         self.window_width = window_width
 
