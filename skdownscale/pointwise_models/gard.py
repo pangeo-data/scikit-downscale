@@ -173,11 +173,12 @@ class AnalogRegression(AnalogBase):
         out = np.empty((len(X), self.n_outputs), dtype=np.float64)
         for i in range(len(X)):
             # predict for this time step
-            out[i] = self._predict_one_step(
+            result = self._predict_one_step(
                 logistic_model,
                 lr_model,
                 X[None, i],
             )
+            out[i, :] = result
 
         # if the input is a dataframe, return dataframe, otherwise return a numpy array
         # the output_names can be used to determine the order of columns
@@ -213,7 +214,7 @@ class AnalogRegression(AnalogBase):
         y_hat = lr_model.predict(x[exceed_ind])
         error = root_mean_squared_error(y[exceed_ind], y_hat)
 
-        predicted = lr_model.predict(X)
+        predicted = lr_model.predict(X).item()
 
         # this order needs to be the same as output_names
         return [predicted, exceedance_prob, error]
