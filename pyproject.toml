@@ -28,7 +28,7 @@
     Homepage = "https://github.com/pangeo-data/scikit-downscale"
 
 [tool.setuptools.packages.find]
-    include = ["ocr*"]
+    include = ["skdownscale*"]
 
 [tool.setuptools_scm]
     fallback_version = "999"
@@ -50,15 +50,19 @@
         "pytest-sugar",
     ]
     docs = [
+        "boto3>=1.40.70",
         "dask",
         "jupyterlab",
+        "matplotlib>=3.9.4",
         "netcdf4",
         "numpydoc>=1.9.0",
+        "s3fs>=2025.10.0",
         "scipy",
         "sphinx",
         "sphinx-gallery>=0.19.0",
         "sphinx-rtd-theme>=3.0.2",
-    ]
+        "zarr>=2.18.2",
+]
 
 [tool.ruff]
     builtins = ["ellipsis"]

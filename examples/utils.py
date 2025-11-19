@@ -1,3 +1,5 @@
+import typing
+
 import numpy as np
 import pandas as pd
 import probscale
@@ -7,12 +9,29 @@ import xarray as xr
 from matplotlib import pyplot as plt
 
 
-def get_sample_data(kind):
+def get_sample_data(
+    kind: typing.Literal['training', 'targets', 'wind-hist', 'wind-obs', 'wind-rcp'],
+) -> pd.DataFrame:
+    if kind in ['training', 'targets']:
+        data = xr.open_datatree(
+            's3://carbonplan/share/scikit-downscale/test-data.zarr',
+            engine='zarr',
+            chunks={},
+            storage_options={'anon': True, 'endpoint_url': 'https://rice1.osn.mghpcc.org'},
+        )
+    else:
+        data = xr.open_datatree(
+            's3://carbonplan/share/scikit-downscale/uas-data.zarr',
+            engine='zarr',
+            chunks={},
+            storage_options={'anon': True, 'endpoint_url': 'https://rice1.osn.mghpcc.org'},
+        )
     if kind == 'training':
-        data = xr.open_zarr('../data/downscale_test_data.zarr.zip', group=kind)
         # extract 1 point of training data for precipitation and temperature
         df = (
-            data.isel(point=0)
+            data['training']
+            .isel(point=0)
+            .to_dataset()
             .to_dataframe()[['T2max', 'PREC_TOT']]
             .rename(columns={'T2max': 'tmax', 'PREC_TOT': 'pcp'})
         )
@@ -20,35 +39,35 @@ def get_sample_data(kind):
         df['pcp'] *= 24
         return df.resample('1d').first()
     elif kind == 'targets':
-        data = xr.open_zarr('../data/downscale_test_data.zarr.zip', group=kind)
         # extract 1 point of training data for precipitation and temperature
         return (
-            data.isel(point=0)
+            data['targets']
+            .isel(point=0)
+            .to_dataset()
             .to_dataframe()[['Tmax', 'Prec']]
             .rename(columns={'Tmax': 'tmax', 'Prec': 'pcp'})
         )
     elif kind == 'wind-hist':
         return (
-            xr.open_dataset(
-                '../data/uas/uas.hist.CanESM2.CRCM5-UQAM.day.NAM-44i.raw.Colorado.19801990.nc'
-            )['uas']
+            data['uas.hist.CanESM2.CRCM5-UQAM.day.NAM-44i.raw']
             .sel(lat=40.25, lon=-109.2, method='nearest')
+            .to_dataset()
             .squeeze()
             .to_dataframe()[['uas']]
         )
     elif kind == 'wind-obs':
         return (
-            xr.open_dataset('../data/uas/uas.gridMET.NAM-44i.Colorado.19801990.nc')['uas']
+            data['uas.gridMET.NAM-44i']
             .sel(lat=40.25, lon=-109.2, method='nearest')
+            .to_dataset()
             .squeeze()
             .to_dataframe()[['uas']]
         )
     elif kind == 'wind-rcp':
         return (
-            xr.open_dataset(
-                '../data/uas/uas.rcp85.CanESM2.CRCM5-UQAM.day.NAM-44i.raw.Colorado.19902000.nc'
-            )['uas']
+            data['uas.rcp85.CanESM2.CRCM5-UQAM.day.NAM-44i.raw']
             .sel(lat=40.25, lon=-109.2, method='nearest')
+            .to_dataset()
             .squeeze()
             .to_dataframe()[['uas']]
         )
