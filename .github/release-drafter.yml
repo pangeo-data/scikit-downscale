@@ -34,7 +34,7 @@ categories:
   - title: "🔁 CI/CD"
     labels:
       - "ci"
-      - "github-actions"
+      - "github_actions"
 change-template: "- $TITLE by @$AUTHOR in #$NUMBER"
 change-title-escapes: '\<*_&'
 version-resolver:
