@@ -20,3 +20,16 @@ Run unit tests with:
 ```bash
 uv run pytest
 ```
+
+## Build Documentation
+
+```bash
+# Install documentation dependencies
+uv sync --group docs
+
+# Build HTML documentation
+uv run sphinx-build docs docs/_build/html
+
+# View the built docs
+open docs/_build/html/index.html
+```
