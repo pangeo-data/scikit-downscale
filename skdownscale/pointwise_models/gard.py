@@ -82,14 +82,16 @@ class AnalogBase(RegressorMixin, NamedColumnBaseEstimator):
 
         return self
 
-    def _more_tags(self):
-        return {
-            '_xfail_checks': {
-                'check_fit_score_takes_y': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                'check_pipeline_consistency': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                'check_regressors_train': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-            },
-        }
+    def __sklearn_tags__(self):
+        from dataclasses import replace
+
+        tags = super().__sklearn_tags__()
+        # Skip tests - GARD models output 3 columns pandas dataframe
+        tags = replace(
+            tags,
+            _skip_test='GARD models output 3 columns pandas dataframe instead of one during predict',
+        )
+        return tags
 
 
 class AnalogRegression(AnalogBase):
@@ -483,11 +485,13 @@ class PureRegression(RegressorMixin, NamedColumnBaseEstimator):
             # this order has to be the same as output_names
             return np.hstack((predicted, exceedance_prob, prediction_error))
 
-    def _more_tags(self):
-        return {
-            '_xfail_checks': {
-                'check_fit_score_takes_y': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                'check_pipeline_consistency': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-                'check_regressors_train': 'GARD models output 3 columns pandas dataframe instead of one during predict',
-            },
-        }
+    def __sklearn_tags__(self):
+        from dataclasses import replace
+
+        tags = super().__sklearn_tags__()
+        # Skip tests - GARD models output 3 columns pandas dataframe
+        tags = replace(
+            tags,
+            _skip_test='GARD models output 3 columns pandas dataframe instead of one during predict',
+        )
+        return tags

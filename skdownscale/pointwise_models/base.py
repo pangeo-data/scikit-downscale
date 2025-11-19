@@ -50,15 +50,20 @@ class TimeSynchronousDownscaler(BaseEstimator):
                     f'was fitted with {self.n_features_in_} features.'
                 )
 
-    def _get_tags(self):
-        """Get estimator tags.
+    def __sklearn_tags__(self):
+        """Get estimator tags for sklearn 1.6+.
 
         Returns
         -------
-        tags : dict
-            Dictionary of tags. Default tags for compatibility.
+        tags : Tags
+            Tags object with estimator metadata.
         """
-        return {'requires_y': False}
+        from dataclasses import replace
+
+        tags = super().__sklearn_tags__()
+        # Update target_tags to indicate y is not required by default
+        tags = replace(tags, target_tags=replace(tags.target_tags, required=False))
+        return tags
 
     def _validate_data(
         self, X, y=None, reset: bool = True, validate_separately: bool = False, **check_params: dict
@@ -93,7 +98,8 @@ class TimeSynchronousDownscaler(BaseEstimator):
         """
 
         if y is None:
-            if self._get_tags().get('requires_y', False):
+            tags = self.__sklearn_tags__()
+            if tags.target_tags.required:
                 raise ValueError(
                     f'This {self.__class__.__name__} estimator '
                     f'requires y to be passed, but the target y is None.'

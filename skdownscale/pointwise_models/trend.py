@@ -75,10 +75,10 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         X = self._validate_data(X)
         return self.lr_model_.predict(np.arange(len(X)).reshape(-1, 1))
 
-    def _more_tags(self):
-        return {
-            '_xfail_checks': {
-                'check_methods_subset_invariance': 'because',
-                'check_methods_sample_order_invariance': 'temporal order matters',
-            }
-        }
+    def __sklearn_tags__(self):
+        from dataclasses import replace
+
+        tags = super().__sklearn_tags__()
+        # Mark as skipping certain tests due to temporal sensitivity
+        tags = replace(tags, _skip_test='Temporal transformer - sample order matters')
+        return tags
