@@ -1,5 +1,4 @@
 import copy
-from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -359,7 +358,7 @@ class PointWiseDownscaler:
             return _transform_wrapper(X, self._models, 'inverse_transform', **kws)
 
     def get_attr(
-        self, key: str, dtype: str, template_output: Optional[Union[xr.DataArray]] = None
+        self, key: str, dtype: str, template_output: xr.DataArray | None = None
     ) -> xr.Dataset:
         """
         Get attribute values specified in key from each of the pointwise models
