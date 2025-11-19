@@ -3,25 +3,21 @@ tag-template: "v$RESOLVED_VERSION"
 categories:
   - title: "⚠️ Breaking Changes"
     labels:
-      - "breaking"
       - "breaking-change"
   - title: "✨ New Features"
     labels:
       - "feature"
       - "enhancement"
-      - "new-feature"
   - title: "🐛 Bug Fixes"
     labels:
       - "bug"
       - "bugfix"
-      - "fix"
   - title: "📚 Documentation"
     labels:
       - "documentation"
       - "docs"
   - title: "🧪 Testing"
     labels:
-      - "test"
       - "testing"
   - title: "⚡ Performance"
     labels:
@@ -35,7 +31,6 @@ categories:
   - title: "📦 Dependencies"
     labels:
       - "dependencies"
-      - "deps"
   - title: "🔁 CI/CD"
     labels:
       - "ci"
@@ -45,13 +40,11 @@ change-title-escapes: '\<*_&'
 version-resolver:
   major:
     labels:
-      - "breaking"
       - "breaking-change"
   minor:
     labels:
       - "feature"
       - "enhancement"
-      - "new-feature"
   default: patch
 exclude-labels:
   - "skip-changelog"
