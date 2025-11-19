@@ -29,7 +29,40 @@ class TimeSynchronousDownscaler(BaseEstimator):
 
         return array
 
-    def _validate_data(self, X, y=None, reset=True, validate_separately=False, **check_params):
+    def _check_n_features(self, X, reset):
+        """Check and set n_features_in_ attribute.
+
+        Parameters
+        ----------
+        X : array-like
+            Input data
+        reset : bool
+            Whether to reset n_features_in_ or check consistency
+        """
+        n_features = X.shape[1] if hasattr(X, 'shape') and len(X.shape) > 1 else 1
+
+        if reset:
+            self.n_features_in_ = n_features
+        elif hasattr(self, 'n_features_in_'):
+            if self.n_features_in_ != n_features:
+                raise ValueError(
+                    f'X has {n_features} features, but {self.__class__.__name__} '
+                    f'was fitted with {self.n_features_in_} features.'
+                )
+
+    def _get_tags(self):
+        """Get estimator tags.
+
+        Returns
+        -------
+        tags : dict
+            Dictionary of tags. Default tags for compatibility.
+        """
+        return {'requires_y': False}
+
+    def _validate_data(
+        self, X, y=None, reset: bool = True, validate_separately: bool = False, **check_params: dict
+    ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
@@ -60,7 +93,7 @@ class TimeSynchronousDownscaler(BaseEstimator):
         """
 
         if y is None:
-            if self._get_tags()['requires_y']:
+            if self._get_tags().get('requires_y', False):
                 raise ValueError(
                     f'This {self.__class__.__name__} estimator '
                     f'requires y to be passed, but the target y is None.'
@@ -80,7 +113,6 @@ class TimeSynchronousDownscaler(BaseEstimator):
                 X, y = self._check_X_y(X, y, **check_params)
             out = X, y
 
-        # TO-DO: add check_n_features attribute
         if check_params.get('ensure_2d', True):
             self._check_n_features(X, reset=reset)
 

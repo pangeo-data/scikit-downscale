@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.base import BaseEstimator, RegressorMixin, TransformerMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import check_is_fitted, validate_data
 
 from .trend import LinearTrendTransformer
 from .utils import check_max_features, default_none_kwargs
@@ -64,6 +64,10 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
         self.detrend = detrend
         self.lt_kwargs = lt_kwargs
         self.qt_kwargs = qt_kwargs
+
+    def _validate_data(self, X, y=None, reset=True, **check_params):
+        """Validate input data using sklearn's validate_data."""
+        return validate_data(self, X=X, y=y, reset=reset, **check_params)
 
     def fit(self, X, y=None):
         """Fit the quantile mapping model.
@@ -188,6 +192,10 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
 
         if self.n_endpoints < 2:
             raise ValueError('Invalid number of n_endpoints, must be >= 2')
+
+    def _validate_data(self, X, y=None, reset=True, **check_params):
+        """Validate input data using sklearn's validate_data."""
+        return validate_data(self, X=X, y=y, reset=reset, **check_params)
 
     def fit(self, X, y, **kwargs):
         """Fit the quantile mapping regression model.
@@ -446,6 +454,10 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
         self.extrapolate = extrapolate
         self.n_endpoints = n_endpoints
 
+    def _validate_data(self, X, y=None, reset=True, **check_params):
+        """Validate input data using sklearn's validate_data."""
+        return validate_data(self, X=X, y=y, reset=reset, **check_params)
+
     def fit(self, X, y=None):
         """Compute CDF and plotting positions for X.
 
@@ -674,6 +686,10 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         self.qm_estimator = qm_estimator
         if trend_transformer is None:
             self.trend_transformer = LinearTrendTransformer()
+
+    def _validate_data(self, X, y=None, reset=True, **check_params):
+        """Validate input data using sklearn's validate_data."""
+        return validate_data(self, X=X, y=y, reset=reset, **check_params)
 
     def fit(self, X, y):
         """Fit the model.

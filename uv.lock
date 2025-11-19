@@ -2668,6 +2668,10 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "boto3" },
+    { name = "dask" },
+    { name = "jupyterlab" },
+    { name = "matplotlib" },
     { name = "netcdf4" },
     { name = "numpydoc" },
     { name = "pooch" },
@@ -2675,6 +2679,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-sugar" },
+    { name = "zarr" },
 ]
 docs = [
     { name = "boto3" },
@@ -2699,6 +2704,10 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "boto3", specifier = ">=1.40.70" },
+    { name = "dask", specifier = ">=2024.11" },
+    { name = "jupyterlab", specifier = ">=4.3" },
+    { name = "matplotlib", specifier = ">=3.9.4" },
     { name = "netcdf4", specifier = ">=1.7" },
     { name = "numpydoc", specifier = ">=1.9.0" },
     { name = "pooch", specifier = ">=1.8.2" },
@@ -2706,6 +2715,7 @@ dev = [
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "pytest-sugar", specifier = ">=1.0" },
+    { name = "zarr", specifier = ">=2.18.2" },
 ]
 docs = [
     { name = "boto3", specifier = ">=1.40.70" },

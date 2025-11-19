@@ -162,10 +162,7 @@ class BcsdPrecipitation(BcsdBase):
         Xqm = self._qm_transform_by_group(self._create_groups(X, climate_trend=True))
 
         # calculate the anomalies as a ratio of the training data
-        if self.return_anoms:
-            return self._calc_ratio_anoms(Xqm, self.y_climo_)
-        else:
-            return Xqm
+        return self._calc_ratio_anoms(Xqm, self.y_climo_) if self.return_anoms else Xqm
 
     def _calc_ratio_anoms(self, obj, climatology, climate_trend=False):
         """helper function for dividing day groups by climatology"""
@@ -283,13 +280,11 @@ class BcsdTemperature(BcsdBase):
 
     def _remove_climatology(self, obj, climatology, climate_trend=False):
         """helper function to remove climatologies"""
-        dfs = []
-        for key, group in self._create_groups(obj, climate_trend):
-            if self.timestep == 'monthly':
-                dfs.append(group - climatology.loc[key].values)
-            elif self.timestep == 'daily':
-                dfs.append(group - climatology.loc[key].values)
-
+        dfs = [
+            group - climatology.loc[key].values
+            for key, group in self._create_groups(obj, climate_trend)
+            if self.timestep in ['monthly', 'daily']
+        ]
         result = pd.concat(dfs).sort_index()
         if obj.shape != result.shape:
             raise ValueError('shape of climo is not equal to input array')

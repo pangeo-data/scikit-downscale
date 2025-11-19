@@ -44,8 +44,7 @@ def _da_to_df(da, feature_dim=DEFAULT_FEATURE_DIM):
     else:
         columns = [f'{feature_dim}_0']
     data = da.transpose('time', ...).data
-    df = pd.DataFrame(data, columns=columns, index=da.indexes['time'])
-    return df
+    return pd.DataFrame(data, columns=columns, index=da.indexes['time'])
 
 
 def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
@@ -205,9 +204,7 @@ class PointWiseDownscaler:
             step, where each parameter name is prefixed such that parameter
             ``p`` for step ``s`` has key ``s__p``.
         """
-        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM}
-        kws.update(kwargs)
-
+        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM} | kwargs
         assert len(args) <= 1
         args = list(args)
         args.append(self._model)
@@ -316,9 +313,7 @@ class PointWiseDownscaler:
         y_trans : xarray.DataArray
         """
 
-        kws = {'feature_dim': DEFAULT_FEATURE_DIM}
-        kws.update(kwargs)
-
+        kws = {'feature_dim': DEFAULT_FEATURE_DIM} | kwargs
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         if X.chunks:
@@ -345,9 +340,7 @@ class PointWiseDownscaler:
         y_inverse_trans : xarray.DataArray
         """
 
-        kws = {'feature_dim': DEFAULT_FEATURE_DIM}
-        kws.update(kwargs)
-
+        kws = {'feature_dim': DEFAULT_FEATURE_DIM} | kwargs
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         if X.chunks:
@@ -408,7 +401,9 @@ class PointWiseDownscaler:
         return X
 
     def __repr__(self):
-        summary = [f'<skdownscale.{self.__class__.__name__}>']
-        summary.append(f'  Fit Status: {self._models is not None}')
-        summary.append(f'  Model:\n    {self._model}')
+        summary = [
+            f'<skdownscale.{self.__class__.__name__}>',
+            f'  Fit Status: {self._models is not None}',
+            f'  Model:\n    {self._model}',
+        ]
         return '\n'.join(summary)

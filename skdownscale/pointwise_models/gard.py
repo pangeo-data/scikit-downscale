@@ -4,10 +4,10 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 from sklearn.neighbors import KDTree
 from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import check_is_fitted, validate_data
 
 from .utils import default_none_kwargs
 
@@ -21,8 +21,6 @@ def select_analogs(analogs, inds):
 
 
 class NamedColumnBaseEstimator(BaseEstimator):
-    # TODO: This class might make more sense to move to base.py so it can be used
-    # by other downscaling methods
     def _validate_data(
         self,
         X='no_validation',
@@ -33,10 +31,21 @@ class NamedColumnBaseEstimator(BaseEstimator):
             feature_names = X.columns
         else:
             feature_names = None
-        X, y = super()._validate_data(X, y=y, **check_params)
+
+        # Check if we should validate y
+        should_validate_y = not (isinstance(y, str) and y == 'no_validation')
+
+        if should_validate_y:
+            result = validate_data(self, X=X, y=y, **check_params)
+            X, y = result
+        else:
+            result = validate_data(self, X=X, **check_params)
+            X = result
+
         if feature_names is not None:
             X = pd.DataFrame(X, columns=feature_names)
-        return X, y
+
+        return (X, y) if should_validate_y else X
 
 
 class AnalogBase(RegressorMixin, NamedColumnBaseEstimator):
@@ -170,9 +179,7 @@ class AnalogRegression(AnalogBase):
 
         # if the input is a dataframe, return dataframe, otherwise return a numpy array
         # the output_names can be used to determine the order of columns
-        if return_df:
-            return pd.DataFrame(out, columns=self.output_names)
-        return out
+        return pd.DataFrame(out, columns=self.output_names) if return_df else out
 
     def _predict_one_step(self, logistic_model, lr_model, X):
         # get analogs
@@ -202,7 +209,7 @@ class AnalogRegression(AnalogBase):
 
         # calculate the rmse of prediction
         y_hat = lr_model.predict(x[exceed_ind])
-        error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
+        error = root_mean_squared_error(y[exceed_ind], y_hat)
 
         predicted = lr_model.predict(X)
 
@@ -403,7 +410,9 @@ class PureRegression(RegressorMixin, NamedColumnBaseEstimator):
                 # more efficient for this very rare corner case
                 # confirm that this error is due to the there being no dry days
                 if len(np.unique(exceed_ind)) > 1:
-                    raise
+                    raise ValueError(
+                        f'Logistic regression requires at least two classes. Found {np.unique(exceed_ind)}'
+                    )
                 else:
                     warnings.warn(
                         'Found only one class while attempting logistic regression. Mutating attribute thresh'
@@ -423,7 +432,7 @@ class PureRegression(RegressorMixin, NamedColumnBaseEstimator):
         self.linear_model_ = LinearRegression(**linear_kwargs).fit(X[exceed_ind], y[exceed_ind])
 
         y_hat = self.linear_model_.predict(X[exceed_ind])
-        error = mean_squared_error(y[exceed_ind], y_hat, squared=False)
+        error = root_mean_squared_error(y[exceed_ind], y_hat)
         self.fit_error_ = error
 
         return self

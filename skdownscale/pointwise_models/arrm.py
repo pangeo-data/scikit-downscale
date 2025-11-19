@@ -69,7 +69,7 @@ def arrm_breakpoints(X, y, window_width, max_breakpoints):
 
     # lower half of distribution
     # start at 0.4 or the first breakpoint
-    start = min(breakpoints) if breakpoints else start
+    start = min(breakpoints, default=start)
     # likely need this to avoid recomputing r2 and picking the same breakpoint twice
     start -= (min_width // 2) + 1
 
@@ -82,7 +82,7 @@ def arrm_breakpoints(X, y, window_width, max_breakpoints):
         r2[mid] = np.corrcoef(X[s], y[s])[0, 1] ** 2
 
     # find the last three breakpoints
-    for bp in range(max_breakpoints // 2):  # this means max_breakpoints must always be even
+    for _ in range(max_breakpoints // 2):  # this means max_breakpoints must always be even
         mind = np.argmin(r2[:start])  # find minimum r2, only look at the first part of the array
         breakpoints.append(mind)  # breakpoint is in the center of the window
 
