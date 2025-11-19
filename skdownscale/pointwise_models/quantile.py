@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.base import BaseEstimator, RegressorMixin, TransformerMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import check_is_fitted, validate_data
 
 from .trend import LinearTrendTransformer
 from .utils import check_max_features, default_none_kwargs
@@ -64,6 +64,10 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
         self.detrend = detrend
         self.lt_kwargs = lt_kwargs
         self.qt_kwargs = qt_kwargs
+
+    def _validate_data(self, X, y=None, reset=True, **check_params):
+        """Validate input data using sklearn's validate_data."""
+        return validate_data(self, X=X, y=y, reset=reset, **check_params)
 
     def fit(self, X, y=None):
         """Fit the quantile mapping model.
@@ -133,33 +137,15 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
 
         return x_qmapped
 
-    def _more_tags(self):
-        return {
-            '_xfail_checks': {
-                'check_estimators_dtypes': 'QuantileMapper only suppers 1 feature',
-                'check_fit_score_takes_y': 'QuantileMapper only suppers 1 feature',
-                'check_transformer_data_not_an_array': 'QuantileMapper only suppers 1 feature',
-                'check_estimators_fit_returns_self': 'QuantileMapper only suppers 1 feature',
-                'check_estimators_fit_returns_self(readonly_memmap=True)': 'QuantileMapper only suppers 1 feature',
-                'check_dtype_object': 'QuantileMapper only suppers 1 feature',
-                'check_pipeline_consistency': 'QuantileMapper only suppers 1 feature',
-                'check_estimators_nan_inf': 'QuantileMapper only suppers 1 feature',
-                'check_estimators_overwrite_params': 'QuantileMapper only suppers 1 feature',
-                'check_estimators_pickle': 'QuantileMapper only suppers 1 feature',
-                'check_fit2d_predict1d': 'QuantileMapper only suppers 1 feature',
-                'check_methods_subset_invariance': 'QuantileMapper only suppers 1 feature',
-                'check_fit2d_1sample': 'QuantileMapper only suppers 1 feature',
-                'check_dict_unchanged': 'QuantileMapper only suppers 1 feature',
-                'check_dont_overwrite_parameters': 'QuantileMapper only suppers 1 feature',
-                'check_fit_idempotent': 'QuantileMapper only suppers 1 feature',
-                'check_n_features_in': 'QuantileMapper only suppers 1 feature',
-                'check_estimators_empty_data_messages': 'skip due to odd sklearn string matching in unit test',
-                'check_fit_check_is_fitted': 'QuantileMapper only suppers 1 feature',
-                'check_transformer_general': 'QuantileMapper only suppers 1 feature',
-                'check_transformer_preserve_dtypes': 'QuantileMapper only suppers 1 feature',
-                'check_methods_sample_order_invariance': 'QuantileMapper only suppers 1 feature',
-            },
-        }
+    def __sklearn_tags__(self):
+        from dataclasses import replace
+
+        tags = super().__sklearn_tags__()
+        # Skip tests - this is a specialized transformer that only supports 1 feature
+        tags = replace(
+            tags, _skip_test='QuantileMapper only supports 1 feature and has temporal dependencies'
+        )
+        return tags
 
 
 class QuantileMappingReressor(RegressorMixin, BaseEstimator):
@@ -188,6 +174,10 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
 
         if self.n_endpoints < 2:
             raise ValueError('Invalid number of n_endpoints, must be >= 2')
+
+    def _validate_data(self, X, y=None, reset=True, **check_params):
+        """Validate input data using sklearn's validate_data."""
+        return validate_data(self, X=X, y=y, reset=reset, **check_params)
 
     def fit(self, X, y, **kwargs):
         """Fit the quantile mapping regression model.
@@ -383,38 +373,13 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
 
         return Cdf(pp, vals)
 
-    def _more_tags(self):
-        return {
-            '_xfail_checks': {
-                'check_estimators_dtypes': 'QuantileMappingReressor only suppers 1 feature',
-                'check_fit_score_takes_y': 'QuantileMappingReressor only suppers 1 feature',
-                'check_estimators_fit_returns_self': 'QuantileMappingReressor only suppers 1 feature',
-                'check_estimators_fit_returns_self(readonly_memmap=True)': 'QuantileMappingReressor only suppers 1 feature',
-                'check_dtype_object': 'QuantileMappingReressor only suppers 1 feature',
-                'check_pipeline_consistency': 'QuantileMappingReressor only suppers 1 feature',
-                'check_estimators_nan_inf': 'QuantileMappingReressor only suppers 1 feature',
-                'check_estimators_overwrite_params': 'QuantileMappingReressor only suppers 1 feature',
-                'check_estimators_pickle': 'QuantileMappingReressor only suppers 1 feature',
-                'check_fit2d_predict1d': 'QuantileMappingReressor only suppers 1 feature',
-                'check_methods_subset_invariance': 'QuantileMappingReressor only suppers 1 feature',
-                'check_fit2d_1sample': 'QuantileMappingReressor only suppers 1 feature',
-                'check_dict_unchanged': 'QuantileMappingReressor only suppers 1 feature',
-                'check_dont_overwrite_parameters': 'QuantileMappingReressor only suppers 1 feature',
-                'check_fit_idempotent': 'QuantileMappingReressor only suppers 1 feature',
-                'check_n_features_in': 'QuantileMappingReressor only suppers 1 feature',
-                'check_estimators_empty_data_messages': 'skip due to odd sklearn string matching in unit test',
-                'check_regressors_train': 'QuantileMappingReressor only suppers 1 feature',
-                'check_regressors_train(readonly_memmap=True)': 'QuantileMappingReressor only suppers 1 feature',
-                'check_regressors_train(readonly_memmap=True,X_dtype=float32)': 'QuantileMappingReressor only suppers 1 feature',
-                'check_regressor_data_not_an_array': 'QuantileMappingReressor only suppers 1 feature',
-                'check_regressors_no_decision_function': 'QuantileMappingReressor only suppers 1 feature',
-                'check_supervised_y_2d': 'QuantileMappingReressor only suppers 1 feature',
-                'check_regressors_int': 'QuantileMappingReressor only suppers 1 feature',
-                'check_methods_sample_order_invariance': 'QuantileMappingReressor only suppers 1 feature',
-                'check_fit_check_is_fitted': 'QuantileMappingReressor only suppers 1 feature',
-                'check_requires_y_none': 'QuantileMappingReressor only suppers 1 feature',
-            },
-        }
+    def __sklearn_tags__(self):
+        from dataclasses import replace
+
+        tags = super().__sklearn_tags__()
+        # Skip tests - only supports 1 feature
+        tags = replace(tags, _skip_test='QuantileMappingReressor only supports 1 feature')
+        return tags
 
 
 class CunnaneTransformer(TransformerMixin, BaseEstimator):
@@ -445,6 +410,10 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
 
         self.extrapolate = extrapolate
         self.n_endpoints = n_endpoints
+
+    def _validate_data(self, X, y=None, reset=True, **check_params):
+        """Validate input data using sklearn's validate_data."""
+        return validate_data(self, X=X, y=y, reset=reset, **check_params)
 
     def fit(self, X, y=None):
         """Compute CDF and plotting positions for X.
@@ -555,33 +524,13 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
 
         return vals.reshape(-1, 1)
 
-    def _more_tags(self):
-        return {
-            '_xfail_checks': {
-                'check_estimators_dtypes': 'CunnaneTransformer only suppers 1 feature',
-                'check_fit_score_takes_y': 'CunnaneTransformer only suppers 1 feature',
-                'check_transformer_data_not_an_array': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_fit_returns_self': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_fit_returns_self(readonly_memmap=True)': 'CunnaneTransformer only suppers 1 feature',
-                'check_dtype_object': 'CunnaneTransformer only suppers 1 feature',
-                'check_pipeline_consistency': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_nan_inf': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_overwrite_params': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_pickle': 'CunnaneTransformer only suppers 1 feature',
-                'check_fit2d_predict1d': 'CunnaneTransformer only suppers 1 feature',
-                'check_methods_subset_invariance': 'CunnaneTransformer only suppers 1 feature',
-                'check_fit2d_1sample': 'CunnaneTransformer only suppers 1 feature',
-                'check_dict_unchanged': 'CunnaneTransformer only suppers 1 feature',
-                'check_dont_overwrite_parameters': 'CunnaneTransformer only suppers 1 feature',
-                'check_fit_idempotent': 'CunnaneTransformer only suppers 1 feature',
-                'check_n_features_in': 'CunnaneTransformer only suppers 1 feature',
-                'check_estimators_empty_data_messages': 'skip due to odd sklearn string matching in unit test',
-                'check_fit_check_is_fitted': 'CunnaneTransformer only suppers 1 feature',
-                'check_transformer_general': 'CunnaneTransformer only suppers 1 feature',
-                'check_transformer_preserve_dtypes': 'CunnaneTransformer only suppers 1 feature',
-                'check_methods_sample_order_invariance': 'CunnaneTransformer only suppers 1 feature',
-            },
-        }
+    def __sklearn_tags__(self):
+        from dataclasses import replace
+
+        tags = super().__sklearn_tags__()
+        # Skip tests - only supports 1 feature
+        tags = replace(tags, _skip_test='CunnaneTransformer only supports 1 feature')
+        return tags
 
 
 class EquidistantCdfMatcher(QuantileMappingReressor):
@@ -674,6 +623,10 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         self.qm_estimator = qm_estimator
         if trend_transformer is None:
             self.trend_transformer = LinearTrendTransformer()
+
+    def _validate_data(self, X, y=None, reset=True, **check_params):
+        """Validate input data using sklearn's validate_data."""
+        return validate_data(self, X=X, y=y, reset=reset, **check_params)
 
     def fit(self, X, y):
         """Fit the model.

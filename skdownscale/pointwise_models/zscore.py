@@ -104,29 +104,13 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
 
         return fut_corrected.to_frame(name)
 
-    def _more_tags(self):
-        return {
-            '_xfail_checks': {
-                'check_estimators_dtypes': 'Zscore only suppers 1 feature',
-                'check_fit_score_takes_y': 'Zscore only suppers 1 feature',
-                'check_estimators_fit_returns_self': 'Zscore only suppers 1 feature',
-                'check_estimators_fit_returns_self(readonly_memmap=True)': 'Zscore only suppers 1 feature',
-                'check_dtype_object': 'Zscore only suppers 1 feature',
-                'check_pipeline_consistency': 'Zscore only suppers 1 feature',
-                'check_estimators_nan_inf': 'Zscore only suppers 1 feature',
-                'check_estimators_overwrite_params': 'Zscore only suppers 1 feature',
-                'check_estimators_pickle': 'Zscore only suppers 1 feature',
-                'check_fit2d_predict1d': 'Zscore only suppers 1 feature',
-                'check_methods_subset_invariance': 'Zscore only suppers 1 feature',
-                'check_fit2d_1sample': 'Zscore only suppers 1 feature',
-                'check_dict_unchanged': 'Zscore only suppers 1 feature',
-                'check_dont_overwrite_parameters': 'Zscore only suppers 1 feature',
-                'check_fit_idempotent': 'Zscore only suppers 1 feature',
-                'check_n_features_in': 'Zscore only suppers 1 feature',
-                'check_fit_check_is_fitted': 'Zscore only suppers 1 feature',
-                'check_methods_sample_order_invariance': 'temporal order matters',
-            },
-        }
+    def __sklearn_tags__(self):
+        from dataclasses import replace
+
+        tags = super().__sklearn_tags__()
+        # Skip tests - only supports 1 feature, temporal order matters
+        tags = replace(tags, _skip_test='ZScore only supports 1 feature and temporal order matters')
+        return tags
 
 
 def _reshape(da, window_width):

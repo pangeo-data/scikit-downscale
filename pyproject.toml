@@ -58,15 +58,18 @@
         "dask>=2024.11",
         "jupyterlab>=4.3",
         "matplotlib>=3.9.4",
+        "mlinsights>=0.5.2",
         "netcdf4>=1.7",
         "numpydoc>=1.9.0",
+        "probscale>=0.2.5",
         "s3fs>=2025.10.0",
         "scipy>=1.14",
+        "seaborn>=0.13.2",
         "sphinx-gallery>=0.19.0",
         "sphinx-rtd-theme>=3.0.2",
         "sphinx>=8.0",
         "zarr>=2.18.2",
-    ]
+]
 
 [tool.ruff]
     builtins = ["ellipsis"]

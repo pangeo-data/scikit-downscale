@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LinearRegression
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import check_is_fitted, validate_data
 
 from .utils import default_none_kwargs
 
@@ -25,6 +25,10 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
 
     def __init__(self, lr_kwargs=None):
         self.lr_kwargs = lr_kwargs
+
+    def _validate_data(self, X, y=None, reset=True, **check_params):
+        """Validate input data using sklearn's validate_data."""
+        return validate_data(self, X=X, y=y, reset=reset, **check_params)
 
     def fit(self, X, y=None):
         """Compute the linear trend.
@@ -71,10 +75,10 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         X = self._validate_data(X)
         return self.lr_model_.predict(np.arange(len(X)).reshape(-1, 1))
 
-    def _more_tags(self):
-        return {
-            '_xfail_checks': {
-                'check_methods_subset_invariance': 'because',
-                'check_methods_sample_order_invariance': 'temporal order matters',
-            }
-        }
+    def __sklearn_tags__(self):
+        from dataclasses import replace
+
+        tags = super().__sklearn_tags__()
+        # Mark as skipping certain tests due to temporal sensitivity
+        tags = replace(tags, _skip_test='Temporal transformer - sample order matters')
+        return tags

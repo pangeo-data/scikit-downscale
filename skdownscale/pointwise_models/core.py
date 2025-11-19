@@ -44,8 +44,7 @@ def _da_to_df(da, feature_dim=DEFAULT_FEATURE_DIM):
     else:
         columns = [f'{feature_dim}_0']
     data = da.transpose('time', ...).data
-    df = pd.DataFrame(data, columns=columns, index=da.indexes['time'])
-    return df
+    return pd.DataFrame(data, columns=columns, index=da.indexes['time'])
 
 
 def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
@@ -81,13 +80,22 @@ def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **
 
 def _predict_wrapper(
     X,
-    models,
     along_dim=None,
     feature_dim=DEFAULT_FEATURE_DIM,
     n_outputs=1,
     output_names=None,
+    models=None,
     **kwargs,
 ):
+    # When models is passed via kwargs (for dask), select the subset matching X's coordinates
+    if models is not None:
+        # Get dimensions that exist in both models and X (excluding feature_dim)
+        common_dims = [d for d in models.dims if d in X.dims and d != feature_dim]
+        if common_dims:
+            # Select models matching this block's coordinates
+            sel_dict = {dim: X.coords[dim] for dim in common_dims}
+            models = models.sel(sel_dict)
+
     # determine the dimension/shape/coordinates of the prediction output
     ydims = list(X.dims)
     yshape = list(X.shape)
@@ -116,7 +124,18 @@ def _predict_wrapper(
     return y
 
 
-def _transform_wrapper(X, models, direction='transform', feature_dim=DEFAULT_FEATURE_DIM, **kwargs):
+def _transform_wrapper(
+    X, direction='transform', feature_dim=DEFAULT_FEATURE_DIM, models=None, **kwargs
+):
+    # When models is passed via kwargs (for dask), select the subset matching X's coordinates
+    if models is not None:
+        # Get dimensions that exist in both models and X (excluding feature_dim and time)
+        common_dims = [d for d in models.dims if d in X.dims and d != feature_dim and d != 'time']
+        if common_dims:
+            # Select models matching this block's coordinates
+            sel_dict = {dim: X.coords[dim] for dim in common_dims}
+            models = models.sel(sel_dict)
+
     dims = list(X.dims)
     shape = list(X.shape)
     coords = dict(X.coords)
@@ -133,7 +152,9 @@ def _transform_wrapper(X, models, direction='transform', feature_dim=DEFAULT_FEA
     return xtrans
 
 
-def _getattr_wrapper(models, key, dtype, template_output=None):
+def _getattr_wrapper(key, dtype, template_output=None, models=None):
+    # Note: for getattr_wrapper, models should already be properly selected since
+    # it doesn't take X as input, so no coordinate matching needed here
     if template_output is None:
         dims = list(models.dims)
         shape = list(models.shape)
@@ -205,9 +226,7 @@ class PointWiseDownscaler:
             step, where each parameter name is prefixed such that parameter
             ``p`` for step ``s`` has key ``s__p``.
         """
-        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM}
-        kws.update(kwargs)
-
+        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM} | kwargs
         assert len(args) <= 1
         args = list(args)
         args.append(self._model)
@@ -247,9 +266,7 @@ class PointWiseDownscaler:
         y_pred : xarray.DataArray
         """
 
-        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM}
-        kws.update(kwargs)
-
+        kws = {'along_dim': self._dim, 'feature_dim': DEFAULT_FEATURE_DIM} | kwargs
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         # check the model type to see if the model returns multiple columns are returned in
@@ -291,11 +308,14 @@ class PointWiseDownscaler:
                 chunksizes[kws['feature_dim']] = kws['n_outputs']
                 template = template.chunk(chunksizes)
 
-            return xr.map_blocks(
-                _predict_wrapper, X, args=[self._models], kwargs=kws, template=template
+            # Pass models via kwargs after computing to avoid xarray rechunking object dtype arrays
+            # xarray's map_blocks doesn't support dask collections in kwargs, so compute first
+            kws['models'] = (
+                self._models.compute() if hasattr(self._models, 'compute') else self._models
             )
+            return xr.map_blocks(_predict_wrapper, X, kwargs=kws, template=template)
         else:
-            return _predict_wrapper(X, self._models, **kws)
+            return _predict_wrapper(X, models=self._models, **kws)
 
     def transform(self, X, **kwargs):
         """Apply transforms to the data, and transform with the final estimator
@@ -316,15 +336,18 @@ class PointWiseDownscaler:
         y_trans : xarray.DataArray
         """
 
-        kws = {'feature_dim': DEFAULT_FEATURE_DIM}
-        kws.update(kwargs)
-
+        kws = {'feature_dim': DEFAULT_FEATURE_DIM} | kwargs
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         if X.chunks:
-            return xr.map_blocks(_transform_wrapper, X, args=[self._models], kwargs=kws)
+            # Pass models via kwargs after computing to avoid xarray rechunking object dtype arrays
+            # xarray's map_blocks doesn't support dask collections in kwargs, so compute first
+            kws['models'] = (
+                self._models.compute() if hasattr(self._models, 'compute') else self._models
+            )
+            return xr.map_blocks(_transform_wrapper, X, kwargs=kws)
         else:
-            return _transform_wrapper(X, self._models, **kws)
+            return _transform_wrapper(X, models=self._models, **kws)
 
     def inverse_transform(self, X, **kwargs):
         """Apply inverse transforms to the data, and transform with the final estimator
@@ -345,17 +368,19 @@ class PointWiseDownscaler:
         y_inverse_trans : xarray.DataArray
         """
 
-        kws = {'feature_dim': DEFAULT_FEATURE_DIM}
-        kws.update(kwargs)
-
+        kws = {'feature_dim': DEFAULT_FEATURE_DIM} | kwargs
         X = self._to_feature_x(X, feature_dim=kws['feature_dim'])
 
         if X.chunks:
-            return xr.map_blocks(
-                _transform_wrapper, X, args=[self._models, 'inverse_transform'], kwargs=kws
+            # Pass models and direction via kwargs after computing to avoid xarray rechunking object dtype arrays
+            # xarray's map_blocks doesn't support dask collections in kwargs, so compute first
+            kws['models'] = (
+                self._models.compute() if hasattr(self._models, 'compute') else self._models
             )
+            kws['direction'] = 'inverse_transform'
+            return xr.map_blocks(_transform_wrapper, X, kwargs=kws)
         else:
-            return _transform_wrapper(X, self._models, 'inverse_transform', **kws)
+            return _transform_wrapper(X, models=self._models, direction='inverse_transform', **kws)
 
     def get_attr(
         self, key: str, dtype: str, template_output: xr.DataArray | None = None
@@ -369,28 +394,15 @@ class PointWiseDownscaler:
         dtype: expected dtype of the values
         template_output: template data array or dataset of the output dimensions
         """
-        if self._models.chunks:
-            if template_output is not None:
-                template = xr.full_like(template_output, None, dtype=dtype)
-                # there is currently a bug in xarray map block such that the template output has to be a dataset instead of a dataarray
-                return xr.map_blocks(
-                    _getattr_wrapper,
-                    self._models,
-                    args=[key, dtype, template_output.to_dataset()],
-                    template=template,
-                )
+        # Compute models if chunked to avoid xarray rechunking object dtype arrays
+        computed_models = (
+            self._models.compute() if hasattr(self._models, 'compute') else self._models
+        )
 
-            else:
-                template = xr.full_like(self._models, None, dtype=dtype)
-                return xr.map_blocks(
-                    _getattr_wrapper, self._models, args=[key, dtype], template=template
-                )
-
+        if template_output is not None:
+            return _getattr_wrapper(key, dtype, template_output, models=computed_models)
         else:
-            if template_output is not None:
-                return _getattr_wrapper(self._models, key, dtype, template_output)
-            else:
-                return _getattr_wrapper(self._models, key, dtype)
+            return _getattr_wrapper(key, dtype, models=computed_models)
 
     def _to_feature_x(self, X, feature_dim=DEFAULT_FEATURE_DIM):
         # xarray.Dataset --> xarray.DataArray
@@ -408,7 +420,9 @@ class PointWiseDownscaler:
         return X
 
     def __repr__(self):
-        summary = [f'<skdownscale.{self.__class__.__name__}>']
-        summary.append(f'  Fit Status: {self._models is not None}')
-        summary.append(f'  Model:\n    {self._model}')
+        summary = [
+            f'<skdownscale.{self.__class__.__name__}>',
+            f'  Fit Status: {self._models is not None}',
+            f'  Model:\n    {self._model}',
+        ]
         return '\n'.join(summary)
