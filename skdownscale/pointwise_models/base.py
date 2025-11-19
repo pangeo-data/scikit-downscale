@@ -8,7 +8,7 @@ from sklearn.utils import check_array, check_X_y
 class TimeSynchronousDownscaler(BaseEstimator):
     def _check_X_y(self, X, y, **kwargs):
         if isinstance(X, pd.DataFrame) and isinstance(y, pd.DataFrame):
-            assert X.index.equals(y.index)
+            pd.testing.assert_index_equal(X.index, y.index)
             check_X_y(X, y)  # this may be inefficient
         else:
             X, y = check_X_y(X, y)

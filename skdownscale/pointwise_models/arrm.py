@@ -11,7 +11,7 @@ except Exception:
     pwlf = None
 
 
-def arrm_breakpoints(X, y, window_width, max_breakpoints):
+def arrm_breakpoints(X, y, window_width: float, max_breakpoints: int) -> np.ndarray:
     """Calculate breakpoints in x and y
 
     Parameters
@@ -30,8 +30,10 @@ def arrm_breakpoints(X, y, window_width, max_breakpoints):
     min_width = 10
 
     npoints = len(X)
-    assert len(X) == len(y)
-    assert X.shape[1] == 1
+    if len(X) != len(y):
+        raise ValueError(f'X and y must have the same length, got {len(X)} and {len(y)}')
+    if X.shape[1] != 1:
+        raise ValueError(f'X must have exactly 1 feature, got {X.shape[1]}')
 
     X = np.sort(X[:, 0])
     y = np.sort(y)
@@ -119,7 +121,9 @@ class PiecewiseLinearRegression(RegressorMixin, BaseEstimator):
 
     _fit_attributes = ['model_', 'fit_breaks_']
 
-    def __init__(self, n_segments=7, fit_option='auto', pwlf_kwargs=None):
+    def __init__(
+        self, n_segments: int = 7, fit_option: str = 'auto', pwlf_kwargs: dict | None = None
+    ):
         if pwlf is None:
             raise ImportError('pwlf is not installed')
 
