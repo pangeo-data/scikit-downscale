@@ -1,4 +1,4 @@
-name: Build and Upload scikit-downscale to PyPI
+name: Publish scikit-downscale to PyPI
 
 on:
   release:
