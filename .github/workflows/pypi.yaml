@@ -1,0 +1,79 @@
+name: Publish scikit-downscale to PyPI
+
+on:
+  release:
+    types:
+      - published
+  push:
+
+jobs:
+  build-artifacts:
+    runs-on: ubuntu-latest
+    if: github.repository == 'pangeo-data/scikit-downscale'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Build tarball and wheels
+        run: |
+          git clean -xdf
+          git restore -SW .
+          uv build
+
+      - name: Check built artifacts
+        run: |
+          uv tool run twine check dist/*
+          pwd
+          if [ -f dist/scikit-downscale-unknown.tar.gz ]; then
+            echo "❌ INVALID VERSION NUMBER"
+            exit 1
+          else
+            echo "✅ Looks good"
+          fi
+      - uses: actions/upload-artifact@v5
+        with:
+          name: releases
+          path: dist
+
+  test-built-dist:
+    needs: build-artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v6
+        with:
+          name: releases
+          path: dist
+      - name: List contents of built dist
+        run: |
+          ls -ltrh
+          ls -ltrh dist
+
+      - name: Verify the built dist/wheel is valid
+        if: github.event_name == 'push'
+        run: |
+          uv venv
+          uv pip install dist/scikit_downscale*.whl
+          uv run python -c "import skdownscale; print(skdownscale.__version__)"
+
+  upload-to-pypi:
+    needs: test-built-dist
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: releases
+          path: dist
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.13.0
