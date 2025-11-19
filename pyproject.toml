@@ -7,7 +7,6 @@
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.12",
@@ -18,13 +17,15 @@
     dependencies = ["scikit-learn>=1.5", "xarray>=2024.10"]
     description = "Statistical downscaling and postprocessing models for climate and weather model simulations."
     dynamic = ["version"]
-    license = { text = "Apache" }
+    license = "Apache Software License 2.0"
+    license-files = ["LICENSE"]
     name = "scikit-downscale"
     readme = "README.md"
     requires-python = ">=3.12"
 
 [project.urls]
-    Homepage = "https://github.com/pangeo-data/scikit-downscale"
+    Documentation = "https://scikit-downscale.readthedocs.io/"
+    Homepage      = "https://github.com/pangeo-data/scikit-downscale"
 
 [tool.setuptools.packages.find]
     include = ["skdownscale*"]
@@ -73,7 +74,7 @@
         "sphinx>=8.0",
         "sphinxext-opengraph>=0.13.0",
         "zarr>=2.18.2",
-]
+    ]
 
 [tool.ruff]
     builtins = ["ellipsis"]

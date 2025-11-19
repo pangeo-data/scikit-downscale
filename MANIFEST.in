@@ -1,0 +1,14 @@
+include LICENSE
+include README.md
+include pyproject.toml
+include skdownscale/py.typed
+
+
+recursive-include docs/*
+recursive-include skdownscale *.yaml
+recursive-include skdownscale *.py
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+prune tests*
+prune .github*
+prune .binder*
