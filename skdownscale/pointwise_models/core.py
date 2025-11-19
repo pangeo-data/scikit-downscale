@@ -61,10 +61,10 @@ def _fit_wrapper(X, *args, along_dim='time', feature_dim=DEFAULT_FEATURE_DIM, **
 
     # create the empty output array
     models = xr.DataArray(
-        np.full(mask.shape, None, dtype=np.object), coords=mask.coords, dims=mask.dims
+        np.full(mask.shape, None, dtype=object), coords=mask.coords, dims=mask.dims
     )
 
-    scalar_obj = np.empty((1), dtype=np.object)
+    scalar_obj = np.empty((1), dtype=object)
     for index, val in xenumerate(mask):
         mod = copy.deepcopy(model)
         if not val:
