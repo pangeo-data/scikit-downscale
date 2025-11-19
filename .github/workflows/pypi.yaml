@@ -61,7 +61,7 @@ jobs:
         if: github.event_name == 'push'
         run: |
           uv pip install --system dist/scikit_downscale*.whl
-          uv run python -c "import scikit_downscale; print(scikit_downscale.__version__)"
+          uv run python -c "import skdownscale; print(skdownscale.__version__)"
 
   upload-to-pypi:
     needs: test-built-dist
