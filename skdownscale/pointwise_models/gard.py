@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import warnings
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import root_mean_squared_error
@@ -12,7 +16,7 @@ from sklearn.utils.validation import check_is_fitted, validate_data
 from .utils import default_none_kwargs
 
 
-def select_analogs(analogs, inds):
+def select_analogs(analogs: NDArray[Any], inds: NDArray[np.integer[Any]]) -> NDArray[Any]:
     # todo: this is possible with fancy indexing
     out = np.empty(len(analogs))
     for i, ind in enumerate(inds):
@@ -131,13 +135,13 @@ class AnalogRegression(AnalogBase):
 
     def __init__(
         self,
-        n_analogs=200,
-        thresh=None,
-        kdtree_kwargs=None,
-        query_kwargs=None,
-        logistic_kwargs=None,
-        lr_kwargs=None,
-    ):
+        n_analogs: int = 200,
+        thresh: float | None = None,
+        kdtree_kwargs: dict[str, Any] | None = None,
+        query_kwargs: dict[str, Any] | None = None,
+        logistic_kwargs: dict[str, Any] | None = None,
+        lr_kwargs: dict[str, Any] | None = None,
+    ) -> None:
         self.n_analogs = n_analogs
         self.thresh = thresh
         self.kdtree_kwargs = kdtree_kwargs
@@ -252,12 +256,14 @@ class PureAnalog(AnalogBase):
 
     def __init__(
         self,
-        n_analogs=200,
-        kind='best_analog',
-        thresh=None,
-        kdtree_kwargs=None,
-        query_kwargs=None,
-    ):
+        n_analogs: int = 200,
+        kind: Literal[
+            'best_analog', 'sample_analogs', 'weight_analogs', 'mean_analogs'
+        ] = 'best_analog',
+        thresh: float | None = None,
+        kdtree_kwargs: dict[str, Any] | None = None,
+        query_kwargs: dict[str, Any] | None = None,
+    ) -> None:
         self.n_analogs = n_analogs
         self.kind = kind
         self.thresh = thresh
@@ -391,10 +397,10 @@ class PureRegression(RegressorMixin, NamedColumnBaseEstimator):
 
     def __init__(
         self,
-        thresh=None,
-        logistic_kwargs=None,
-        linear_kwargs=None,
-    ):
+        thresh: float | None = None,
+        logistic_kwargs: dict[str, Any] | None = None,
+        linear_kwargs: dict[str, Any] | None = None,
+    ) -> None:
         self.thresh = thresh
         self.logistic_kwargs = logistic_kwargs
         self.linear_kwargs = linear_kwargs

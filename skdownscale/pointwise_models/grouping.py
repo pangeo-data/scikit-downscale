@@ -1,4 +1,10 @@
+from __future__ import annotations
+
+from typing import Any
+
 import numpy as np
+import pandas as pd
+from numpy.typing import NDArray
 
 from .utils import default_none_kwargs
 
@@ -26,13 +32,13 @@ class GroupedRegressor:
 
     def __init__(
         self,
-        estimator,
-        fit_grouper,
-        predict_grouper,
-        estimator_kwargs=None,
-        fit_grouper_kwargs=None,
-        predict_grouper_kwargs=None,
-    ):
+        estimator: Any,
+        fit_grouper: Any,
+        predict_grouper: Any,
+        estimator_kwargs: dict[str, Any] | None = None,
+        fit_grouper_kwargs: dict[str, Any] | None = None,
+        predict_grouper_kwargs: dict[str, Any] | None = None,
+    ) -> None:
         self.estimator = estimator
         self.estimator_kwargs = estimator_kwargs
 
@@ -108,7 +114,7 @@ class PaddedDOYGrouper:
         Size of the padded offset for each day of year.
     """
 
-    def __init__(self, index, window):
+    def __init__(self, index: pd.DatetimeIndex, window: int) -> None:
         self.index = index
         self.window = window
 
@@ -127,6 +133,6 @@ class PaddedDOYGrouper:
         self._groups = {doy: np.nonzero(arr[:, doy - 1])[0] for doy in range(1, n + 1)}
 
     @property
-    def groups(self):
+    def groups(self) -> dict[int, NDArray[np.intp]]:
         """Dict {doy -> group indicies}."""
         return self._groups
