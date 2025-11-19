@@ -1,4 +1,9 @@
+from __future__ import annotations
+
+from typing import Any
+
 import numpy as np
+from numpy.typing import ArrayLike, NDArray
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.utils.validation import check_is_fitted, validate_data
@@ -23,14 +28,16 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         Linear Regression object.
     """
 
-    def __init__(self, lr_kwargs=None):
+    def __init__(self, lr_kwargs: dict[str, Any] | None = None) -> None:
         self.lr_kwargs = lr_kwargs
 
-    def _validate_data(self, X, y=None, reset=True, **check_params):
+    def _validate_data(
+        self, X: ArrayLike, y: ArrayLike | None = None, reset: bool = True, **check_params: Any
+    ) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
         """Validate input data using sklearn's validate_data."""
         return validate_data(self, X=X, y=y, reset=reset, **check_params)
 
-    def fit(self, X, y=None):
+    def fit(self, X: ArrayLike, y: ArrayLike | None = None) -> LinearTrendTransformer:
         """Compute the linear trend.
 
         Parameters
@@ -44,7 +51,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         self.lr_model_.fit(np.arange(len(X)).reshape(-1, 1), X)
         return self
 
-    def transform(self, X):
+    def transform(self, X: ArrayLike) -> NDArray[Any]:
         """Perform transformation by removing the trend.
 
         Parameters
@@ -57,7 +64,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         X = self._validate_data(X)
         return X - self.trendline(X)
 
-    def inverse_transform(self, X):
+    def inverse_transform(self, X: ArrayLike) -> NDArray[Any]:
         """Add the trend back to the data.
 
         Parameters
@@ -70,7 +77,7 @@ class LinearTrendTransformer(TransformerMixin, BaseEstimator):
         X = self._validate_data(X)
         return X + self.trendline(X)
 
-    def trendline(self, X):
+    def trendline(self, X: ArrayLike) -> NDArray[Any]:
         """helper function to calculate a linear trendline"""
         X = self._validate_data(X)
         return self.lr_model_.predict(np.arange(len(X)).reshape(-1, 1))

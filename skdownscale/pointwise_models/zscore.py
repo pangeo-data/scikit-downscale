@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -22,7 +24,7 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
     _fit_attributes = ['shift_', 'scale_']
     _timestep = 'M'
 
-    def __init__(self, window_width: int = 31):
+    def __init__(self, window_width: int = 31) -> None:
         if window_width <= 0:
             raise ValueError(f'window_width must be positive, got {window_width}')
         self.window_width = window_width
@@ -118,7 +120,7 @@ class ZScoreRegressor(TimeSynchronousDownscaler):
         return tags
 
 
-def _reshape(da, window_width):
+def _reshape(da: xr.DataArray, window_width: int) -> xr.DataArray:
     """
     Helper function for `fit` that splits the year and day
     dimensions of the time-coordinate and bookends the years
@@ -157,7 +159,7 @@ def _reshape(da, window_width):
     return da_rsh
 
 
-def _calc_stats(series, window_width):
+def _calc_stats(series: pd.Series, window_width: int) -> tuple[pd.Series, pd.Series]:
     """
     Helper function for `fit` that calculates the rolling mean and
     standard deviation for each day of the year across all years.
@@ -191,7 +193,9 @@ def _calc_stats(series, window_width):
     return mean, std
 
 
-def _get_params(hist_mean, hist_std, meas_mean, meas_std):
+def _get_params(
+    hist_mean: pd.Series, hist_std: pd.Series, meas_mean: pd.Series, meas_std: pd.Series
+) -> tuple[pd.Series, pd.Series]:
     """
     Helper function for `fit` that calculates the shift and scale parameters
     for z-score correction by comparing the historical and measured
@@ -236,7 +240,7 @@ def _get_params(hist_mean, hist_std, meas_mean, meas_std):
 
 
 # Helpers for Predict
-def _get_fut_stats(series, window_width):
+def _get_fut_stats(series: pd.Series, window_width: int) -> tuple[pd.Series, pd.Series, pd.Series]:
     """
     Helper function for `predict` that calculates statistics
     for the future dataset
@@ -266,7 +270,9 @@ def _get_fut_stats(series, window_width):
     return fut_mean, fut_std, fut_zscore
 
 
-def _expand_params(series, shift, scale):
+def _expand_params(
+    series: pd.Series, shift: pd.Series, scale: pd.Series
+) -> tuple[pd.Series, pd.Series]:
     """
     Helper function for `predict` that expands the shift and scale parameters
     from a 365-day average year, to the length of the future series.
@@ -313,7 +319,9 @@ def _expand_params(series, shift, scale):
     return shift_expanded, scale_expanded
 
 
-def _correct_fut_stats(fut_mean, fut_std, shift_expanded, scale_expanded):
+def _correct_fut_stats(
+    fut_mean: pd.Series, fut_std: pd.Series, shift_expanded: pd.Series, scale_expanded: pd.Series
+) -> tuple[pd.Series, pd.Series]:
     """
     Helper function for `predict` that adjusts future statistics by shift and
     scale parameters.

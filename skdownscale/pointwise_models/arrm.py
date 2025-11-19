@@ -1,4 +1,9 @@
+from __future__ import annotations
+
+from typing import Any, Literal
+
 import numpy as np
+from numpy.typing import NDArray
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 
@@ -11,7 +16,9 @@ except Exception:
     pwlf = None
 
 
-def arrm_breakpoints(X, y, window_width: float, max_breakpoints: int) -> np.ndarray:
+def arrm_breakpoints(
+    X: NDArray[Any], y: NDArray[Any], window_width: float, max_breakpoints: int
+) -> NDArray[Any]:
     """Calculate breakpoints in x and y
 
     Parameters
@@ -122,8 +129,11 @@ class PiecewiseLinearRegression(RegressorMixin, BaseEstimator):
     _fit_attributes = ['model_', 'fit_breaks_']
 
     def __init__(
-        self, n_segments: int = 7, fit_option: str = 'auto', pwlf_kwargs: dict | None = None
-    ):
+        self,
+        n_segments: int = 7,
+        fit_option: Literal['auto', 'fast', 'arrm'] = 'auto',
+        pwlf_kwargs: dict[str, Any] | None = None,
+    ) -> None:
         if pwlf is None:
             raise ImportError('pwlf is not installed')
 

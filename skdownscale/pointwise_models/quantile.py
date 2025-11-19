@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import collections
 import copy
+from typing import Any, Literal
 
 import numpy as np
+from numpy.typing import NDArray
 from sklearn.base import BaseEstimator, RegressorMixin, TransformerMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.utils import check_array
@@ -16,7 +20,7 @@ SYNTHETIC_MAX = 1e20
 Cdf = collections.namedtuple('CDF', ['pp', 'vals'])
 
 
-def plotting_positions(n, alpha=0.4, beta=0.4):
+def plotting_positions(n: int, alpha: float = 0.4, beta: float = 0.4) -> NDArray[np.floating[Any]]:
     """Returns a monotonic array of plotting positions.
 
     Parameters
@@ -60,7 +64,12 @@ class QuantileMapper(TransformerMixin, BaseEstimator):
 
     _fit_attributes = ['x_cdf_fit_']
 
-    def __init__(self, detrend=False, lt_kwargs=None, qt_kwargs=None):
+    def __init__(
+        self,
+        detrend: bool = False,
+        lt_kwargs: dict[str, Any] | None = None,
+        qt_kwargs: dict[str, Any] | None = None,
+    ) -> None:
         self.detrend = detrend
         self.lt_kwargs = lt_kwargs
         self.qt_kwargs = qt_kwargs
@@ -168,7 +177,11 @@ class QuantileMappingReressor(RegressorMixin, BaseEstimator):
 
     _fit_attributes = ['_X_cdf', '_y_cdf']
 
-    def __init__(self, extrapolate=None, n_endpoints=10):
+    def __init__(
+        self,
+        extrapolate: Literal['min', 'max', 'both', '1to1'] | None = None,
+        n_endpoints: int = 10,
+    ) -> None:
         self.extrapolate = extrapolate
         self.n_endpoints = n_endpoints
 
@@ -404,7 +417,14 @@ class CunnaneTransformer(TransformerMixin, BaseEstimator):
 
     _fit_attributes = ['cdf_']
 
-    def __init__(self, *, alpha=0.4, beta=0.4, extrapolate='both', n_endpoints=10):
+    def __init__(
+        self,
+        *,
+        alpha: float = 0.4,
+        beta: float = 0.4,
+        extrapolate: Literal['min', 'max', 'both', '1to1'] | None = 'both',
+        n_endpoints: int = 10,
+    ) -> None:
         self.alpha = alpha
         self.beta = beta
 
@@ -553,7 +573,13 @@ class EquidistantCdfMatcher(QuantileMappingReressor):
 
     _fit_attributes = ['_X_cdf', '_y_cdf']
 
-    def __init__(self, kind='difference', extrapolate=None, n_endpoints=10, max_ratio=None):
+    def __init__(
+        self,
+        kind: Literal['difference', 'ratio'] = 'difference',
+        extrapolate: Literal['min', 'max', 'both', '1to1'] | None = None,
+        n_endpoints: int = 10,
+        max_ratio: float | None = None,
+    ) -> None:
         if kind not in ['difference', 'ratio']:
             raise NotImplementedError('kind must be either difference or ratio')
         self.kind = kind
@@ -619,7 +645,11 @@ class TrendAwareQuantileMappingRegressor(RegressorMixin, BaseEstimator):
         Regressor object such as ``QuantileMappingReressor``.
     """
 
-    def __init__(self, qm_estimator=None, trend_transformer=None):
+    def __init__(
+        self,
+        qm_estimator: BaseEstimator | None = None,
+        trend_transformer: LinearTrendTransformer | None = None,
+    ) -> None:
         self.qm_estimator = qm_estimator
         if trend_transformer is None:
             self.trend_transformer = LinearTrendTransformer()

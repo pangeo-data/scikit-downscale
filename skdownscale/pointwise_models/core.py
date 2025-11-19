@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import copy
+from typing import Any
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+from numpy.typing import DTypeLike
 
 DEFAULT_FEATURE_DIM = 'variable'
 
@@ -208,7 +212,7 @@ class PointWiseDownscaler:
         Dimension to apply the model along. Default is ``time``.
     """
 
-    def __init__(self, model, dim='time'):
+    def __init__(self, model: Any, dim: str = 'time') -> None:
         self._dim = dim
         self._model = model
         self._models = None
@@ -399,8 +403,8 @@ class PointWiseDownscaler:
             return _transform_wrapper(X, models=self._models, direction='inverse_transform', **kws)
 
     def get_attr(
-        self, key: str, dtype: str, template_output: xr.DataArray | None = None
-    ) -> xr.Dataset:
+        self, key: str, dtype: DTypeLike, template_output: xr.DataArray | xr.Dataset | None = None
+    ) -> xr.DataArray:
         """
         Get attribute values specified in key from each of the pointwise models
 

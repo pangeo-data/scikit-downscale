@@ -1,8 +1,13 @@
+from __future__ import annotations
+
+from typing import Any
+
 import numpy as np
 import pandas as pd
+from numpy.typing import ArrayLike, NDArray
 
 
-def check_max_features(array, n=1):
+def check_max_features(array: ArrayLike, n: int = 1) -> ArrayLike:
     if array.ndim == 1:
         pass
     elif array.ndim == 2:
@@ -20,7 +25,9 @@ def check_max_features(array, n=1):
     return array
 
 
-def ensure_samples_features(obj):
+def ensure_samples_features(
+    obj: pd.DataFrame | pd.Series | NDArray[Any],
+) -> pd.DataFrame | NDArray[Any]:
     """helper function to ensure sammples conform to sklearn format
     requirements
     """
@@ -36,7 +43,7 @@ def ensure_samples_features(obj):
     return obj  # hope for the best, probably better to raise an error here
 
 
-def default_none_kwargs(kwargs, copy=False):
+def default_none_kwargs(kwargs: dict[str, Any] | None, copy: bool = False) -> dict[str, Any]:
     if kwargs is not None:
         if copy:
             return kwargs.copy()

@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import warnings
+from typing import Any
 
 import pandas as pd
+from numpy.typing import ArrayLike
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_array, check_X_y
 
 
 class TimeSynchronousDownscaler(BaseEstimator):
-    def _check_X_y(self, X, y, **kwargs):
+    def _check_X_y(
+        self, X: ArrayLike, y: ArrayLike, **kwargs: Any
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         if isinstance(X, pd.DataFrame) and isinstance(y, pd.DataFrame):
             pd.testing.assert_index_equal(X.index, y.index)
             check_X_y(X, y)  # this may be inefficient
@@ -18,7 +24,7 @@ class TimeSynchronousDownscaler(BaseEstimator):
             y = pd.DataFrame(y, index=index)
         return X, y
 
-    def _check_array(self, array, **kwargs):
+    def _check_array(self, array: ArrayLike, **kwargs: Any) -> pd.DataFrame:
         if isinstance(array, pd.DataFrame):
             check_array(array)
         else:
@@ -29,7 +35,7 @@ class TimeSynchronousDownscaler(BaseEstimator):
 
         return array
 
-    def _check_n_features(self, X, reset):
+    def _check_n_features(self, X: ArrayLike, reset: bool) -> None:
         """Check and set n_features_in_ attribute.
 
         Parameters
@@ -66,8 +72,13 @@ class TimeSynchronousDownscaler(BaseEstimator):
         return tags
 
     def _validate_data(
-        self, X, y=None, reset: bool = True, validate_separately: bool = False, **check_params: dict
-    ):
+        self,
+        X: ArrayLike,
+        y: ArrayLike | None = None,
+        reset: bool = True,
+        validate_separately: bool = False,
+        **check_params: Any,
+    ) -> ArrayLike | tuple[ArrayLike, ArrayLike]:
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters

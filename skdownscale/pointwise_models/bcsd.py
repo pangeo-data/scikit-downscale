@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 import pandas as pd
 from sklearn.utils.validation import check_is_fitted
 
@@ -15,12 +19,12 @@ class BcsdBase(TimeSynchronousDownscaler):
 
     def __init__(
         self,
-        time_grouper=MONTH_GROUPER,
-        climate_trend_grouper=DAY_GROUPER,
-        climate_trend=MONTH_GROUPER,
-        return_anoms=True,
-        qm_kwargs=None,
-    ):
+        time_grouper: str | pd.Grouper | type[PaddedDOYGrouper] = MONTH_GROUPER,
+        climate_trend_grouper: str | pd.Grouper = DAY_GROUPER,
+        climate_trend: str | pd.Grouper = MONTH_GROUPER,
+        return_anoms: bool = True,
+        qm_kwargs: dict[str, Any] | None = None,
+    ) -> None:
         self.time_grouper = time_grouper
         self.climate_trend_grouper = climate_trend_grouper
         self.climate_trend = climate_trend
