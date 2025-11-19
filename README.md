@@ -6,3 +6,17 @@ Statistical downscaling and postprocessing models for climate and weather model 
 
 [![](https://img.shields.io/pypi/v/scikit-downscale.svg)](https://pypi.org/pypi/name/)
 ![Conda (channel only)](https://img.shields.io/conda/vn/conda-forge/scikit-downscale)
+
+## Development
+
+Sync the development environment with `uv`:
+
+```bash
+uv sync --all-groups
+```
+
+Run unit tests with:
+
+```bash
+uv run pytest
+```
