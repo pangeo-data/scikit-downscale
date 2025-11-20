@@ -31,6 +31,11 @@ extensions = [
 myst_enable_extensions = ['amsmath', 'colon_fence', 'deflist', 'html_image']
 myst_url_schemes = ['http', 'https', 'mailto']
 
+# Jupyter notebook config
+nb_execution_mode = 'auto'  # Don't execute notebooks during build
+nb_execution_allow_errors = False
+nb_execution_timeout = 300
+
 # sphinx-copybutton configurations
 copybutton_prompt_text = r'>>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: '
 copybutton_prompt_is_regexp = True
